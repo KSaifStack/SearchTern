@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import sqlite3
-import time
+import os
 
 def clean_text(text):
     text = text.replace("↳", "")                        # Remove arrow
@@ -58,7 +58,10 @@ def update_database():
     print("Running scraper...")
     target(data)
     
-    conn = sqlite3.connect("database.db")
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DB_PATH = os.path.join(BASE_DIR, "database.db")
+    conn = sqlite3.connect(DB_PATH)
+
     cursor = conn.cursor()
     
     cursor.execute("""
@@ -91,7 +94,7 @@ def search_location(x):
 
 #Tests
 # target(data)
-# update_database()
+update_database()
 # for comp in data.items():
    # print(comp)
 

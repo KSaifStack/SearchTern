@@ -1,2 +1,2 @@
-# Starts backend/fastapi 
-uvicorn backend.api:app --reload
+uvicorn backend.api:app --reload &
+cd frontend 
