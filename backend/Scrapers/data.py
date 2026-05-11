@@ -10,6 +10,7 @@ def clean_text(text):
     text = text.strip()                                  # Remove leftover whitespace
     return text
 
+data = {}
 
 def target(datatable):
     # Take the repo you want to scrape it to and format from
@@ -53,7 +54,7 @@ def target(datatable):
             datatable[id] = [company,role,location,date,link] 
 
 
-def update_database(data):
+def update_database():
     print("Running scraper...")
     target(data)
     
@@ -77,14 +78,20 @@ def update_database(data):
     
     conn.commit()
     conn.close()
-    print(f"Done! {len(data)} internships saved.")
+    return(f"Done! {len(data)} internships saved.")
 
+def search_location(x):
+    conn = sqlite3.connect("database.db")
+    rows = conn.execute(
+        "SELECT * FROM internships WHERE location LIKE ?",
+        [f"%{x}%"]
+    ).fetchall()
+    return rows
 
 
 #Tests
-data = {}
-target(data)
-update_database(data)
+# target(data)
+# update_database()
 # for comp in data.items():
    # print(comp)
 
