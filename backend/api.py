@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-import Scrapers.data
+import backend.scraper
+import backend.read_db
 # This connects the backend to the frontend using FastAPI
 # http://localhost:8000/ by default
 # to run/test the server run uvicorn backend.api:app --reload
@@ -13,7 +14,20 @@ def read_root():
 #Update DataBase
 @app.get("/update")
 def update_base():
-    return {"result": Scrapers.data.update_database()}
+    return {"result": backend.scraper.update_database()}
 
-#Search DataBase
-#
+#Search recent internships
+@app.get("/recent")
+def pull_recent():
+    return {"result": backend.read_db.recent_internships()}
+
+#Search location
+@app.get("/location")
+def location_base(searchterm:str):
+    return {"result": backend.read_db.search_location(searchterm)}
+
+#Search internships
+@app.get("/keywords")
+def keyword_base(searchterm:str):
+    return{"result":backend.read_db.find_keywords(searchterm)}
+
