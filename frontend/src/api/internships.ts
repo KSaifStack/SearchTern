@@ -7,27 +7,32 @@ fetch("http://localhost:8000/test")
   .catch(err => console.error("Fetch failed:", err));
 
 // pulls update Backend data via fastapi  
-async function pullUpdateBackend() {
-  const res = await fetch("http://localhost:8000/update");
-  const data = await res.json();
-  return data.result;
+export async function pullUpdateBackend() {
+    const res = await fetch("http://localhost:8000/update", {
+        method: "GET"
+    })
+    console.log(res.status)
+    const data = await res.json()
+    return data.result
 }
+
 // pulls recent internships via fastapi
-async function pullRecent(){
+export async function pullRecent(){
   const res = await fetch("http://localhost:8000/recent");
   const data = await res.json();
   return data.result;
 }
 
 // pulls internships based off location via fastapi
-async function pullLocation(searchterm){
+export async function pullLocation(searchterm:String){
     const res = await fetch("http://localhost:8000/location?searchterm=" + searchterm);  
     const data = await res.json();
   return data.result;
 }
 
+
 // pulls internships based off keyword via fastapi
-async function pullKeyword(searchterm){
+export async function pullKeyword(searchterm:String){
     const res = await fetch("http://localhost:8000/keywords?searchterm=" + searchterm);
     const data = await res.json();
     return data.result;
@@ -35,7 +40,5 @@ async function pullKeyword(searchterm){
 
 
 //Function tests
-const result = await pullUpdateBackend();
-const keywordtest = await pullLocation("Charlotte");
-console.log(keywordtest);
+pullUpdateBackend();
 

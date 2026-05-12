@@ -4,13 +4,16 @@ import re
 import sqlite3
 import os
 
+data = {}    
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "database.db")
+
 def clean_text(text):
-    text = text.replace("↳", "")                        # Remove arrow
-    text = re.sub(r'[^\x00-\x7F]+', '', text)           # Remove non-ASCII (emojis)
-    text = text.strip()                                  # Remove leftover whitespace
+    text = text.replace("↳", "")                        
+    text = re.sub(r'[^\x00-\x7F]+', '', text)           
+    text = text.strip()                                 
     return text
 
-data = {}
 
 def target(datatable):
     # Take the repo you want to scrape it to and format from
@@ -55,17 +58,16 @@ def target(datatable):
 
 
 def update_database():
-    print("Running scraper...")
+    print("Running scraper for Simplify-2026...")
     target(data)
     
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    DB_PATH = os.path.join(BASE_DIR, "database.db")
     conn = sqlite3.connect(DB_PATH)
 
     cursor = conn.cursor()
     
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS internships (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             company TEXT,
             role TEXT,
             location TEXT,

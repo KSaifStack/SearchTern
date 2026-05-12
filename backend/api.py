@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 import backend.scraper
 import backend.read_db
+import os
 # This connects the backend to the frontend using FastAPI
 # http://localhost:8000/ by default
 # to run/test the server run uvicorn backend.api:app --reload
