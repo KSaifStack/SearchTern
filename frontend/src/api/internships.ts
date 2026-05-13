@@ -1,3 +1,4 @@
+const api_key = "api go brr";
 // This test frontend to backend(fastapi)
 fetch("http://localhost:8000/test")
   .then(res => res.json())
@@ -9,7 +10,11 @@ fetch("http://localhost:8000/test")
 // pulls update Backend data via fastapi  
 export async function pullUpdateBackend() {
     const res = await fetch("http://localhost:8000/update", {
-        method: "GET"
+      method: "POST",
+      headers: {
+            "X-API-Key": api_key,   // Same key as in .env
+        }
+
     })
     console.log(res.status)
     const data = await res.json()
@@ -38,7 +43,4 @@ export async function pullKeyword(searchterm:String){
     return data.result;
 }
 
-
-//Function tests
-pullUpdateBackend();
 

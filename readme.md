@@ -28,3 +28,29 @@ The process is exhausting, unorganized, and overwhelming.</div>
 <li>Auth — JWT, bcrypt</li>
 <li>AI — Unknown at the moment</li>
 </ul>
+
+<h2>Build Instructions</h2>
+<p>Prerequisites: Python 3.8+, Node.js 16+, PostgreSQL</p>
+
+<ol>
+<li>Clone the repository and navigate to the project directory.</li>
+<li>Install backend dependencies:
+<pre><code>cd backend
+pip install -r requirements.txt</code></pre>
+</li>
+<li>Install frontend dependencies:
+<pre><code>cd ../frontend
+npm install</code></pre>
+</li>
+<li>Set up the database (PostgreSQL) and configure connection in backend code.</li>
+<li>Run the backend server:
+<pre><code>cd ../backend
+uvicorn api:app --reload</code></pre>
+</li>
+<li>In a new terminal, run the frontend development server:
+<pre><code>cd frontend
+npm run dev</code></pre>
+</li>
+<li>Open <a href="http://localhost:5173">http://localhost:5173</a> in your browser for the frontend, and the backend will be available at <a href="http://localhost:8000">http://localhost:8000</a>.</li>
+</ol>
+<p>Alternatively, use the provided <code>start.sh</code> script after installing dependencies (ensure uvicorn and vite are available globally or adjust paths).</p>

@@ -77,10 +77,10 @@ def update_database():
     """)
     
     cursor.execute("DELETE FROM internships")  # clear old data
+    cursor.execute("DELETE FROM sqlite_sequence WHERE name='internships'")
     
     for id, info in data.items():
-        cursor.execute("INSERT INTO internships VALUES (?,?,?,?,?)", info)
-    
+        cursor.execute("INSERT INTO internships (company, role, location, date, link) VALUES (?,?,?,?,?)", info)        
     conn.commit()
     conn.close()
     return(f"Done! {len(data)} internships saved.")
@@ -97,6 +97,5 @@ def search_location(x):
 #Tests
 # target(data)
 update_database()
-# for comp in data.items():
-   # print(comp)
+
 

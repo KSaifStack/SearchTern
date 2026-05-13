@@ -18,7 +18,8 @@ def search_location(x):
 # Get only recent ones
 def recent_internships():
     conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute("SELECT * FROM internships WHERE date = '0d'").fetchall()
+    rows = conn.execute("SELECT * FROM internships ORDER BY date").fetchall()
+    conn.close()
     return rows
 
 
@@ -31,8 +32,6 @@ def find_keywords(x):
     return rows
 
 #Test
-print(search_location("Charlotte"))
 print(recent_internships())
-print(find_keywords("AI"))
 
 

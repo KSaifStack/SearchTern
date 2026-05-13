@@ -24,4 +24,6 @@ dist-ssr
 *.sw?
 database.db
 .vscode
+.env
+frontend/.env
 
