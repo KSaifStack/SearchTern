@@ -1,7 +1,7 @@
 // This will handles job data from api
 import { pullUpdateBackend,pullRecent,pullLocation,pullKeyword } from "../api/internships.ts"; 
 
-interface Jobs{
+interface Job{
     id: number,
     company: string,
     role: string,
@@ -10,9 +10,9 @@ interface Jobs{
     link: string   
 }
 
-const jobCache: Record<string, Jobs[]> = {}
+const jobCache: Record<string, Job[]> = {}
 let lastRefreshed: Date | null = null;
-let recentCache: Jobs[] = []
+let recentCache: Job[] = []
 
 function getCacheKey(searchterm: string): string {
     const hour = new Date().getHours()
