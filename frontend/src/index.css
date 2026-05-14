@@ -41,7 +41,6 @@ padding: 30px 20px;
 }
 
 
-
 /* Feature Cards */
 .feature {
 border-radius: var(--radius);
@@ -58,9 +57,32 @@ transition: transform var(--transition), box-shadow var(--transition);
 }
 
 /* Subheader */
-#subhead{
+#subhead {
    color: var(--accent-color);
    font-size: 24px;
 
 }
+
+/* Buttons */
+button {
+font-size: 14px;
+background-color: var(--button-color);
+color: white;
+width: auto; 
+margin: 4px;
+white-space: nowrap; 
+border: none;
+border-radius: 4px;
+padding: 10px 20px;
+transition: background-color 0.2s ease, transform 0.15s;
+cursor: pointer;
+
+}
+
+button:hover {
+background-color: var(--button-hover-color);
+transform: translateY(-1px);
+box-shadow: 0 3px 10px rgba(45,122,79,0.3);
+}
+
 

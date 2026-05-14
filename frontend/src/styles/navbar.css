@@ -16,6 +16,11 @@
     margin: 0;
 }
 
+.Logo {
+    display: flex;
+    align-items: center;
+}
+
 .accent{
 color:#2d7a4f;
 }

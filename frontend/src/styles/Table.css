@@ -1,0 +1,90 @@
+
+
+.mantine-Table-thead {
+  text-align: left; 
+  padding: 12px 15px; 
+  border-bottom: 1px solid var(#e0e0e0);
+}
+
+.mantine-Table-th {
+    color:  #94a3b8;
+    padding: 10px 16px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+
+.mantine-Table-td {
+  color: #334155;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 12px;
+  transition: all 0.15s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3a9e6e;
+  box-shadow: 0 0 0 2px rgba(58, 158, 110, 0.15);
+}
+
+.result-count {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 10px;
+}
+
+.check-btn {
+    width: 15px;
+    height: 15px;
+}
+
+.apply_btn {
+  background-color: transparent;
+  color: forestgreen;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+}
+.apply_btn:hover{
+    color: white;
+}
+
+/* Active/selected page */
+.mantine-Pagination-control[data-active] {
+  background-color: #3a9e6e;
+  border-color: #3a9e6e;
+  color: white;
+}
+
+.mantine-Menu-item:hover {
+  background-color: #f1f3f5;
+  color: #3a9e6e;
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.sort_btn {
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}

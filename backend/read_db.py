@@ -12,15 +12,18 @@ def search_location(x):
         "SELECT * FROM internships WHERE location LIKE ?",
         [f"%{x}%"]
     ).fetchall()
-    return rows
+    return [dict(row) for row in rows]
+
 
 
 # Get only recent ones
 def recent_internships():
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     rows = conn.execute("SELECT * FROM internships ORDER BY date").fetchall()
     conn.close()
-    return rows
+    return [dict(row) for row in rows]
+
 
 
 # Search by role keywords
@@ -29,9 +32,8 @@ def find_keywords(x):
     rows = conn.execute(
         "SELECT * FROM internships WHERE role LIKE ?",
         [f"%{x}%"]).fetchall()
-    return rows
+    conn.close()
+    return [dict(row) for row in rows]
 
-#Test
-print(recent_internships())
 
 

@@ -73,7 +73,6 @@ export async function getDatabase() {
     if (!result) return { success: false }
     return { success: true }
 }
-console.log(await getDatabase());
 
 
 

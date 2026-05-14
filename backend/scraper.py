@@ -76,8 +76,12 @@ def update_database():
         )
     """)
     
-    cursor.execute("DELETE FROM internships")  # clear old data
-    cursor.execute("DELETE FROM sqlite_sequence WHERE name='internships'")
+    cursor.execute("DELETE FROM internships")
+    try:
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='internships'")
+    except sqlite3.OperationalError:
+        pass
+    
     
     for id, info in data.items():
         cursor.execute("INSERT INTO internships (company, role, location, date, link) VALUES (?,?,?,?,?)", info)        
