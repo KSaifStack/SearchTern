@@ -10,8 +10,18 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Start services
-pkill -f uvicorn
-uvicorn backend.api:app --reload &
-cd frontend && npm run dev &
+# Kill any existing uvicorn process
+pkill -f uvicorn 2>/dev/null
+
+echo "Starting SearchTern..."
+
+# Install backend deps and start
+(cd "$(dirname "$0")/backend" && pip install -r requirements.txt && python -m uvicorn api:app --reload) &
+
+# Install frontend deps and start
+(cd "$(dirname "$0")/frontend" && npm install && npm run dev) &
+
+echo "Backend running at http://localhost:8000"
+echo "Frontend running at http://localhost:5173"
+
 wait

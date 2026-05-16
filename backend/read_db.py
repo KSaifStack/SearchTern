@@ -38,5 +38,4 @@ def find_keywords(x):
     ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
-
-print(recent_internships())
+

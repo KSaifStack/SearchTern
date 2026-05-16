@@ -26,4 +26,6 @@ database.db
 .vscode
 .env
 frontend/.env
+backend/.env
+frontend/.env.local
 

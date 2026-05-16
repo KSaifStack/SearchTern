@@ -103,16 +103,10 @@ def update_database():
     conn.close()
     return(f"Done! {len(data)} internships saved.")
 
-def search_location(x):
-    conn = sqlite3.connect("database.db")
-    rows = conn.execute(
-        "SELECT * FROM internships WHERE location LIKE ?",
-        [f"%{x}%"]
-    ).fetchall()
-    return rows
 
+if __name__ == "__main__":
+    target(data)
+    print(data)
+    update_database()
 
-target(data)
-print(data)
-update_database()
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { Table, Pagination,Menu, MenuDropdown } from '@mantine/core'
 import {BookmarkSimpleIcon}  from '@phosphor-icons/react';
 import "../styles/Table.css"
-import { getRecent,getDatabase } from "../services/internshipmanager"
+import { getRecent } from "../services/internshipmanager"
 
 
 interface Job {
@@ -22,7 +22,7 @@ function Jobs() {
   const [loading, setLoading] = useState(true)
   const [timeRemaining, setTimeRemaining] = useState("1:00:00")
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
-  const perPage = 15 // Jobs per page
+  const perPage = 15; 
 
   
   useEffect(() => {
@@ -50,21 +50,15 @@ useEffect(() => {
   
   
   setTimeRemaining(format(seconds))
-
   const interval = setInterval(async () => {
     seconds -= 1
     if (seconds <= 0) {
-      seconds = 3600
-      setJobs([])
-    const res = await getDatabase()
-    console.log("update result:", res.data)
-    if (res.success) setJobs([...res.data])
-    
-      
+      seconds = getSecondsUntilNextHour()
+      const res = await getRecent()
+      if (res.success) setJobs([...res.data])
     }
     setTimeRemaining(format(seconds))
-
-}, 1000)
+  }, 1000)
 
   return () => clearInterval(interval)
   

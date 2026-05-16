@@ -2,5 +2,6 @@ fastapi[standard]
 uvicorn
 requests
 beautifulsoup4
-schedule
 slowapi
+apscheduler
+python-dotenv

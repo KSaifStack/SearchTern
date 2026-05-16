@@ -21,11 +21,12 @@ function Tracker() {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            <Table.Td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
+            <Table.Tr>
+              <Table.Td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
                 No applications found. Add an application or save a job to get started!
-            </Table.Td>
+              </Table.Td>
+            </Table.Tr>
             {/* rows will go here */}
-
           </Table.Tbody>
         </Table>
       </section>
