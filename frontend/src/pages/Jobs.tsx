@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react"
-import { Table, Pagination,Menu, Button, MenuDropdown } from '@mantine/core'
-//import { GearSixIcon, MagnifyingGlassIcon, ImageIcon, ChatCircleIcon, TrashIcon, IconArrowsLeftRight } from '@phosphor-icons/react';
+import { Table, Pagination,Menu, MenuDropdown } from '@mantine/core'
+import {BookmarkSimpleIcon}  from '@phosphor-icons/react';
 import "../styles/Table.css"
-import { getRecent } from "../services/internshipmanager"
+import { getRecent,getDatabase } from "../services/internshipmanager"
+
 
 interface Job {
   id: number
   company: string
   role: string
   location: string
-  date: string
+  date: string 
   link: string
 }
 
@@ -19,21 +20,88 @@ function Jobs() {
   const [saved, setSaved] = useState<Set<number>>(new Set())
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [timeRemaining, setTimeRemaining] = useState("1:00:00")
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
   const perPage = 15 // Jobs per page
 
+  
   useEffect(() => {
   getRecent().then(res => {
-    console.log(res) 
-    if(res.success) setJobs(res.data)
+    if(res.success) setJobs([...res.data])
+    console.log("Sample job dates:", res.data.slice(0, 5).map(j => j.date));
     setLoading(false)
   })
 }, [])
 
-  const filtered = jobs.filter(job =>
+useEffect(() => {
+  const getSecondsUntilNextHour = () => {
+  const now = new Date()
+  const secondsElapsed = now.getMinutes() * 60 + now.getSeconds()
+  return 3600 - secondsElapsed
+}
+  let seconds = getSecondsUntilNextHour()
+
+  const format = (s: number) => {
+    const m = Math.floor(s / 60).toString().padStart(2, '0')
+    const sec = (s % 60).toString().padStart(2, '0')
+    return `${m}:${sec}`
+  }
+
+  
+  
+  setTimeRemaining(format(seconds))
+
+  const interval = setInterval(async () => {
+    seconds -= 1
+    if (seconds <= 0) {
+      seconds = 3600
+      setJobs([])
+    const res = await getDatabase()
+    console.log("update result:", res.data)
+    if (res.success) setJobs([...res.data])
+    
+      
+    }
+    setTimeRemaining(format(seconds))
+
+}, 1000)
+
+  return () => clearInterval(interval)
+  
+}, [])
+
+const DatetoNum = (val: string | number) => {
+  if (typeof val === 'number') return val;
+  const parsed = parseFloat(val);
+  return !isNaN(parsed) ? parsed : 999;
+}
+
+const formatRelativeDate = (val: string | number) => {
+  const days = DatetoNum(val);
+  
+  if (days === 999) return "N/A";
+  if (days === 0) return "24 hours ago ";
+  if (days > 0 && days < 1) return "< 1 day ago"; 
+  if (days === 1) return "1 day ago";
+  if (days >= 30) {
+    const months = Math.floor(days / 30);
+    return `${months} month${months > 1 ? 's' : ''} ago`;
+  }
+  return `${days} days ago`;
+}
+
+const filtered = jobs
+  .filter((job: any) => job && job.company)
+  .filter(job =>
     job.company.toLowerCase().includes(search.toLowerCase()) ||
     job.role.toLowerCase().includes(search.toLowerCase()) ||
     job.location.toLowerCase().includes(search.toLowerCase())
   )
+  .sort((a, b) => {
+    const aNum = DatetoNum(a.date);
+    const bNum = DatetoNum(b.date);
+    return sortOrder === 'newest' ? aNum - bNum : bNum - aNum;
+  });
 
   const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
@@ -45,10 +113,13 @@ function Jobs() {
     })
   }
 
+  
+  
+
   return (
     <>
       <section className="feature">
-        <p>Refreshes in: 1:00:00</p>
+        <p className="result-count">Refreshes in: {timeRemaining}</p>
         <input
           className="search-input"
           placeholder="Search by company, role, or location..."
@@ -59,13 +130,15 @@ function Jobs() {
         <p className="result-count">{filtered.length} internships found</p>
         <Menu shadow="md" width={200}>
           <Menu.Target>
-            <button className="sort_btn">Sort By: </button>
+            <button className="sort_btn">
+              Sort By: {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
+            </button> 
           </Menu.Target>
           <MenuDropdown>
-            <Menu.Item>
+            <Menu.Item onClick={() => setSortOrder('newest')}>
               Newest Listing
             </Menu.Item>
-            <Menu.Item>
+            <Menu.Item onClick={() => setSortOrder('oldest')}>
               Oldest Listing
             </Menu.Item>
           </MenuDropdown>
@@ -79,31 +152,29 @@ function Jobs() {
               <Table.Th>Role</Table.Th>
               <Table.Th>Location</Table.Th>
               <Table.Th>Date</Table.Th>
-              <Table.Th>Apply</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {loading ? (
               <Table.Tr>
-                <Table.Td colSpan={6} className="empty-state">Loading...</Table.Td>
+                <Table.Td colSpan={5} className="empty-state">Loading...</Table.Td>
               </Table.Tr>
             ) : paginated.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={6} className="empty-state">No internships found! check your internet connection.</Table.Td>
+                <Table.Td colSpan={5} className="empty-state">No internships found!</Table.Td>
               </Table.Tr>
             ) : (
               paginated.map(job => (
                 <Table.Tr key={job.id}>
               
-                  <Table.Td>{job.company}</Table.Td>
-                  <Table.Td>{job.role}</Table.Td>
-                  <Table.Td>{job.location}</Table.Td>
-                  <Table.Td>{job.date}</Table.Td>
+                  <Table.Td className="company-cell">{<BookmarkSimpleIcon size={25} className="bookmark-icon" />}{job.company}</Table.Td>
                   <Table.Td>
                     <a href={job.link} target="_blank" rel="noreferrer" className="apply-link">
-                      <button className="apply_btn">➜</button>
+                    {job.role}
                     </a>
-                  </Table.Td>
+                    </Table.Td>
+                  <Table.Td>{job.location}</Table.Td>
+                  <Table.Td>{formatRelativeDate(job.date)}</Table.Td>
                 </Table.Tr>
               ))
             )}

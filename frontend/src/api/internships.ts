@@ -1,4 +1,4 @@
-const api_key = "api go brr";
+const api_key = "84e247280b88c583cd7037552b9ccfe52680be3496b2b53b8d201332a8099faa";
 // This test frontend to backend(fastapi)
 fetch("http://localhost:8000/test")
   .then(res => res.json())

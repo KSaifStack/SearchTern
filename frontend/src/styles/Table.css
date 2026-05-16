@@ -46,21 +46,22 @@
     height: 15px;
 }
 
-.apply_btn {
-  background-color: transparent;
-  color: forestgreen;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.apply-link {
+  color: #2d7a4f;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s;
+}
 
+.apply-link:hover {
+  color: #2d7a4f;
+  text-decoration: underline;
 }
-.apply_btn:hover{
-    color: white;
+
+.apply-link:visited {
+  color: #7a9e8e; 
 }
+
 
 /* Active/selected page */
 .mantine-Pagination-control[data-active] {
@@ -87,4 +88,28 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+  border: 1.5px solid #e2e8f0;
+  background: transparent;
+  color: #475569;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.sort_btn:hover {
+  color: white;
+}
+
+.company-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bookmark-icon {
+  cursor: pointer;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.bookmark-icon:hover {
+  color: var(--accent-color);
 }

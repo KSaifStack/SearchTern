@@ -52,7 +52,8 @@ def health():
 @app.post("/update")
 @limiter.limit("5/minute")
 def update_base(request: Request,verified=Depends(verify_key)):
-    return {"result": scraper.update_database()}
+    scraper.update_database()
+    return {"result": read_db.recent_internships()}
 
 #Search recent internships
 @app.get("/recent")

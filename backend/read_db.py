@@ -8,10 +8,12 @@ DB_PATH = os.path.join(BASE_DIR, "database.db")
 # Get only Charlotte internships
 def search_location(x):
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row  
     rows = conn.execute(
-        "SELECT * FROM internships WHERE location LIKE ?",
+        "SELECT rowid as id, * FROM internships WHERE location LIKE ?",
         [f"%{x}%"]
     ).fetchall()
+    conn.close()
     return [dict(row) for row in rows]
 
 
@@ -20,7 +22,7 @@ def search_location(x):
 def recent_internships():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    rows = conn.execute("SELECT * FROM internships ORDER BY date").fetchall()
+    rows = conn.execute("SELECT rowid as id, * FROM internships ORDER BY date").fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
@@ -29,11 +31,12 @@ def recent_internships():
 # Search by role keywords
 def find_keywords(x):
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row  
     rows = conn.execute(
-        "SELECT * FROM internships WHERE role LIKE ?",
-        [f"%{x}%"]).fetchall()
+        "SELECT rowid as id, * FROM internships WHERE role LIKE ?",
+        [f"%{x}%"]
+    ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-
-
+print(recent_internships())

@@ -8,12 +8,24 @@ data = {}
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database.db")
 
+# Removes arrows missing, company tags and 
 def clean_text(text):
     text = text.replace("↳", "")                        
     text = re.sub(r'[^\x00-\x7F]+', '', text)           
     text = text.strip()                                 
     return text
 
+def sort_date(date:str):
+    match = re.match(r'(\d+)([a-z]+)', date)
+    if not match:
+        return date
+    day = int(match.group(1))
+    type = match.group(2).lower()
+    if(type=="mo"):
+        day=day*30
+        return day 
+    return str(day)
+    
 
 def target(datatable):
     # Take the repo you want to scrape it to and format from
@@ -54,6 +66,8 @@ def target(datatable):
                 company = last_company
             else:
                 last_company=company
+            # Change date here 
+            date= sort_date(date)   
             datatable[id] = [company,role,location,date,link] 
 
 
@@ -98,8 +112,7 @@ def search_location(x):
     return rows
 
 
-#Tests
-# target(data)
+target(data)
+print(data)
 update_database()
-
 

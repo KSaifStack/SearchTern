@@ -19,6 +19,8 @@
 .Logo {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
+
 }
 
 .accent{
@@ -26,10 +28,16 @@ color:#2d7a4f;
 }
 
 nav {
+display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.nav-right {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 20px;
+    justify-content: flex-end;
+
 }
 
 nav a {

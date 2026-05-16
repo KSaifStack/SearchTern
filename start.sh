@@ -11,6 +11,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # Start services
+pkill -f uvicorn
 uvicorn backend.api:app --reload &
 cd frontend && npm run dev &
 wait

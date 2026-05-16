@@ -70,8 +70,18 @@ export async function getRecent() {
 
 export async function getDatabase() {
     const result = await pullUpdateBackend()
-    if (!result) return { success: false }
-    return { success: true }
+    console.log("raw result:", result)
+    if (!result) return { success: false, data: [] }
+    recentCache = result  
+    lastRefreshed = new Date()
+    return { success: true, data: result }
+}
+
+
+export function clearCache() {
+  recentCache = []
+  lastRefreshed = null
+  Object.keys(jobCache).forEach(key => delete jobCache[key])  
 }
 
 

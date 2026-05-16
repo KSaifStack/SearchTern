@@ -11,8 +11,8 @@ function Navbar() {
             <img src={logo} alt="Logo" height="55"></img>
             </ul>
             <ul className="nav-left">
-                <li><Link to = "/jobs">Job-Finder</Link></li>
-                <li><Link to = "/tracker">Job-Tracker</Link></li>
+                <li><Link to = "/jobs">Internships</Link></li>
+                <li><Link to = "/tracker">Applications</Link></li>
             </ul>
             <ul className="nav-right">
                 <li><Link to ="/signup">Sign-up</Link></li>
