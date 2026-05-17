@@ -1,0 +1,100 @@
+.home-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.home-card {
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 28px !important;
+}
+
+.home-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-slate);
+}
+
+.home-card-title {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+}
+
+.home-card-link {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-color);
+    text-decoration: none;
+}
+.home-card-link:hover { text-decoration: underline; }
+
+/* ── Recent Jobs rows ─────────────────────────────────────── */
+.recent-job-row {
+    display: grid;
+    grid-template-columns: 3fr 4fr auto;
+    align-items: start;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border-slate);
+    text-decoration: none;
+    transition: background 0.12s;
+}
+.recent-job-row:last-child { border-bottom: none; }
+.recent-job-row:hover .recent-job-company { color: var(--accent-color); }
+
+.recent-job-company {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-dark);
+    line-height: 1.4;
+    transition: color 0.12s;
+}
+.recent-job-role {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+.recent-job-location {
+    font-size: 12px;
+    color: var(--text-light);
+    white-space: nowrap;
+    text-align: right;
+    margin-top: 2px;
+}
+
+
+
+/* ── Activity rows ────────────────────────────────────────── */
+.activity-row {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--border-slate);
+}
+.activity-row:last-child { border-bottom: none; }
+
+.activity-text { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+.activity-text strong { color: var(--text-dark); font-weight: 600; }
+.activity-time { font-size: 11px; color: var(--text-light); margin: 3px 0 0; }
+
+/* ── Empty states ─────────────────────────────────────────── */
+.home-empty {
+    font-size: 13px;
+    color: var(--text-light);
+    text-align: center;
+    padding: 32px 0;
+    margin: auto;
+}
+
+/* ── Mobile ───────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .home-columns { grid-template-columns: 1fr; }
+    .recent-job-row { grid-template-columns: 1fr 1fr; }
+    .recent-job-location { display: none; }
+}

@@ -118,12 +118,12 @@ function Tracker() {
     };
 
     const ringData = totalTracked > 0 ? [
-        { value: (stats.saved / totalTracked) * 100, color: 'gray' },
-        { value: (stats.applied / totalTracked) * 100, color: 'blue' },
-        { value: (stats.interview / totalTracked) * 100, color: 'yellow' },
-        { value: (stats.offer / totalTracked) * 100, color: 'green' },
-        { value: (stats.rejected / totalTracked) * 100, color: 'red' },
-    ].filter(segment => segment.value > 0) : [{ value: 100, color: '#f1f3f5' }];
+        { value: (stats.saved / totalTracked) * 100, color: 'gray', tooltip: `Saved: ${stats.saved}` },
+        { value: (stats.applied / totalTracked) * 100, color: 'blue', tooltip: `Applied: ${stats.applied}` },
+        { value: (stats.interview / totalTracked) * 100, color: 'yellow', tooltip: `Interview: ${stats.interview}` },
+        { value: (stats.offer / totalTracked) * 100, color: 'green', tooltip: `Offer: ${stats.offer}` },
+        { value: (stats.rejected / totalTracked) * 100, color: 'red', tooltip: `Rejected: ${stats.rejected}` },
+    ].filter(segment => segment.value > 0) : [{ value: 100, color: '#f1f3f5', tooltip: 'No data yet' }];
 
     const exportToCSV = () => {
         if (!trackedJobs || trackedJobs.length === 0) {
@@ -158,24 +158,13 @@ function Tracker() {
 
     return (
         <div style={{ width: 'max-content', maxWidth: '100%', margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div>
-                    <button onClick={() => openModal()}>+ Add Application</button>
-                    <button 
-                        onClick={exportToCSV}
-                        style={{ backgroundColor: 'transparent', color: 'var(--font-color)', border: '1px solid var(--border-medium)' }}
-                    >
-                        Export CSV
-                    </button>
-                </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', marginTop: '10px' }}>
+                <Text size="xl" fw={800} c="var(--text-dark)" style={{ fontSize: '1.75rem' }}>Application Tracker</Text>
+                <button onClick={() => openModal()} style={{ padding: '10px 24px', fontWeight: 600 }}>+ Add Application</button>
             </div>
 
             <section className="feature" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px', margin: '0 0 20px 0', width: '100%', boxSizing: 'border-box' }}>
                 <div style={{ display: 'flex', flexGrow: 1, justifyContent: 'space-around', paddingRight: '40px' }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <Text c="dimmed" size="xs" tt="uppercase" fw={700}>Total</Text>
-                        <Text fw={700} size="xl">{totalTracked}</Text>
-                    </div>
                     <div style={{ textAlign: 'center' }}>
                         <Text c="dimmed" size="xs" tt="uppercase" fw={700}>Applied</Text>
                         <Text fw={700} size="xl">{totalApplied}</Text>
@@ -196,18 +185,27 @@ function Tracker() {
 
                 <Divider orientation="vertical" />
 
-                <div style={{ paddingLeft: '40px' }}>
+                <div style={{ paddingLeft: '40px', display: 'flex', alignItems: 'center', gap: '20px' }}>
                     <RingProgress
-                        size={100}
+                        size={120}
                         thickness={12}
                         roundCaps
                         sections={ringData}
                         label={
-                            <Text c="dimmed" ta="center" size="xs" fw={700}>
-                                {totalTracked > 0 ? 'Stats' : 'No Data'}
-                            </Text>
+                            <div style={{ textAlign: 'center', marginTop: '-4px' }}>
+                                <Text fw={800} size="xl" lh={1}>{totalTracked > 0 ? totalTracked : 0}</Text>
+                                <Text c="dimmed" size="xs" tt="uppercase" fw={700} mt={2}>Total</Text>
+                            </div>
                         }
                     />
+                    <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {ringData.filter(d => d.tooltip !== 'No data yet').map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: item.color === 'gray' ? '#868e96' : item.color === 'blue' ? '#228be6' : item.color === 'yellow' ? '#fab005' : item.color === 'green' ? '#40c057' : '#fa5252' }} />
+                                <Text size="xs" c="dimmed" fw={600}>{item.tooltip}</Text>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </section>
 
@@ -227,6 +225,15 @@ function Tracker() {
                     {activeJob ? <JobCard job={activeJob} /> : null}
                 </DragOverlay>
             </DndContext>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', paddingRight: '10px' }}>
+                <button 
+                    onClick={exportToCSV}
+                    style={{ backgroundColor: 'transparent', color: 'var(--text-light)', border: 'none', fontSize: '12px', textDecoration: 'underline', padding: 0, margin: 0, boxShadow: 'none' }}
+                >
+                    Export tracking data to CSV
+                </button>
+            </div>
 
             <JobModal 
                 opened={modalOpen} 

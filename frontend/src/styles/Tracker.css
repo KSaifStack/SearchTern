@@ -50,6 +50,12 @@
     border: 1px solid var(--border-light);
 }
 
+.card-status-saved { border-left: 3px solid #94a3b8; }
+.card-status-applied { border-left: 3px solid #3b82f6; }
+.card-status-interview { border-left: 3px solid #f59e0b; }
+.card-status-offer { border-left: 3px solid #22c55e; }
+.card-status-rejected { border-left: 3px solid #ef4444; }
+
 .tracker-card:hover {
     box-shadow: 0 2px 5px var(--shadow-sm);
 }
@@ -59,12 +65,14 @@
     font-weight: bold;
     color: var(--text-dark);
     margin: 0 0 4px 0;
+    line-height: 1.4;
 }
 
 .card-role {
     font-size: 13px;
     color: var(--text-muted);
     margin: 0 0 12px 0;
+    line-height: 1.4;
 }
 
 .card-footer {

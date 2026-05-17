@@ -6,21 +6,32 @@ import { CSS } from '@dnd-kit/utilities';
 import type { JobStatus, TrackedJob } from './TrackerContext';
 
 export const STATUS_COLORS: Record<JobStatus, string> = {
-    'Saved': 'gray',
-    'Applied': 'blue',
-    'Interview': 'yellow',
-    'Offer': 'green',
-    'Rejected': 'red'
+    'Saved': '#94a3b8',
+    'Applied': '#3b82f6',
+    'Interview': '#f59e0b',
+    'Offer': '#22c55e',
+    'Rejected': '#ef4444'
 };
 
 export const JobCard = ({ job, onClick }: { job: TrackedJob, onClick?: () => void }) => {
+    const companyDomain = `${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com`;
     return (
-        <div className="tracker-card" onClick={onClick}>
-            <h4 className="card-company">{job.company}</h4>
+        <div className={`tracker-card card-status-${job.status.toLowerCase()}`} onClick={onClick}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <img 
+                    src={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=32`}
+                    style={{ width: '16px', height: '16px', borderRadius: '2px' }}
+                    onError={(e) => e.currentTarget.style.display = 'none'}
+                    alt=""
+                />
+                <h4 className="card-company" style={{ margin: 0 }}>{job.company}</h4>
+            </div>
             <p className="card-role">{job.role}</p>
             <div className="card-footer">
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>{job.location}</span>
-                <Badge color={STATUS_COLORS[job.status]} size="sm" variant="light">{job.status}</Badge>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>{job.location}</span>
+                <span style={{ color: 'var(--text-light)', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                    {job.dateApplied ? new Date(job.dateApplied).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Added today'}
+                </span>
             </div>
         </div>
     );
@@ -61,9 +72,9 @@ export const Column = ({ status, jobs, onEdit, onAdd }: { status: JobStatus, job
 
     return (
         <div className="tracker-column">
-            <div className="column-header">
+            <div className="column-header" style={{ color: STATUS_COLORS[status] }}>
                 <span>{status}</span>
-                <span className="column-count">{jobs.length}</span>
+                <span className="column-count" style={{ backgroundColor: `${STATUS_COLORS[status]}22`, color: STATUS_COLORS[status] }}>{jobs.length}</span>
             </div>
             
             <SortableContext items={jobs.map(j => j.id)} strategy={verticalListSortingStrategy}>
@@ -72,13 +83,12 @@ export const Column = ({ status, jobs, onEdit, onAdd }: { status: JobStatus, job
                         <SortableJobCard key={job.id} job={job} onEdit={onEdit} />
                     ))}
                     {jobs.length === 0 && (
-                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-light)', fontSize: '14px' }}>
-                            No applications yet
+                        <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-light)', fontSize: '13px', border: '1px dashed var(--border-medium)', borderRadius: '6px', margin: '10px 0' }}>
+                            {status === 'Saved' ? 'Drop jobs here to track later' : 'No applications here'}
                         </div>
                     )}
                 </div>
             </SortableContext>
-            <button className="add-card-btn" onClick={() => onAdd(status)}>+ Add a job</button>
         </div>
     );
 };

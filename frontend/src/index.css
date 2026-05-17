@@ -1,47 +1,63 @@
 :root {
---accent-color: #2d7a4f;
---button-color: #3aa76d;
---button-hover-color: #2d7a4f;
---font-color: #1a1a1a;
---feature-color: #ffffff;
---header-bg: #ffffff;
---page-bg: #f5f7f9;
---shadow: 0 2px 8px rgba(0,0,0,0.08);
---white: #ffffff;
---text-dark: #172b4d;
---text-muted: #5e6c84;
---text-light: #8993a4;
---text-gray: #888;
---text-slate: #475569;
---table-th-color: #94a3b8;
---table-td-color: #334155;
---badge-bg: #e4e6ea;
---hover-bg: rgba(9, 30, 66, 0.08);
---menu-hover-bg: #f1f3f5;
---border-light: #e0e0e0;
---border-medium: #ddd;
---border-slate: #e2e8f0;
---primary-green: #3a9e6e;
---primary-green-light: rgba(58, 158, 110, 0.15);
---link-visited: #7a9e8e;
---shadow-light: rgba(0,0,0,0.1);
---shadow-sm: rgba(9, 30, 66, 0.15);
---shadow-md: rgba(9, 30, 66, 0.25);
+    --accent-color: #2d7a4f;
+    --button-color: #3aa76d;
+    --button-hover-color: #2d7a4f;
+    --font-color: #1a1a1a;
+    --feature-color: #ffffff;
+    --header-bg: #ffffff;
+    --page-bg: #f8f7f4;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --white: #ffffff;
+    --text-dark: #172b4d;
+    --text-muted: #5e6c84;
+    --text-light: #8993a4;
+    --text-gray: #888;
+    --text-slate: #475569;
+    --table-th-color: #94a3b8;
+    --table-td-color: #334155;
+    --badge-bg: #e4e6ea;
+    --hover-bg: rgba(9, 30, 66, 0.08);
+    --menu-hover-bg: #f1f3f5;
+    --border-light: #e0e0e0;
+    --border-medium: #ddd;
+    --border-slate: #e2e8f0;
+    --primary-green: #3a9e6e;
+    --primary-green-light: rgba(58, 158, 110, 0.15);
+    --link-visited: #7a9e8e;
+    --shadow-light: rgba(0, 0, 0, 0.1);
+    --shadow-sm: rgba(9, 30, 66, 0.15);
+    --shadow-md: rgba(9, 30, 66, 0.25);
 }
 
 * {
-  font-family: 'Lexend', sans-serif;
+    font-family: 'Lexend', sans-serif;
+}
+
+/* Typography Scale */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-dark);
+    margin-top: 0;
+    font-weight: 700;
+}
+h1 { font-size: 2.5rem; letter-spacing: -0.02em; line-height: 1.2; }
+h2 { font-size: 2rem; letter-spacing: -0.01em; line-height: 1.3; }
+h3 { font-size: 1.5rem; line-height: 1.4; }
+h4 { font-size: 1.25rem; line-height: 1.4; }
+p {
+    line-height: 1.6;
+    margin-top: 0;
 }
 
 /* Body */
 body {
-    background-color: #f4f6f8;
+    background-color: #f8f7f4;
     color: var(--font-color);
     margin: 0;
     padding: 0;
-    
+
 
 }
+
 /* Header */
 header {
     background-color: var(--header-bg);
@@ -66,13 +82,13 @@ header {
 
 /* Feature Cards */
 .feature {
-border-radius: var(--radius);
-background: var(--feature-color);
-padding: 25px 30px;
-margin: 25px 0;
-box-shadow: var(--shadow);
-border: 1px solid var(--border-color);
-transition: transform var(--transition), box-shadow var(--transition);
+    border-radius: var(--radius);
+    background: var(--feature-color);
+    padding: 25px 30px;
+    margin: 25px 0;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+    transition: transform var(--transition), box-shadow var(--transition);
 }
 
 .feature a {
@@ -81,31 +97,29 @@ transition: transform var(--transition), box-shadow var(--transition);
 
 /* Subheader */
 #subhead {
-   color: var(--accent-color);
-   font-size: 24px;
+    color: var(--accent-color);
+    font-size: 24px;
 
 }
 
 /* Buttons */
 button {
-font-size: 14px;
-background-color: var(--button-color);
-color: white;
-width: auto; 
-margin: 4px;
-white-space: nowrap; 
-border: none;
-border-radius: 4px;
-padding: 10px 20px;
-transition: background-color 0.2s ease, transform 0.15s;
-cursor: pointer;
+    font-size: 14px;
+    background-color: var(--button-color);
+    color: white;
+    width: auto;
+    margin: 4px;
+    white-space: nowrap;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    transition: background-color 0.2s ease, transform 0.15s;
+    cursor: pointer;
 
 }
 
 button:hover {
-background-color: var(--button-hover-color);
-transform: translateY(-1px);
-box-shadow: 0 3px 10px rgba(45,122,79,0.3);
+    background-color: var(--button-hover-color);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(45, 122, 79, 0.3);
 }
-
-

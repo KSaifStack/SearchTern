@@ -169,6 +169,12 @@ const filtered = jobs
                       color={isJobTracked(job.id) ? "var(--accent-color)" : "currentColor"}
                       onClick={() => toggleSave(job)}
                     />
+                    <img 
+                        src={`https://www.google.com/s2/favicons?domain=${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com&sz=32`}
+                        style={{ width: '16px', height: '16px', borderRadius: '2px' }}
+                        onError={(e) => e.currentTarget.style.display = 'none'}
+                        alt=""
+                    />
                     {job.company}
                   </Table.Td>
                   <Table.Td>
