@@ -1,0 +1,53 @@
+.modal-form-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.group.grow {
+    display: flex;
+    gap: 1rem; 
+}
+
+.group.grow > * {
+    flex-grow: 1;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1rem;
+}
+
+.modal-footer .group {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-delete {
+    background-color: #ffe3e3;
+    color: #fa5252;
+    font-weight: 600;
+}
+
+.btn-delete:hover {
+    background-color: #ffc9c9;
+    box-shadow: none;
+}
+
+.btn-cancel {
+    background-color: #f8f9fa;
+    color: #212529;
+    border: 1px solid #ced4da;
+    font-weight: 600;
+}
+
+.btn-cancel:hover {
+    background-color: #f1f3f5;
+    box-shadow: none;
+}
+
+.btn-save {
+    background-color: var(--accent-color);
+    font-weight: 600;
+}

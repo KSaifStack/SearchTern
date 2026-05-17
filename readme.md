@@ -1,78 +1,110 @@
-<h1>SearchTern </h1> 
+# SearchTern
 
-<h2>The all-in-one platform for college students to find, track, and land internships.</h2>
-<div><strong>In today's tech market, finding an internship has never been harder.</strong></div>
-<br>
-<div>Students frequently send out 500–1000+ applications just to land a single offer. 
-The process is exhausting, unorganized, and overwhelming, often requiring students to check multiple GitHub repositories and job boards daily just to keep up.</div>
-<br>
-<div>SearchTern aims to break this cycle. It is an automated aggregation platform and personal dashboard that does the heavy lifting for you. It automatically finds the latest internships, allows you to filter and sort them, and gives you the tools to manage your application pipeline in one place.</div> 
+> **The all-in-one platform for college students to find, track, and land internships.**
 
-<h2>How does SearchTern work?</h2>
-<ol>
-<li><strong>Automated Scraping:</strong> The Python backend uses an automated scheduler to scrape <a href="https://github.com/SimplifyJobs/Summer2026-Internships">SimplifyJobs Summer 2026 Internships</a> repository at every hour.</li>
-<li><strong>Local Database:</strong> The scraped jobs are cleaned, formatted, and stored in a local SQLite database, ensuring lightning-fast search and filter capabilities without relying on third-party APIs.</li>
-<li><strong>Live Dashboard:</strong> The React/TypeScript frontend provides a clean, responsive UI to browse, search (by keyword, location, or company), and sort the most recent listings.</li>
-</ol>
+![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-TypeScript-61DAFB?style=flat&logo=react&logoColor=black)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-2d7a4f?style=flat)
 
-<h2> Features</h2>
-<h3>Currently Implemented:</h3>
-<ul>
-<li><strong>Live Job Board</strong> — Hundreds of internships automatically scraped and refreshed hourly and shown on the frontend 1 second after the scrape completes.</li>
-<li><strong>Smart Search & Filter</strong> — Instantly filter jobs by company, role, or location.</li>
-<li><strong>Pagination & Sorting</strong> — Sort by newest or oldest listings for easy browsing.</li>
-</ul>
+---
 
-<h3>Coming Soon:</h3>
-<ul>
-<li><strong>Application Tracker</strong> — Manage every application, interview stage, and offer in a personalized Kanban/Table view.</li>
-<li><strong>Saved Jobs</strong> — Bookmark jobs you want to apply to later.</li>
-<li><strong>AI Resume Grader</strong> — Get instant STAR-method feedback on your resume, scored 1-10.</li>
-<li><strong>Resource Hub</strong> — AI-curated computer science practice sites and market trends.</li>
-</ul>
+## The Problem
 
-<h2>Tech Stack</h2>
-<ul>
-<li><strong>Scraper</strong> — Python, BeautifulSoup4, Requests, APScheduler</li>
-<li><strong>Database</strong> — SQLite (Currently) -> PostgreSQL (Planned for Production)</li>
-<li><strong>Backend</strong> — FastAPI, Uvicorn, SlowAPI (Rate Limiting)</li>
-<li><strong>Frontend</strong> — React, TypeScript, Vite, Mantine UI</li>
-<li><strong>Planned Additions</strong> — JWT Auth, AI Integration</li>
-</ul>
+In today's tech market, finding an internship has never been harder. Students frequently send out **500–1000+ applications** just to land a single offer. The process is exhausting, unorganized, and overwhelming — requiring students to check multiple GitHub repos and job boards daily just to keep up.
 
-<h2>Quickstart (Running Locally)</h2>
-<p><strong>Prerequisites:</strong> Python 3.8+, Node.js 16+</p>
+**SearchTern breaks this cycle.** It's an automated aggregation platform and personal dashboard that does the heavy lifting for you — automatically finding the latest internships, letting you filter and sort them, and giving you the tools to manage your entire application pipeline in one place.
 
-<ol>
-<li><strong>Clone the repository</strong>
-<pre><code>git clone &lt;your-repo-url&gt;
-cd SearchTernBase</code></pre>
-</li>
+---
 
-<li><strong>Set up Environment Variables</strong><br>
-Create the necessary <code>.env</code> files.<br>
-<strong>Backend (<code>backend/.env</code>):</strong>
-<pre><code>API_KEY=your_secure_random_string_here</code></pre>
-<strong>Frontend (<code>frontend/.env.local</code>):</strong>
-<pre><code>VITE_API_KEY=your_secure_random_string_here</code></pre>
-</li>
+## How It Works
 
-<li><strong>Start the Application</strong><br>
-SearchTern includes automated startup scripts that will install all necessary dependencies and launch both servers simultaneously in development mode.
-<br><br>
-<strong>On Windows:</strong><br>
-Double-click <code>start.bat</code> from the project root, or run it in your terminal:
-<pre><code>.\start.bat</code></pre>
-<br>
-<strong>On Mac/Linux:</strong>
-<pre><code>chmod +x start.sh
-./start.sh</code></pre>
-</li>
+1. **Automated Scraping** — The Python backend uses APScheduler to automatically pull the latest internships from the [SimplifyJobs Summer 2026 Internships](https://github.com/SimplifyJobs/Summer2026-Internships) repository every hour. No manual triggers needed.
 
-<li><strong>Access the App:</strong>
-<ul>
-<li>Frontend (UI): <a href="http://localhost:5173">http://localhost:5173</a></li>
-<li>Backend (API Docs): <a href="http://localhost:8000/docs">http://localhost:8000/docs</a></li>
-</ul>
-</li>
-</ol>
+2. **Local Database** — Scraped jobs are cleaned, formatted, and stored in a local SQLite database, enabling instant search and filtering without hitting third-party APIs on every request.
+
+3. **Live Dashboard** — The React/TypeScript frontend provides a clean, responsive UI to browse, search (by keyword, location, or company), sort, and track the most recent listings — updating automatically after each scrape.
+
+---
+
+## Features
+
+### Currently Implemented
+
+| Feature | Description |
+|---|---|
+| **Live Job Board** | Hundreds of internships automatically scraped and refreshed every hour |
+| **Smart Search & Filter** | Instantly filter jobs by company, role, or location |
+| **Pagination & Sorting** | Sort by newest or oldest listings for easy browsing |
+| **Application Tracker** | A highly modular, drag-and-drop Kanban board (`Saved` → `Applied` → `Interview` → `Offer` → `Rejected`) |
+| **Performance Dashboard** | Real-time analytics visualizer (Total, Applied, Reply Rate, Offers, Rejections) using segmented HSL progress rings |
+| **Input Validation & Safety** | Block-level validation ensuring company names and roles are fully populated before saving, with clear error feedback |
+| **Saved Jobs** | Bookmark listings from the job board and sync them directly to your tracker |
+| **High-Fidelity CSV Export** | Safe export of your full application pipeline (including UTF-8 BOM encoding for seamless Excel parsing and character-safety) |
+
+### Coming Soon
+
+| Feature | Description |
+|---|---|
+| **AI Resume Grader** | Instant STAR-method feedback on your resume, scored 1–10 |
+| **Resource Hub** | Curated CS practice sites, interview prep, and market trend insights |
+
+---
+
+## Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| **Scraper** | Python, BeautifulSoup4, Requests, APScheduler |
+| **Database** | SQLite → PostgreSQL *(planned for production)* |
+| **Backend** | FastAPI, Uvicorn, SlowAPI (Rate Limiting) |
+| **Frontend** | React, TypeScript, Vite, Mantine UI, @dnd-kit |
+| **Planned** | JWT Auth, AI Integration |
+
+---
+
+## Quickstart
+
+**Prerequisites:** Python 3.8+, Node.js 16+
+
+### 1. Clone the repository
+
+```bash
+git clone <your-repo-url>
+cd SearchTernBase
+```
+
+### 2. Set up environment variables
+
+**Backend** (`backend/.env`):
+```env
+API_KEY=your_secure_random_string_here
+```
+
+**Frontend** (`frontend/.env.local`):
+```env
+VITE_API_KEY=your_secure_random_string_here
+```
+
+### 3. Start the application
+
+SearchTern includes automated startup scripts that install all dependencies and launch both servers simultaneously.
+
+**Windows:**
+```bat
+.\start.bat
+```
+
+**Mac / Linux:**
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+### 4. Access the app
+
+| Service | URL |
+|---|---|
+| Frontend (UI) | http://localhost:5173 |
+| Backend (API Docs) | http://localhost:8000/docs |

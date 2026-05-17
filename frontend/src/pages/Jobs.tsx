@@ -3,7 +3,7 @@ import { Table, Pagination,Menu, MenuDropdown } from '@mantine/core'
 import {BookmarkSimpleIcon}  from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent } from "../services/internshipmanager"
-
+import { useTracker } from "../components/TrackerContext"
 
 interface Job {
   id: number
@@ -17,7 +17,7 @@ interface Job {
 function Jobs() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [search, setSearch] = useState('')
-  const [saved, setSaved] = useState<Set<number>>(new Set())
+  const { addJob, removeJob, isJobTracked } = useTracker()
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [timeRemaining, setTimeRemaining] = useState("1:00:00")
@@ -100,11 +100,11 @@ const filtered = jobs
   const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
   function toggleSave(job: Job) {
-    setSaved(prev => {
-      const next = new Set(prev)
-      next.has(job.id) ? next.delete(job.id) : next.add(job.id)
-      return next
-    })
+    if (isJobTracked(job.id)) {
+      removeJob(job.id);
+    } else {
+      addJob({ id: job.id, company: job.company, role: job.role, location: job.location, link: job.link }, 'Saved');
+    }
   }
 
   
@@ -161,7 +161,16 @@ const filtered = jobs
               paginated.map(job => (
                 <Table.Tr key={job.id}>
               
-                  <Table.Td className="company-cell">{<BookmarkSimpleIcon size={25} className="bookmark-icon" />}{job.company}</Table.Td>
+                  <Table.Td className="company-cell">
+                    <BookmarkSimpleIcon 
+                      size={25} 
+                      className="bookmark-icon" 
+                      weight={isJobTracked(job.id) ? "fill" : "regular"}
+                      color={isJobTracked(job.id) ? "var(--accent-color)" : "currentColor"}
+                      onClick={() => toggleSave(job)}
+                    />
+                    {job.company}
+                  </Table.Td>
                   <Table.Td>
                     <a href={job.link} target="_blank" rel="noreferrer" className="apply-link">
                     {job.role}

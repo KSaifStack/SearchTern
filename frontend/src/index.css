@@ -1,15 +1,32 @@
-/* Variables */
 :root {
 --accent-color: #2d7a4f;
 --button-color: #3aa76d;
 --button-hover-color: #2d7a4f;
 --font-color: #1a1a1a;
-
 --feature-color: #ffffff;
 --header-bg: #ffffff;
 --page-bg: #f5f7f9;
-
 --shadow: 0 2px 8px rgba(0,0,0,0.08);
+--white: #ffffff;
+--text-dark: #172b4d;
+--text-muted: #5e6c84;
+--text-light: #8993a4;
+--text-gray: #888;
+--text-slate: #475569;
+--table-th-color: #94a3b8;
+--table-td-color: #334155;
+--badge-bg: #e4e6ea;
+--hover-bg: rgba(9, 30, 66, 0.08);
+--menu-hover-bg: #f1f3f5;
+--border-light: #e0e0e0;
+--border-medium: #ddd;
+--border-slate: #e2e8f0;
+--primary-green: #3a9e6e;
+--primary-green-light: rgba(58, 158, 110, 0.15);
+--link-visited: #7a9e8e;
+--shadow-light: rgba(0,0,0,0.1);
+--shadow-sm: rgba(9, 30, 66, 0.15);
+--shadow-md: rgba(9, 30, 66, 0.25);
 }
 
 * {
@@ -33,11 +50,17 @@ header {
     justify-content: space-between;
 }
 
-/* Main */
-main {
-margin: 0 auto;
-max-width: 1100px;
-padding: 30px 20px;
+/* Layouts */
+.standard-layout {
+    margin: 0 auto;
+    max-width: 1100px;
+    padding: 30px 20px;
+}
+
+.full-width-layout {
+    padding: 30px 20px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 

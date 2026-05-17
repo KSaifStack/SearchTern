@@ -3,20 +3,23 @@ import Navbar from "./components/Navbar"
 import Home from "./pages/Home"
 import Jobs from "./pages/Jobs"
 import Tracker from "./pages/Tracker"
+import { TrackerProvider } from "./components/TrackerContext"
 
 function App() {
     return (
         <BrowserRouter>
-            <div>
-                <Navbar />
-                <main>
-                    <Routes>
-                        <Route path="/" element={<Home />} />
-                        <Route path="/jobs" element={<Jobs />} />
-                        <Route path="/tracker" element={<Tracker />} />
-                    </Routes>
-                </main>
-            </div>
+            <TrackerProvider>
+                <div>
+                    <Navbar />
+                    <div className="app-content">
+                        <Routes>
+                            <Route path="/" element={<main className="standard-layout"><Home /></main>} />
+                            <Route path="/jobs" element={<main className="standard-layout"><Jobs /></main>} />
+                            <Route path="/tracker" element={<main className="full-width-layout"><Tracker /></main>} />
+                        </Routes>
+                    </div>
+                </div>
+            </TrackerProvider>
         </BrowserRouter>
     )
 }

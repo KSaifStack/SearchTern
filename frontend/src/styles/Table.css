@@ -3,11 +3,11 @@
 .mantine-Table-thead {
   text-align: left; 
   padding: 12px 15px; 
-  border-bottom: 1px solid var(#e0e0e0);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .mantine-Table-th {
-    color:  #94a3b8;
+    color: var(--table-th-color);
     padding: 10px 16px;
     font-size: 12px;
     text-transform: uppercase;
@@ -16,13 +16,13 @@
 
 
 .mantine-Table-td {
-  color: #334155;
+  color: var(--table-td-color);
 }
 
 .search-input {
   width: 100%;
   padding: 10px 14px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-medium);
   border-radius: 6px;
   font-size: 14px;
   margin-bottom: 12px;
@@ -31,13 +31,13 @@
 
 .search-input:focus {
   outline: none;
-  border-color: #3a9e6e;
-  box-shadow: 0 0 0 2px rgba(58, 158, 110, 0.15);
+  border-color: var(--primary-green);
+  box-shadow: 0 0 0 2px var(--primary-green-light);
 }
 
 .result-count {
   font-size: 13px;
-  color: #888;
+  color: var(--text-gray);
   margin-bottom: 10px;
 }
 
@@ -47,32 +47,32 @@
 }
 
 .apply-link {
-  color: #2d7a4f;
+  color: var(--accent-color);
   text-decoration: none;
   font-weight: 500;
   transition: color 0.15s;
 }
 
 .apply-link:hover {
-  color: #2d7a4f;
+  color: var(--accent-color);
   text-decoration: underline;
 }
 
 .apply-link:visited {
-  color: #7a9e8e; 
+  color: var(--link-visited); 
 }
 
 
 /* Active/selected page */
 .mantine-Pagination-control[data-active] {
-  background-color: #3a9e6e;
-  border-color: #3a9e6e;
-  color: white;
+  background-color: var(--primary-green);
+  border-color: var(--primary-green);
+  color: var(--white);
 }
 
 .mantine-Menu-item:hover {
-  background-color: #f1f3f5;
-  color: #3a9e6e;
+  background-color: var(--menu-hover-bg);
+  color: var(--primary-green);
 }
 
 .results-header {
@@ -88,14 +88,14 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--border-slate);
   background: transparent;
-  color: #475569;
+  color: var(--text-slate);
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .sort_btn:hover {
-  color: white;
+  color: var(--white);
 }
 
 .company-cell {
