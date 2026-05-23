@@ -14,7 +14,7 @@ interface JobModalProps {
     editingJob: TrackedJob | null;
     initialStatus: JobStatus;
     onSave: (job: Partial<TrackedJob>, isNew: boolean) => void;
-    onDelete: (id: string | number) => void;
+    onDelete: (id: string) => void;
 }
 
 export const JobModal: React.FC<JobModalProps> = ({ opened, onClose, editingJob, initialStatus, onSave, onDelete }) => {

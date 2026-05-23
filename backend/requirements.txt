@@ -5,3 +5,4 @@ beautifulsoup4
 slowapi
 apscheduler
 python-dotenv
+psycopg2-binary

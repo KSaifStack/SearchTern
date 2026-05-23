@@ -1,14 +1,14 @@
 .home-columns {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    gap: 28px;
 }
 
 .home-card {
-    min-height: 320px;
+    min-height: 420px;
     display: flex;
     flex-direction: column;
-    padding: 24px 28px !important;
+    padding: 32px 36px !important;
 }
 
 .home-card-header {
@@ -21,7 +21,7 @@
 }
 
 .home-card-title {
-    font-size: 16px !important;
+    font-size: 18px !important;
     font-weight: 700 !important;
 }
 
@@ -38,8 +38,8 @@
     display: grid;
     grid-template-columns: 3fr 4fr auto;
     align-items: start;
-    gap: 16px;
-    padding: 14px 0;
+    gap: 20px;
+    padding: 18px 0;
     border-bottom: 1px solid var(--border-slate);
     text-decoration: none;
     transition: background 0.12s;
@@ -48,14 +48,14 @@
 .recent-job-row:hover .recent-job-company { color: var(--accent-color); }
 
 .recent-job-company {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--text-dark);
     line-height: 1.4;
     transition: color 0.12s;
 }
 .recent-job-role {
-    font-size: 13px;
+    font-size: 14px;
     color: var(--text-muted);
     line-height: 1.4;
 }
@@ -74,14 +74,14 @@
     display: flex;
     gap: 14px;
     align-items: flex-start;
-    padding: 13px 0;
+    padding: 17px 0;
     border-bottom: 1px solid var(--border-slate);
 }
 .activity-row:last-child { border-bottom: none; }
 
-.activity-text { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+.activity-text { font-size: 14px; color: var(--text-muted); line-height: 1.5; margin: 0; }
 .activity-text strong { color: var(--text-dark); font-weight: 600; }
-.activity-time { font-size: 11px; color: var(--text-light); margin: 3px 0 0; }
+.activity-time { font-size: 12px; color: var(--text-light); margin: 4px 0 0; }
 
 /* ── Empty states ─────────────────────────────────────────── */
 .home-empty {
@@ -90,6 +90,39 @@
     text-align: center;
     padding: 32px 0;
     margin: auto;
+}
+
+.home-empty-enhanced {
+    text-align: center;
+    padding: 32px 0;
+    margin: auto;
+}
+
+.home-empty-enhanced p {
+    margin-bottom: 8px;
+    color: var(--text-light);
+}
+
+.home-empty-enhanced ul {
+    list-style: none;
+    padding: 0;
+    text-align: left;
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.home-empty-enhanced li {
+    margin-bottom: 4px;
+    padding-left: 16px;
+    position: relative;
+    color: var(--text-muted);
+}
+
+.home-empty-enhanced li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--accent-color);
 }
 
 /* ── Mobile ───────────────────────────────────────────────── */

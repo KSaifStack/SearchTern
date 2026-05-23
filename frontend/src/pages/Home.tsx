@@ -54,11 +54,16 @@ function Home() {
         { value: Math.round((trackedJobs.filter(j => j.status === 'Rejected').length / total) * 100), color: 'red', tooltip: `Rejected: ${trackedJobs.filter(j => j.status === 'Rejected').length}` },
     ].filter(s => s.value > 0) : [{ value: 100, color: '#e9ecef', tooltip: 'No data yet' }];
 
-    // Show jobs from past 24h (date === 0) AND 1 day mark (date === 1)
+    // Show jobs from past 48 hours
     const recentJobs = jobs
         .filter(j => {
             const d = parseFloat(String(j.date));
-            return d === 0 || d === 1;
+            return d >= 0 && d < 2; // Last 48 hours
+        })
+        .sort((a, b) => {
+            const aNum = parseFloat(String(a.date));
+            const bNum = parseFloat(String(b.date));
+            return aNum - bNum; // Newest first
         })
         .slice(0, 6);
 
@@ -72,7 +77,7 @@ function Home() {
     };
 
     return (
-        <div className="standard-layout">
+        <div className="standard-layout" style={{ maxWidth: '1400px', padding: '36px 32px' }}>
 
             {/* ── Stat Bar ── */}
             <section className="feature" style={{
@@ -141,12 +146,22 @@ function Home() {
                     {loading ? (
                         <p className="home-empty">Loading...</p>
                     ) : recentJobs.length === 0 ? (
-                        <p className="home-empty">No recent listings in the last 48 hours.<br />Check back soon!</p>
+                        <div className="home-empty-enhanced">
+                            <p>No recent listings in the last 48 hours.</p>
+                            <p className="mt-4">
+                                <strong>Try these:</strong>
+                            </p>
+                            <ul className="mt-2 space-y-1 text-sm">
+                                <li>Visit the <Link to="/jobs" className="home-card-link">full job board</Link> for all listings</li>
+                                <li>Check back later for hourly updates</li>
+                                <li>Use filters to narrow your search</li>
+                            </ul>
+                        </div>
                     ) : (
                         recentJobs.map(job => (
                                 <a key={job.id} href={job.link} target="_blank" rel="noreferrer" className="recent-job-row">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <img 
+                                        <img
                                             src={`https://www.google.com/s2/favicons?domain=${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com&sz=32`}
                                             style={{ width: '16px', height: '16px', borderRadius: '2px' }}
                                             onError={(e) => e.currentTarget.style.display = 'none'}

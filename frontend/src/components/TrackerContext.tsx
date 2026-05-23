@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { makeJobFingerprint } from '../utils/jobFingerprint';
 
 export type JobStatus = 'Saved' | 'Applied' | 'Interview' | 'Offer' | 'Rejected';
 
 export interface TrackedJob {
-    id: string | number;
+    /** Stable content-based fingerprint — immune to backend ID rotation. */
+    id: string;
     company: string;
     role: string;
     location: string;
@@ -27,18 +29,24 @@ export interface ActivityEvent {
 interface TrackerContextType {
     trackedJobs: TrackedJob[];
     activityLog: ActivityEvent[];
-    addJob: (job: Omit<TrackedJob, 'status' | 'dateAdded'>, status?: JobStatus) => void;
-    updateJobStatus: (id: string | number, newStatus: JobStatus) => void;
-    editJob: (id: string | number, updatedFields: Partial<TrackedJob>) => void;
-    removeJob: (id: string | number) => void;
-    isJobTracked: (id: string | number) => boolean;
+    /**
+     * Add a job to the tracker. The stable fingerprint id is computed
+     * internally from company + role + location — do NOT pass a DB id.
+     */
+    addJob: (job: Omit<TrackedJob, 'id' | 'status' | 'dateAdded'>, status?: JobStatus) => void;
+    updateJobStatus: (id: string, newStatus: JobStatus) => void;
+    editJob: (id: string, updatedFields: Partial<TrackedJob>) => void;
+    removeJob: (id: string) => void;
+    /** Returns true if a job with the same company+role+location fingerprint is tracked. */
+    isJobTracked: (company: string, role: string, location: string) => boolean;
 }
 
 const TrackerContext = createContext<TrackerContextType | undefined>(undefined);
 
 export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [trackedJobs, setTrackedJobs] = useState<TrackedJob[]>(() => {
-        const stored = localStorage.getItem('searchtern_tracker');
+        // v2 key: avoids collisions with stale v1 entries that used numeric DB ids.
+        const stored = localStorage.getItem('searchtern_tracker_v2');
         return stored ? JSON.parse(stored) : [];
     });
 
@@ -48,7 +56,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
 
     useEffect(() => {
-        localStorage.setItem('searchtern_tracker', JSON.stringify(trackedJobs));
+        localStorage.setItem('searchtern_tracker_v2', JSON.stringify(trackedJobs));
     }, [trackedJobs]);
 
     useEffect(() => {
@@ -77,15 +85,16 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
     };
 
-    const addJob = (job: Omit<TrackedJob, 'status' | 'dateAdded'>, status: JobStatus = 'Saved') => {
+    const addJob = (job: Omit<TrackedJob, 'id' | 'status' | 'dateAdded'>, status: JobStatus = 'Saved') => {
+        const fingerprint = makeJobFingerprint(job.company, job.role, job.location);
         setTrackedJobs(prev => {
-            if (prev.some(j => j.id === job.id)) return prev;
-            return [...prev, { ...job, status, dateAdded: new Date().toISOString() }];
+            if (prev.some(j => j.id === fingerprint)) return prev;
+            return [...prev, { ...job, id: fingerprint, status, dateAdded: new Date().toISOString() }];
         });
         logActivity({ type: 'added', company: job.company, role: job.role, to: status });
     };
 
-    const updateJobStatus = (id: string | number, newStatus: JobStatus) => {
+    const updateJobStatus = (id: string, newStatus: JobStatus) => {
         setTrackedJobs(prev => prev.map(job => {
             if (job.id === id) {
                 logActivity({ type: 'status_change', company: job.company, role: job.role, from: job.status, to: newStatus });
@@ -95,7 +104,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }));
     };
 
-    const editJob = (id: string | number, updatedFields: Partial<TrackedJob>) => {
+    const editJob = (id: string, updatedFields: Partial<TrackedJob>) => {
         setTrackedJobs(prev => prev.map(job => {
             if (job.id === id) {
                 if (updatedFields.status && updatedFields.status !== job.status) {
@@ -107,14 +116,15 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }));
     };
 
-    const removeJob = (id: string | number) => {
+    const removeJob = (id: string) => {
         const job = trackedJobs.find(j => j.id === id);
         if (job) logActivity({ type: 'removed', company: job.company, role: job.role });
         setTrackedJobs(prev => prev.filter(job => job.id !== id));
     };
 
-    const isJobTracked = (id: string | number) => {
-        return trackedJobs.some(job => job.id === id);
+    const isJobTracked = (company: string, role: string, location: string) => {
+        const fingerprint = makeJobFingerprint(company, role, location);
+        return trackedJobs.some(job => job.id === fingerprint);
     };
 
     return (

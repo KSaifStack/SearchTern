@@ -35,5 +35,13 @@ export async function pullKeyword(searchterm:String){
     const data = await res.json();
     return data.result;
 }
-
-
+// checks health
+export async function checkHealth() {
+  try {
+    const res = await fetch("http://localhost:8000/health");
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    return { status: "error", next_scrape: "unknown" };
+  }
+}

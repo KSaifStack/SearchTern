@@ -19,7 +19,7 @@ import "../styles/Tracker.css";
 
 function Tracker() {
     const { trackedJobs, updateJobStatus, addJob, editJob, removeJob } = useTracker();
-    const [activeId, setActiveId] = React.useState<string | number | null>(null);
+    const [activeId, setActiveId] = React.useState<string | null>(null);
 
     // Modal State
     const [modalOpen, setModalOpen] = useState(false);
@@ -41,7 +41,6 @@ function Tracker() {
             editJob(editingJob.id, jobData);
         } else {
             addJob({
-                id: Date.now().toString(),
                 company: jobData.company || '',
                 role: jobData.role || '',
                 location: jobData.location || '',
@@ -53,7 +52,7 @@ function Tracker() {
         setModalOpen(false);
     };
 
-    const handleDelete = (id: string | number) => {
+    const handleDelete = (id: string) => {
         removeJob(id);
         setModalOpen(false);
     };
@@ -72,7 +71,7 @@ function Tracker() {
     );
 
     const onDragStart = (event: DragStartEvent) => {
-        setActiveId(event.active.id);
+        setActiveId(event.active.id as string);
     };
 
     const onDragEnd = (event: DragEndEvent) => {
@@ -88,7 +87,7 @@ function Tracker() {
         // If dropped directly on an empty column
         if (STATUSES.includes(overId as JobStatus)) {
             if (activeJob.status !== overId) {
-                updateJobStatus(active.id, overId as JobStatus);
+                updateJobStatus(active.id as string, overId as JobStatus);
             }
             return;
         }
@@ -96,7 +95,7 @@ function Tracker() {
         // If dropped over another job
         const overJob = trackedJobs.find(j => j.id === overId);
         if (overJob && activeJob.status !== overJob.status) {
-            updateJobStatus(active.id, overJob.status);
+            updateJobStatus(active.id as string, overJob.status);
         }
     };
 

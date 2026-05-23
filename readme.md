@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-TypeScript-61DAFB?style=flat&logo=react&logoColor=black)
-![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat&logo=postgresql&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-2d7a4f?style=flat)
 
 
@@ -30,7 +30,7 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 
 ## How it works
 
-1. **Scraper** — APScheduler pulls from the [Simplify ](https://github.com/SimplifyJobs/Summer2026-Internships) repo hourly and stores results in SQLite
+1. **Scraper** — APScheduler pulls from the [Simplify ](https://github.com/SimplifyJobs/Summer2026-Internships) repo hourly and stores results in a PostgreSQL database
 2. **Backend** — FastAPI serves the data with rate limiting and input validation
 3. **Frontend** — React/TypeScript dashboard with live search, sorting, and a drag-and-drop Kanban tracker
 
@@ -78,7 +78,7 @@ Most CS students end up sending 500+ applications across a dozen job boards with
   </tr>
   <tr>
     <td><strong>Database</strong></td>
-    <td>SQLite → PostgreSQL (planned)</td>
+    <td>PostgreSQL</td>
   </tr>
   <tr>
     <td><strong>Backend</strong></td>
@@ -94,7 +94,7 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 
 ## Quickstart
 
-Requires Python 3.8+ and Node.js 16+
+Requires Python 3.8+, Node.js 16+, and a running PostgreSQL database.
 
 **1. Clone the repo**
 
@@ -108,6 +108,7 @@ cd SearchTernBase
 Create `backend/.env`:
 ```env
 API_KEY=your_secure_random_string_here
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/searchtern
 ```
 
 Create `frontend/.env.local`:

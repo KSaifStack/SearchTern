@@ -1,41 +1,46 @@
 # read_db.py
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import os
+from dotenv import load_dotenv
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "database.db")
+load_dotenv()
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# Get only Charlotte internships
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
+
+# Search by location
 def search_location(x):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  
-    rows = conn.execute(
-        "SELECT rowid as id, * FROM internships WHERE location LIKE ?",
-        [f"%{x}%"]
-    ).fetchall()
+    conn = get_conn()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT * FROM internships WHERE location ILIKE %s ORDER BY date",
+            (f"%{x}%",)
+        )
+        rows = cur.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
 
-
-# Get only recent ones
+# Get all internships ordered by date
 def recent_internships():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute("SELECT rowid as id, * FROM internships ORDER BY date").fetchall()
+    conn = get_conn()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SELECT * FROM internships ORDER BY date")
+        rows = cur.fetchall()
     conn.close()
     return [dict(row) for row in rows]
-
 
 
 # Search by role keywords
 def find_keywords(x):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  
-    rows = conn.execute(
-        "SELECT rowid as id, * FROM internships WHERE role LIKE ?",
-        [f"%{x}%"]
-    ).fetchall()
+    conn = get_conn()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT * FROM internships WHERE role ILIKE %s ORDER BY date",
+            (f"%{x}%",)
+        )
+        rows = cur.fetchall()
     conn.close()
     return [dict(row) for row in rows]
-

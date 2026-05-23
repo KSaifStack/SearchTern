@@ -14,9 +14,6 @@ function Navbar() {
                 <li><Link to = "/jobs">Internships</Link></li>
                 <li><Link to = "/tracker">Applications</Link></li>
             </ul>
-            <ul className="nav-right">
-                <li><Link to ="/signup">Sign-up</Link></li>
-            </ul>
         </nav>
         </header>
     )

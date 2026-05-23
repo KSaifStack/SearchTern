@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react"
-import { Table, Pagination,Menu, MenuDropdown } from '@mantine/core'
+import { Table, Pagination, Menu, MenuDropdown, Popover, Text } from '@mantine/core'
+import { checkHealth } from "../api/internships"
 import {BookmarkSimpleIcon}  from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
+import { makeJobFingerprint } from "../utils/jobFingerprint"
 
 interface Job {
   id: number
@@ -22,13 +24,37 @@ function Jobs() {
   const [loading, setLoading] = useState(true)
   const [timeRemaining, setTimeRemaining] = useState("1:00:00")
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
-  const perPage = 15; 
+  const [healthStatus, setHealthStatus] = useState<any>(null)
+  const [popoverOpened, setPopoverOpened] = useState(false)
+
+  const perPage = 15;
+
+  const fetchHealth = async () => {
+    if (!popoverOpened) {
+      const data = await checkHealth()
+      setHealthStatus(data)
+    }
+    setPopoverOpened((o) => !o)
+  }
+
+  const formatNextUpdate = (dateString: string) => {
+    if (!dateString || dateString === 'unknown') return 'Unknown';
+    try {
+      const d = new Date(dateString.replace(' ', 'T'));
+      if (isNaN(d.getTime())) return dateString;
+      return d.toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true });
+    } catch(e) {
+      return dateString;
+    }
+  }
 
   
   useEffect(() => {
   getRecent().then(res => {
-    if(res.success) setJobs([...res.data])
-    console.log("Sample job dates:", res.data.slice(0, 5).map(j => j.date));
+    if(res.success) {
+      setJobs([...res.data])
+
+    }
     setLoading(false)
   })
 }, [])
@@ -70,6 +96,23 @@ const DatetoNum = (val: string | number) => {
   return !isNaN(parsed) ? parsed : 999;
 }
 
+// Filter jobs based on active filters
+const applyFilters = (jobs: Job[]): Job[] => {
+  return jobs
+    .filter((job: any) => job && job.company)
+    .filter(job => {
+      // Text search
+      return job.company.toLowerCase().includes(search.toLowerCase()) ||
+        job.role.toLowerCase().includes(search.toLowerCase()) ||
+        job.location.toLowerCase().includes(search.toLowerCase());
+    })
+    .sort((a, b) => {
+      const aNum = DatetoNum(a.date);
+      const bNum = DatetoNum(b.date);
+      return sortOrder === 'newest' ? aNum - bNum : bNum - aNum;
+    });
+};
+
 const formatRelativeDate = (val: string | number) => {
   const days = DatetoNum(val);
   
@@ -84,26 +127,16 @@ const formatRelativeDate = (val: string | number) => {
   return `${days} days ago`;
 }
 
-const filtered = jobs
-  .filter((job: any) => job && job.company)
-  .filter(job =>
-    job.company.toLowerCase().includes(search.toLowerCase()) ||
-    job.role.toLowerCase().includes(search.toLowerCase()) ||
-    job.location.toLowerCase().includes(search.toLowerCase())
-  )
-  .sort((a, b) => {
-    const aNum = DatetoNum(a.date);
-    const bNum = DatetoNum(b.date);
-    return sortOrder === 'newest' ? aNum - bNum : bNum - aNum;
-  });
+const filtered = applyFilters(jobs);
 
   const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
   function toggleSave(job: Job) {
-    if (isJobTracked(job.id)) {
-      removeJob(job.id);
+    const fingerprint = makeJobFingerprint(job.company, job.role, job.location);
+    if (isJobTracked(job.company, job.role, job.location)) {
+      removeJob(fingerprint);
     } else {
-      addJob({ id: job.id, company: job.company, role: job.role, location: job.location, link: job.link }, 'Saved');
+      addJob({ company: job.company, role: job.role, location: job.location, link: job.link }, 'Saved');
     }
   }
 
@@ -113,13 +146,35 @@ const filtered = jobs
   return (
     <>
       <section className="feature">
-        <p className="result-count">Refreshes in: {timeRemaining}</p>
+        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+          <p className="result-count" style={{ margin: 0 }}>Refreshes in: {timeRemaining}</p>
+          <Popover width={250} position="bottom-start" withArrow shadow="md" opened={popoverOpened} onChange={setPopoverOpened}>
+            <Popover.Target>
+              <button className="sort_btn" onClick={fetchHealth}>...</button>
+            </Popover.Target>
+            <Popover.Dropdown>
+              {healthStatus ? (
+                <>
+                  <Text size="xs">Status: <span style={{ color: healthStatus.status === 'ok' ? 'green' : 'red' }}>{healthStatus.status}</span></Text>
+                  <Text size="xs">Next Update: {formatNextUpdate(healthStatus.next_scrape)}</Text>
+                  <Text size="xs" mt={5} c="dimmed">Data Source: SimplifyJobs</Text>
+                </>
+              ) : (
+                <Text size="xs">Loading...</Text>
+              )}
+            </Popover.Dropdown>
+          </Popover>
+        </div>
+
+
+
         <input
           className="search-input"
           placeholder="Search by company, role, or location..."
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1) }}
         />
+
         <div className="results-header">
         <p className="result-count">{filtered.length} internships found</p>
         <Menu shadow="md" width={200}>
@@ -165,11 +220,11 @@ const filtered = jobs
                     <BookmarkSimpleIcon 
                       size={25} 
                       className="bookmark-icon" 
-                      weight={isJobTracked(job.id) ? "fill" : "regular"}
-                      color={isJobTracked(job.id) ? "var(--accent-color)" : "currentColor"}
+                      weight={isJobTracked(job.company, job.role, job.location) ? "fill" : "regular"}
+                      color={isJobTracked(job.company, job.role, job.location) ? "var(--accent-color)" : "currentColor"}
                       onClick={() => toggleSave(job)}
                     />
-                    <img 
+                    <img
                         src={`https://www.google.com/s2/favicons?domain=${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com&sz=32`}
                         style={{ width: '16px', height: '16px', borderRadius: '2px' }}
                         onError={(e) => e.currentTarget.style.display = 'none'}
