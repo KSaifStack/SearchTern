@@ -1,6 +1,6 @@
 # SearchTern
 
-**Find and track internships without the chaos.**
+**Find and track internships without the chaos.** → [searchtern.vercel.app](https://searchtern.vercel.app)
 
 ![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
@@ -8,12 +8,6 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat&logo=postgresql&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-2d7a4f?style=flat)
 
-
----
-# Live Link
-
- [https://searchtern.vercel.app/](https://searchtern.vercel.app/)
- 
 ---
 
 # Screenshot of the website
@@ -65,7 +59,7 @@ Most CS students end up sending 500+ applications across a dozen job boards with
   </tr>
 </table>
 
-> **Coming soon:** AI resume grader, resource hub, user accounts and more 
+> **Coming soon:** AI resume grader, resource hub, user accounts
 
 ---
 
@@ -92,43 +86,4 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 
 ---
 
-## Quickstart
-
-Requires Python 3.8+, Node.js 16+, and a running PostgreSQL database.
-
-**1. Clone the repo**
-
-```bash
-git clone <https://github.com/KSaifStack/SearchTernBase.git>
-cd SearchTernBase
-```
-
-**2. Set up environment variables**
-
-Create `backend/.env`:
-```env
-API_KEY=your_secure_random_string_here
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/searchtern
-```
-
-Create `frontend/.env.local`:
-```env
-VITE_API_KEY=your_secure_random_string_here
-```
-
-**3. Start the app**
-
-```bash
-# Mac/Linux
-./start.sh
-
-# Windows
-.\start.bat
-```
-
-**4. Open it**
-
-| | |
-|---|---|
-| Frontend | http://localhost:5173 |
-| API docs | http://localhost:8000/docs |
+> **Developers:** For setup, build, and local development instructions, please see [dev.md](dev.md).
