@@ -1,8 +1,8 @@
 const api_key = import.meta.env.VITE_API_KEY;
-
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 // pulls update Backend data via fastapi  
 export async function pullUpdateBackend() {
-    const res = await fetch("http://localhost:8000/update", {
+    const res = await fetch(`${BASE_URL}/update`, {
       method: "POST",
       headers: {
             "X-API-Key": api_key,   // Same key as in .env
@@ -16,14 +16,14 @@ export async function pullUpdateBackend() {
 
 // pulls recent internships via fastapi
 export async function pullRecent(){
-  const res = await fetch("http://localhost:8000/recent");
+  const res = await fetch(`${BASE_URL}/recent`);
   const data = await res.json();
   return data.result;
 }
 
 // pulls internships based off location via fastapi
 export async function pullLocation(searchterm:String){
-    const res = await fetch("http://localhost:8000/location?searchterm=" + searchterm);  
+    const res = await fetch(`${BASE_URL}/location?searchterm=` + searchterm);  
     const data = await res.json();
   return data.result;
 }
@@ -31,14 +31,14 @@ export async function pullLocation(searchterm:String){
 
 // pulls internships based off keyword via fastapi
 export async function pullKeyword(searchterm:String){
-    const res = await fetch("http://localhost:8000/keywords?searchterm=" + searchterm);
+    const res = await fetch(`${BASE_URL}/keywords?searchterm=` + searchterm);
     const data = await res.json();
     return data.result;
 }
 // checks health
 export async function checkHealth() {
   try {
-    const res = await fetch("http://localhost:8000/health");
+    const res = await fetch(`${BASE_URL}/health`);
     const data = await res.json();
     return data;
   } catch (err) {
