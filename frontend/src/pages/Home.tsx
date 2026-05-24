@@ -70,11 +70,7 @@ function Home() {
     const recentActivity = activityLog.slice(0, 6);
     const todayCount = jobs.filter(j => parseFloat(String(j.date)) === 0).length;
 
-    const activityDotColor: Record<ActivityEvent['type'], string> = {
-        added: 'var(--accent-color)',
-        removed: '#fa5252',
-        status_change: '#228be6',
-    };
+
 
     return (
         <div className="standard-layout" style={{ maxWidth: '1400px', padding: '36px 32px' }}>

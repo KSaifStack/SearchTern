@@ -1,5 +1,3 @@
-import React from 'react';
-import { Badge } from '@mantine/core';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -61,7 +59,7 @@ export const SortableJobCard = ({ job, onEdit }: { job: TrackedJob, onEdit: (job
     );
 };
 
-export const Column = ({ status, jobs, onEdit, onAdd }: { status: JobStatus, jobs: TrackedJob[], onEdit: (job: TrackedJob) => void, onAdd: (status: JobStatus) => void }) => {
+export const Column = ({ status, jobs, onEdit }: { status: JobStatus, jobs: TrackedJob[], onEdit: (job: TrackedJob) => void, onAdd: (status: JobStatus) => void }) => {
     const { setNodeRef } = useDroppable({
         id: status,
         data: {
