@@ -1,6 +1,6 @@
 # SearchTern
 
-**Find and track internships without the chaos.** → [searchtern.vercel.app](https://searchtern.vercel.app)
+**Find and track internships without the chaos.** → [searchtern.ksaif.dev](https://searchtern.ksaif.dev)
 
 ![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
@@ -10,7 +10,6 @@
 
 ---
 
-# Screenshot of the website
 
 ![App Screenshot](search_tern.png)
 
@@ -27,6 +26,7 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 1. **Scraper** — APScheduler pulls from the [Simplify ](https://github.com/SimplifyJobs/Summer2026-Internships) repo hourly and stores results in a PostgreSQL database
 2. **Backend** — FastAPI serves the data with rate limiting and input validation
 3. **Frontend** — React/TypeScript dashboard with live search, sorting, and a drag-and-drop Kanban tracker
+4. **Infrastructure** — Self-hosted on a Fedora Linux server using Systemd services, routed securely via a Cloudflare Tunnel
 
 ---
 
@@ -81,6 +81,10 @@ Most CS students end up sending 500+ applications across a dozen job boards with
   <tr>
     <td><strong>Frontend</strong></td>
     <td>React, TypeScript, Vite, Mantine UI, @dnd-kit</td>
+  </tr>
+  <tr>
+    <td><strong>Infrastructure</strong></td>
+    <td>Fedora Server, Systemd, Cloudflare Tunnels, Vercel</td>
   </tr>
 </table>
 
