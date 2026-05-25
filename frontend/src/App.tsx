@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 import Navbar from "./components/Navbar"
 import Home from "./pages/Home"
 import Jobs from "./pages/Jobs"
@@ -18,6 +19,7 @@ function App() {
                             <Route path="/tracker" element={<main className="full-width-layout"><Tracker /></main>} />
                         </Routes>
                     </div>
+                    <SpeedInsights />
                 </div>
             </TrackerProvider>
         </BrowserRouter>
