@@ -11,7 +11,7 @@
 ---
 
 
-![App Screenshot](search_tern.png)
+<img width="1917" height="991" alt="image" src="https://github.com/user-attachments/assets/f5299847-5ad8-458d-8c85-9e1a52c79356" />
 
  
 
