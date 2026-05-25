@@ -1,17 +1,15 @@
-
-
 .mantine-Table-thead {
-  text-align: left; 
-  padding: 12px 15px; 
+  text-align: left;
+  padding: 12px 15px;
   border-bottom: 1px solid var(--border-light);
 }
 
 .mantine-Table-th {
-    color: var(--table-th-color);
-    padding: 10px 16px;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  color: var(--table-th-color);
+  padding: 10px 16px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 
@@ -42,8 +40,8 @@
 }
 
 .check-btn {
-    width: 15px;
-    height: 15px;
+  width: 15px;
+  height: 15px;
 }
 
 .apply-link {
@@ -59,7 +57,7 @@
 }
 
 .apply-link:visited {
-  color: var(--link-visited); 
+  color: var(--link-visited);
 }
 
 
@@ -123,7 +121,7 @@
     flex-direction: column;
   }
 
-  .filter-controls > div {
+  .filter-controls>div {
     min-width: 100% !important;
   }
 }
@@ -139,17 +137,28 @@
   border-radius: 6px;
   padding: 6px 14px;
   font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
   border: 1.5px solid var(--border-slate);
   background: transparent;
   color: var(--text-slate);
-  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .sort_btn:hover {
   color: var(--white);
 }
+
+.health_btn {
+  border-radius: 6px;
+  padding: 2px 13px;
+  font-size: 14px;
+  border: 1.5px solid var(--border-slate);
+  background: transparent;
+  color: var(--text-slate);
+}
+
+.health_btn:hover {
+  color: var(--white);
+}
+
 
 .company-cell {
   display: flex;

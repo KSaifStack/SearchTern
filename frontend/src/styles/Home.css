@@ -131,3 +131,129 @@
     .recent-job-row { grid-template-columns: 1fr 1fr; }
     .recent-job-location { display: none; }
 }
+
+/* ── Layout & Stat Bar ────────────────────────────────────── */
+.home-layout {
+    max-width: 1400px;
+    padding: 36px 32px;
+}
+
+.stat-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 20px 40px;
+    margin: 0 0 24px 0;
+    gap: 16px;
+}
+
+.stat-item {
+    text-align: center;
+    flex: 1;
+    border-top: 3px solid var(--border-slate);
+    padding-top: 16px;
+}
+
+.stat-item-title {
+    letter-spacing: 0.05em;
+}
+
+.stat-item-value {
+    font-size: 2rem;
+}
+
+.stat-divider {
+    height: 60px;
+}
+
+.stat-ring-container {
+    text-align: center;
+    flex: 1.5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+}
+
+.stat-ring-label {
+    text-align: center;
+    margin-top: -4px;
+}
+
+.stat-ring-legend {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-ring-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stat-ring-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.recent-job-company-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.recent-job-company-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+}
+
+.activity-list-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.activity-row-content {
+    width: 100%;
+}
+
+.activity-caught-up {
+    flex: 1;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top: 1px dashed var(--border-slate);
+    margin-top: auto;
+    padding-top: 20px;
+    color: var(--text-light);
+    font-size: 12px;
+}
+
+.activity-caught-up p {
+    margin: 0;
+}
+
+/* ── Footer ───────────────────────────────────────────────── */
+.home-footer {
+    text-align: center;
+    margin-top: 60px;
+    padding-bottom: 20px;
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+.home-footer-text {
+    margin: 0 0 8px 0;
+    font-weight: 500;
+}
+
+.home-footer-link {
+    color: var(--accent-color);
+    text-decoration: none;
+    font-weight: 500;
+}

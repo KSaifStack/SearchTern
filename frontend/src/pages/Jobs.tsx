@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { Table, Pagination, Menu, MenuDropdown, Popover, Text } from '@mantine/core'
 import { checkHealth } from "../api/internships"
-import {BookmarkSimpleIcon}  from '@phosphor-icons/react';
+import { BookmarkSimpleIcon } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
@@ -12,7 +12,7 @@ interface Job {
   company: string
   role: string
   location: string
-  date: string 
+  date: string
   link: string
 }
 
@@ -43,91 +43,91 @@ function Jobs() {
       const d = new Date(dateString.replace(' ', 'T'));
       if (isNaN(d.getTime())) return dateString;
       return d.toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true });
-    } catch(e) {
+    } catch (e) {
       return dateString;
     }
   }
 
-  
+
   useEffect(() => {
-  getRecent().then(res => {
-    if(res.success) {
-      setJobs([...res.data])
+    getRecent().then(res => {
+      if (res.success) {
+        setJobs([...res.data])
 
-    }
-    setLoading(false)
-  })
-}, [])
-
-useEffect(() => {
-  const getSecondsUntilNextHour = () => {
-  const now = new Date()
-  const secondsElapsed = now.getMinutes() * 60 + now.getSeconds()
-  return 3600 - secondsElapsed
-}
-  let seconds = getSecondsUntilNextHour()
-
-  const format = (s: number) => {
-    const m = Math.floor(s / 60).toString().padStart(2, '0')
-    const sec = (s % 60).toString().padStart(2, '0')
-    return `${m}:${sec}`
-  }
-
-  
-  
-  setTimeRemaining(format(seconds))
-  const interval = setInterval(async () => {
-    seconds -= 1
-    if (seconds <= 0) {
-      seconds = getSecondsUntilNextHour()
-      const res = await getRecent()
-      if (res.success) setJobs([...res.data])
-    }
-    setTimeRemaining(format(seconds))
-  }, 1000)
-
-  return () => clearInterval(interval)
-  
-}, [])
-
-const DatetoNum = (val: string | number) => {
-  if (typeof val === 'number') return val;
-  const parsed = parseFloat(val);
-  return !isNaN(parsed) ? parsed : 999;
-}
-
-// Filter jobs based on active filters
-const applyFilters = (jobs: Job[]): Job[] => {
-  return jobs
-    .filter((job: any) => job && job.company)
-    .filter(job => {
-      // Text search
-      return job.company.toLowerCase().includes(search.toLowerCase()) ||
-        job.role.toLowerCase().includes(search.toLowerCase()) ||
-        job.location.toLowerCase().includes(search.toLowerCase());
+      }
+      setLoading(false)
     })
-    .sort((a, b) => {
-      const aNum = DatetoNum(a.date);
-      const bNum = DatetoNum(b.date);
-      return sortOrder === 'newest' ? aNum - bNum : bNum - aNum;
-    });
-};
+  }, [])
 
-const formatRelativeDate = (val: string | number) => {
-  const days = DatetoNum(val);
-  
-  if (days === 999) return "N/A";
-  if (days === 0) return "24 hours ago ";
-  if (days > 0 && days < 1) return "< 1 day ago"; 
-  if (days === 1) return "1 day ago";
-  if (days >= 30) {
-    const months = Math.floor(days / 30);
-    return `${months} month${months > 1 ? 's' : ''} ago`;
+  useEffect(() => {
+    const getSecondsUntilNextHour = () => {
+      const now = new Date()
+      const secondsElapsed = now.getMinutes() * 60 + now.getSeconds()
+      return 3600 - secondsElapsed
+    }
+    let seconds = getSecondsUntilNextHour()
+
+    const format = (s: number) => {
+      const m = Math.floor(s / 60).toString().padStart(2, '0')
+      const sec = (s % 60).toString().padStart(2, '0')
+      return `${m}:${sec}`
+    }
+
+
+
+    setTimeRemaining(format(seconds))
+    const interval = setInterval(async () => {
+      seconds -= 1
+      if (seconds <= 0) {
+        seconds = getSecondsUntilNextHour()
+        const res = await getRecent()
+        if (res.success) setJobs([...res.data])
+      }
+      setTimeRemaining(format(seconds))
+    }, 1000)
+
+    return () => clearInterval(interval)
+
+  }, [])
+
+  const DatetoNum = (val: string | number) => {
+    if (typeof val === 'number') return val;
+    const parsed = parseFloat(val);
+    return !isNaN(parsed) ? parsed : 999;
   }
-  return `${days} days ago`;
-}
 
-const filtered = applyFilters(jobs);
+  // Filter jobs based on active filters
+  const applyFilters = (jobs: Job[]): Job[] => {
+    return jobs
+      .filter((job: any) => job && job.company)
+      .filter(job => {
+        // Text search
+        return job.company.toLowerCase().includes(search.toLowerCase()) ||
+          job.role.toLowerCase().includes(search.toLowerCase()) ||
+          job.location.toLowerCase().includes(search.toLowerCase());
+      })
+      .sort((a, b) => {
+        const aNum = DatetoNum(a.date);
+        const bNum = DatetoNum(b.date);
+        return sortOrder === 'newest' ? aNum - bNum : bNum - aNum;
+      });
+  };
+
+  const formatRelativeDate = (val: string | number) => {
+    const days = DatetoNum(val);
+
+    if (days === 999) return "N/A";
+    if (days === 0) return "24 hours ago ";
+    if (days > 0 && days < 1) return "< 1 day ago";
+    if (days === 1) return "1 day ago";
+    if (days >= 30) {
+      const months = Math.floor(days / 30);
+      return `${months} month${months > 1 ? 's' : ''} ago`;
+    }
+    return `${days} days ago`;
+  }
+
+  const filtered = applyFilters(jobs);
 
   const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
@@ -140,8 +140,8 @@ const filtered = applyFilters(jobs);
     }
   }
 
-  
-  
+
+
 
   return (
     <>
@@ -150,7 +150,7 @@ const filtered = applyFilters(jobs);
           <p className="result-count" style={{ margin: 0 }}>Refreshes in: {timeRemaining}</p>
           <Popover width={250} position="bottom-start" withArrow shadow="md" opened={popoverOpened} onChange={setPopoverOpened}>
             <Popover.Target>
-              <button className="sort_btn" onClick={fetchHealth}>...</button>
+              <button className="health_btn" onClick={fetchHealth}>...</button>
             </Popover.Target>
             <Popover.Dropdown>
               {healthStatus ? (
@@ -176,22 +176,22 @@ const filtered = applyFilters(jobs);
         />
 
         <div className="results-header">
-        <p className="result-count">{filtered.length} internships found</p>
-        <Menu shadow="md" width={200}>
-          <Menu.Target>
-            <button className="sort_btn">
-              Sort By: {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
-            </button> 
-          </Menu.Target>
-          <MenuDropdown>
-            <Menu.Item onClick={() => setSortOrder('newest')}>
-              Newest Listing
-            </Menu.Item>
-            <Menu.Item onClick={() => setSortOrder('oldest')}>
-              Oldest Listing
-            </Menu.Item>
-          </MenuDropdown>
-        </Menu>
+          <p className="result-count">{filtered.length} internships found</p>
+          <Menu shadow="md" width={200}>
+            <Menu.Target>
+              <button className="sort_btn">
+                Sort By: {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
+              </button>
+            </Menu.Target>
+            <MenuDropdown>
+              <Menu.Item onClick={() => setSortOrder('newest')}>
+                Newest Listing
+              </Menu.Item>
+              <Menu.Item onClick={() => setSortOrder('oldest')}>
+                Oldest Listing
+              </Menu.Item>
+            </MenuDropdown>
+          </Menu>
         </div>
 
         <Table striped highlightOnHover mt="md">
@@ -215,28 +215,28 @@ const filtered = applyFilters(jobs);
             ) : (
               paginated.map(job => (
                 <Table.Tr key={job.id}>
-              
+
                   <Table.Td className="company-cell">
-                    <BookmarkSimpleIcon 
-                      size={25} 
-                      className="bookmark-icon" 
+                    <BookmarkSimpleIcon
+                      size={25}
+                      className="bookmark-icon"
                       weight={isJobTracked(job.company, job.role, job.location) ? "fill" : "regular"}
                       color={isJobTracked(job.company, job.role, job.location) ? "var(--accent-color)" : "currentColor"}
                       onClick={() => toggleSave(job)}
                     />
                     <img
-                        src={`https://www.google.com/s2/favicons?domain=${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com&sz=32`}
-                        style={{ width: '16px', height: '16px', borderRadius: '2px' }}
-                        onError={(e) => e.currentTarget.style.display = 'none'}
-                        alt=""
+                      src={`https://www.google.com/s2/favicons?domain=${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com&sz=32`}
+                      style={{ width: '16px', height: '16px', borderRadius: '2px' }}
+                      onError={(e) => e.currentTarget.style.display = 'none'}
+                      alt=""
                     />
                     {job.company}
                   </Table.Td>
                   <Table.Td>
                     <a href={job.link} target="_blank" rel="noreferrer" className="apply-link">
-                    {job.role}
+                      {job.role}
                     </a>
-                    </Table.Td>
+                  </Table.Td>
                   <Table.Td>{job.location}</Table.Td>
                   <Table.Td>{formatRelativeDate(job.date)}</Table.Td>
                 </Table.Tr>

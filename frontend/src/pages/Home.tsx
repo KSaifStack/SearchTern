@@ -73,55 +73,48 @@ function Home() {
 
 
     return (
-        <div className="standard-layout" style={{ maxWidth: '1400px', padding: '36px 32px' }}>
+        <div className="standard-layout home-layout">
 
             {/* ── Stat Bar ── */}
-            <section className="feature" style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-around',
-                padding: '20px 40px',
-                margin: '0 0 24px 0',
-                gap: '16px'
-            }}>
-                <div style={{ textAlign: 'center', flex: 1, borderTop: '3px solid var(--border-slate)', paddingTop: '16px' }}>
-                    <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb={6} style={{ letterSpacing: '0.05em' }}>Total Internships</Text>
-                    <Text fw={800} size="xl" c="var(--text-dark)" style={{ fontSize: '2rem' }}>
+            <section className="feature stat-bar">
+                <div className="stat-item">
+                    <Text className="stat-item-title" c="dimmed" size="xs" tt="uppercase" fw={600} mb={6}>Total Internships</Text>
+                    <Text className="stat-item-value" fw={800} c="var(--text-dark)">
                         {loading ? '—' : jobs.length}
                     </Text>
                 </div>
-                <Divider orientation="vertical" style={{ height: '60px' }} />
-                <div style={{ textAlign: 'center', flex: 1, borderTop: '3px solid var(--border-slate)', paddingTop: '16px' }}>
-                    <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb={6} style={{ letterSpacing: '0.05em' }}>Added Today</Text>
-                    <Text fw={800} size="xl" c="var(--text-dark)" style={{ fontSize: '2rem' }}>
+                <Divider orientation="vertical" className="stat-divider" />
+                <div className="stat-item">
+                    <Text className="stat-item-title" c="dimmed" size="xs" tt="uppercase" fw={600} mb={6}>Added Today</Text>
+                    <Text className="stat-item-value" fw={800} c="var(--text-dark)">
                         {loading ? '—' : todayCount}
                     </Text>
                 </div>
-                <Divider orientation="vertical" style={{ height: '60px' }} />
-                <div style={{ textAlign: 'center', flex: 1, borderTop: '3px solid var(--border-slate)', paddingTop: '16px' }}>
-                    <Text c="dimmed" size="xs" tt="uppercase" fw={600} mb={6} style={{ letterSpacing: '0.05em' }}>Tracked Apps</Text>
-                    <Text fw={800} size="xl" c="var(--text-dark)" style={{ fontSize: '2rem' }}>
+                <Divider orientation="vertical" className="stat-divider" />
+                <div className="stat-item">
+                    <Text className="stat-item-title" c="dimmed" size="xs" tt="uppercase" fw={600} mb={6}>Tracked Apps</Text>
+                    <Text className="stat-item-value" fw={800} c="var(--text-dark)">
                         {trackedJobs.length}
                     </Text>
                 </div>
-                <Divider orientation="vertical" style={{ height: '60px' }} />
-                <div style={{ textAlign: 'center', flex: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+                <Divider orientation="vertical" className="stat-divider" />
+                <div className="stat-ring-container">
                     <RingProgress
                         size={110}
                         thickness={10}
                         roundCaps
                         sections={ringData}
                         label={
-                            <div style={{ textAlign: 'center', marginTop: '-4px' }}>
+                            <div className="stat-ring-label">
                                 <Text fw={800} size="xl" lh={1}>{total > 0 ? total : 0}</Text>
                                 <Text c="dimmed" size="xs" tt="uppercase" fw={700} mt={2}>Total</Text>
                             </div>
                         }
                     />
-                    <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div className="stat-ring-legend">
                         {ringData.filter(d => d.tooltip !== 'No data yet').map((item, idx) => (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: item.color === 'gray' ? '#868e96' : item.color === 'blue' ? '#228be6' : item.color === 'yellow' ? '#fab005' : item.color === 'green' ? '#40c057' : '#fa5252' }} />
+                            <div key={idx} className="stat-ring-legend-item">
+                                <div className="stat-ring-legend-dot" style={{ backgroundColor: item.color === 'gray' ? '#868e96' : item.color === 'blue' ? '#228be6' : item.color === 'yellow' ? '#fab005' : item.color === 'green' ? '#40c057' : '#fa5252' }} />
                                 <Text size="xs" c="dimmed" fw={600}>{item.tooltip}</Text>
                             </div>
                         ))}
@@ -155,20 +148,20 @@ function Home() {
                         </div>
                     ) : (
                         recentJobs.map(job => (
-                                <a key={job.id} href={job.link} target="_blank" rel="noreferrer" className="recent-job-row">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <img
-                                            src={`https://www.google.com/s2/favicons?domain=${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com&sz=32`}
-                                            style={{ width: '16px', height: '16px', borderRadius: '2px' }}
-                                            onError={(e) => e.currentTarget.style.display = 'none'}
-                                            alt=""
-                                        />
-                                        <span className="recent-job-company">{job.company}</span>
-                                    </div>
-                                    <span className="recent-job-role">{job.role}</span>
-                                    <span className="recent-job-location">{job.location}</span>
-                                </a>
-                            ))
+                            <a key={job.id} href={job.link} target="_blank" rel="noreferrer" className="recent-job-row">
+                                <div className="recent-job-company-container">
+                                    <img
+                                        src={`https://www.google.com/s2/favicons?domain=${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com&sz=32`}
+                                        className="recent-job-company-icon"
+                                        onError={(e) => e.currentTarget.style.display = 'none'}
+                                        alt=""
+                                    />
+                                    <span className="recent-job-company">{job.company}</span>
+                                </div>
+                                <span className="recent-job-role">{job.role}</span>
+                                <span className="recent-job-location">{job.location}</span>
+                            </a>
+                        ))
                     )}
                 </section>
 
@@ -182,10 +175,10 @@ function Home() {
                     {recentActivity.length === 0 ? (
                         <p className="home-empty">No activity yet.<br />Start tracking applications to see updates here!</p>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        <div className="activity-list-container">
                             {recentActivity.map(event => (
                                 <div key={event.id} className="activity-row">
-                                    <div style={{ width: '100%' }}>
+                                    <div className="activity-row-content">
                                         <p className="activity-text">
                                             {activityDescription(event)}
                                         </p>
@@ -194,8 +187,8 @@ function Home() {
                                 </div>
                             ))}
                             {recentActivity.length < 6 && (
-                                <div style={{ flex: 1, minHeight: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: '1px dashed var(--border-slate)', marginTop: 'auto', paddingTop: '20px', color: 'var(--text-light)', fontSize: '12px' }}>
-                                    <p style={{ margin: 0 }}>You're all caught up!</p>
+                                <div className="activity-caught-up">
+                                    <p>You're all caught up!</p>
                                 </div>
                             )}
                         </div>
@@ -203,6 +196,14 @@ function Home() {
                 </section>
 
             </div>
+
+            {/* ── Footer ── */}
+            <footer className="home-footer">
+                <p className="home-footer-text">© 2026 SearchTern</p>
+                <a href="https://github.com/KSaifStack/SearchTern" target="_blank" rel="noopener noreferrer" className="home-footer-link">
+                    GitHub
+                </a>
+            </footer>
         </div>
     );
 }
