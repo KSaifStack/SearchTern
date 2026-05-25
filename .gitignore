@@ -28,4 +28,4 @@ database.db
 frontend/.env
 backend/.env
 frontend/.env.local
-
+__pycache__/
