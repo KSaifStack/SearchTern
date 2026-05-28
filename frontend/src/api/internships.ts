@@ -1,6 +1,13 @@
+import { createClient } from '@supabase/supabase-js';
+
 const api_key = import.meta.env.VITE_API_KEY;
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-// pulls update Backend data via fastapi  
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// pulls update Backend data via fastapi (ThinkPad)
 export async function pullUpdateBackend() {
     const res = await fetch(`${BASE_URL}/update`, {
       method: "POST",
@@ -14,28 +21,51 @@ export async function pullUpdateBackend() {
     return data.result
 }
 
-// pulls recent internships via fastapi
+// pulls recent internships directly from Supabase
 export async function pullRecent(){
-  const res = await fetch(`${BASE_URL}/recent`);
-  const data = await res.json();
-  return data.result;
+  const { data, error } = await supabase
+    .from('internships')
+    .select('*')
+    .order('date');
+  
+  if (error) {
+    console.error("Error fetching from Supabase:", error);
+    return [];
+  }
+  return data;
 }
 
-// pulls internships based off location via fastapi
+// pulls internships based off location directly from Supabase
 export async function pullLocation(searchterm:String){
-    const res = await fetch(`${BASE_URL}/location?searchterm=` + searchterm);  
-    const data = await res.json();
-  return data.result;
+  const { data, error } = await supabase
+    .from('internships')
+    .select('*')
+    .ilike('location', `%${searchterm}%`)
+    .order('date');
+
+  if (error) {
+    console.error("Error fetching location from Supabase:", error);
+    return [];
+  }
+  return data;
 }
 
-
-// pulls internships based off keyword via fastapi
+// pulls internships based off keyword directly from Supabase
 export async function pullKeyword(searchterm:String){
-    const res = await fetch(`${BASE_URL}/keywords?searchterm=` + searchterm);
-    const data = await res.json();
-    return data.result;
+  const { data, error } = await supabase
+    .from('internships')
+    .select('*')
+    .ilike('role', `%${searchterm}%`)
+    .order('date');
+
+  if (error) {
+    console.error("Error fetching keyword from Supabase:", error);
+    return [];
+  }
+  return data;
 }
-// checks health
+
+// checks health of the ThinkPad scraper
 export async function checkHealth() {
   try {
     const res = await fetch(`${BASE_URL}/health`);
