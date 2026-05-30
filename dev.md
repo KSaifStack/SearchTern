@@ -11,17 +11,24 @@ git clone <https://github.com/KSaifStack/SearchTernBase.git>
 cd SearchTernBase
 ```
 
-**2. Set up environment variables**
+**2. Set up environment variables and database**
 
-Create `backend/.env`:
-```env
-API_KEY=your_secure_random_string_here
-DATABASE_URL=postgresql://user:password@localhost:5432/searchtern
+Make sure PostgreSQL is running locally, and create a database named `searchtern`:
+```sql
+CREATE DATABASE searchtern;
 ```
 
-Create `frontend/.env.local`:
+Create `backend/.env` (you can copy `backend/.env.template`):
+```env
+API_KEY=your_secure_random_string_here
+DATABASE_URL=postgresql://postgres:password@localhost:5432/searchtern
+```
+
+Create `frontend/.env.local` (you can copy `frontend/.env.local.template`):
 ```env
 VITE_API_KEY=your_secure_random_string_here
+# Note: If VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are not specified,
+# the frontend will automatically fall back to querying your local FastAPI backend.
 ```
 
 **3. Start the app**

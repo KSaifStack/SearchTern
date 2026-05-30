@@ -5,7 +5,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 // pulls update Backend data via fastapi (ThinkPad)
 export async function pullUpdateBackend() {
@@ -23,6 +23,18 @@ export async function pullUpdateBackend() {
 
 // pulls recent internships directly from Supabase
 export async function pullRecent(){
+  if (!supabase) {
+    console.log("Supabase URL or Key missing. Falling back to local backend API.");
+    try {
+      const res = await fetch(`${BASE_URL}/recent`);
+      const data = await res.json();
+      return data.result || [];
+    } catch (e) {
+      console.error("Error fetching recent internships from local backend:", e);
+      return [];
+    }
+  }
+
   const { data, error } = await supabase
     .from('internships')
     .select('*')
@@ -37,6 +49,18 @@ export async function pullRecent(){
 
 // pulls internships based off location directly from Supabase
 export async function pullLocation(searchterm:String){
+  if (!supabase) {
+    console.log("Supabase URL or Key missing. Falling back to local backend API.");
+    try {
+      const res = await fetch(`${BASE_URL}/location?searchterm=${encodeURIComponent(searchterm.toString())}`);
+      const data = await res.json();
+      return data.result || [];
+    } catch (e) {
+      console.error("Error fetching location search from local backend:", e);
+      return [];
+    }
+  }
+
   const { data, error } = await supabase
     .from('internships')
     .select('*')
@@ -52,6 +76,18 @@ export async function pullLocation(searchterm:String){
 
 // pulls internships based off keyword directly from Supabase
 export async function pullKeyword(searchterm:String){
+  if (!supabase) {
+    console.log("Supabase URL or Key missing. Falling back to local backend API.");
+    try {
+      const res = await fetch(`${BASE_URL}/keywords?searchterm=${encodeURIComponent(searchterm.toString())}`);
+      const data = await res.json();
+      return data.result || [];
+    } catch (e) {
+      console.error("Error fetching keyword search from local backend:", e);
+      return [];
+    }
+  }
+
   const { data, error } = await supabase
     .from('internships')
     .select('*')
