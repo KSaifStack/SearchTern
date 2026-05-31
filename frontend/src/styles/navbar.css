@@ -37,8 +37,11 @@ display: grid;
 .nav-right {
     display: flex;
     justify-content: flex-end;
-
+    align-items: center;
+    margin-left: auto;
+    margin-right: 1rem;
 }
+
 
 nav a {
     text-decoration: none;
@@ -86,7 +89,29 @@ nav li a.active {
     color: white;
     background-color: var(--accent-color);
 }
+.register-btn {
+    display: inline-block;
+    padding: 8px 20px;
+    background-color: #111;
+    color: #fff !important;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: opacity 0.15s, transform 0.1s;
+    white-space: nowrap;
+    letter-spacing: normal;
+    text-transform: none;
+}
 
+.register-btn:hover {
+    opacity: 0.8;
+    background-color: #111;
+    color: #fff;
+}
 
+.register-btn:active {
+    transform: scale(0.97);
+}
 
 

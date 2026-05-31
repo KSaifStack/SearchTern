@@ -5,6 +5,7 @@ import Home from "./pages/Home"
 import Jobs from "./pages/Jobs"
 import Tracker from "./pages/Tracker"
 import { TrackerProvider } from "./components/TrackerContext"
+import RegistrationForm from "./pages/Registrationform"
 
 function App() {
     return (
@@ -17,6 +18,7 @@ function App() {
                             <Route path="/" element={<Home />} />
                             <Route path="/jobs" element={<main className="standard-layout"><Jobs /></main>} />
                             <Route path="/tracker" element={<main className="full-width-layout"><Tracker /></main>} />
+                            <Route path="/register" element={<main className="RegistrationForm"><RegistrationForm /></main>} />
                         </Routes>
                     </div>
                     <SpeedInsights />
