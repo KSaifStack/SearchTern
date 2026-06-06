@@ -77,6 +77,7 @@ header {
     padding: 30px 20px;
     width: 100%;
     box-sizing: border-box;
+    overflow-x: hidden;
 }
 
 
@@ -122,4 +123,11 @@ button:hover {
     background-color: var(--button-hover-color);
     transform: translateY(-1px);
     box-shadow: 0 3px 10px rgba(45, 122, 79, 0.3);
+}
+
+@media (max-width: 640px) {
+  .standard-layout { padding: 20px 16px; }
+  .full-width-layout { padding: 20px 12px; }
+  /* Ensure buttons meet 44px touch target */
+  button { min-height: 44px; }
 }

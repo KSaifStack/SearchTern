@@ -257,3 +257,10 @@
     text-decoration: none;
     font-weight: 500;
 }
+
+@media (max-width: 640px) {
+  .stat-bar { flex-direction: column; padding: 16px; gap: 20px; }
+  .stat-divider { display: none; } /* hide vertical dividers */
+  .stat-ring-container { width: 100%; justify-content: center; }
+  .home-layout { padding: 20px 16px; }
+}

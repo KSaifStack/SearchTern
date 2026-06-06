@@ -175,3 +175,35 @@
 .bookmark-icon:hover {
   color: var(--accent-color);
 }
+
+@media (max-width: 640px) {
+  /* Hide thead */
+  .mantine-Table-thead { display: none; }
+
+  /* Each row becomes a card */
+  .mantine-Table-tr { 
+    display: block; 
+    border: 1px solid var(--border-light);
+    border-radius: 8px; 
+    margin-bottom: 12px; 
+    padding: 12px; 
+  }
+
+  /* Each cell stacks */
+  .mantine-Table-td { 
+    display: block; 
+    padding: 6px 0; 
+  }
+  
+  .mantine-Table-td::before { 
+    content: attr(data-label); 
+    font-size: 11px;
+    text-transform: uppercase; 
+    color: var(--text-light); 
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  /* Hide Date column (less critical on mobile) */
+  .mantine-Table-td:last-child { display: none; }
+}

@@ -51,3 +51,9 @@
     background-color: var(--accent-color);
     font-weight: 600;
 }
+
+@media (max-width: 480px) {
+  .group.grow { flex-direction: column; }
+  .modal-footer { flex-direction: column; gap: 10px; }
+  .modal-footer .group { justify-content: flex-end; }
+}
