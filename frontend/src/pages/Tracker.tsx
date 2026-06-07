@@ -20,6 +20,7 @@ import "../styles/Tracker.css";
 function Tracker() {
     const { trackedJobs, updateJobStatus, addJob, editJob, removeJob } = useTracker();
     const [activeId, setActiveId] = React.useState<string | null>(null);
+    const [activeColumn, setActiveColumn] = useState<JobStatus>('Saved');
 
     // Modal State
     const [modalOpen, setModalOpen] = useState(false);
@@ -156,14 +157,14 @@ function Tracker() {
     };
 
     return (
-        <div style={{ width: 'max-content', maxWidth: '100%', margin: '0 auto' }}>
+        <div style={{ width: '100%', maxWidth: '1580px', margin: '0 auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', marginTop: '10px' }}>
                 <Text size="xl" fw={800} c="var(--text-dark)" style={{ fontSize: '1.75rem' }}>Application Tracker</Text>
                 <button onClick={() => openModal()} style={{ padding: '10px 24px', fontWeight: 600 }}>+ Add Application</button>
             </div>
 
-            <section className="feature" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px', margin: '0 0 20px 0', width: '100%', boxSizing: 'border-box' }}>
-                <div style={{ display: 'flex', flexGrow: 1, justifyContent: 'space-around', paddingRight: '40px' }}>
+            <section className="feature tracker-stats" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px', margin: '0 0 20px 0', boxSizing: 'border-box' }}>
+                <div className="tracker-stats-numbers" style={{ display: 'flex', flexGrow: 1, justifyContent: 'space-around', paddingRight: '40px' }}>
                     <div style={{ textAlign: 'center' }}>
                         <Text c="dimmed" size="xs" tt="uppercase" fw={700}>Applied</Text>
                         <Text fw={700} size="xl">{totalApplied}</Text>
@@ -182,9 +183,9 @@ function Tracker() {
                     </div>
                 </div>
 
-                <Divider orientation="vertical" />
+                <Divider orientation="vertical" className="tracker-divider" />
 
-                <div style={{ paddingLeft: '40px', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <div className="tracker-ring" style={{ paddingLeft: '40px', display: 'flex', alignItems: 'center', gap: '20px' }}>
                     <RingProgress
                         size={120}
                         thickness={12}
@@ -208,22 +209,38 @@ function Tracker() {
                 </div>
             </section>
 
-            <DndContext
-                sensors={sensors}
-                collisionDetection={closestCorners}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-            >
-                <div className="tracker-board" style={{ width: '100%', maxWidth: 'none', margin: 0 }}>
+            <div className="tracker-board-scroll">
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCorners}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                >
+                <div className="tracker-tab-strip">
                     {STATUSES.map(status => (
-                        <Column key={status} status={status} jobs={columns[status]} onEdit={openModal} onAdd={openModal} />
+                        <button
+                            key={status}
+                            className={`tracker-tab ${activeColumn === status ? 'active' : ''}`}
+                            onClick={() => setActiveColumn(status)}
+                        >
+                            {status}
+                            <span className="tab-count">{columns[status].length}</span>
+                        </button>
+                    ))}
+                </div>
+                <div className="tracker-board">
+                    {STATUSES.map(status => (
+                        <div key={status} className={`tracker-column-wrapper ${activeColumn === status ? 'active' : ''}`}>
+                            <Column status={status} jobs={columns[status]} onEdit={openModal} onAdd={openModal} />
+                        </div>
                     ))}
                 </div>
 
-                <DragOverlay>
-                    {activeJob ? <JobCard job={activeJob} /> : null}
-                </DragOverlay>
-            </DndContext>
+                    <DragOverlay>
+                        {activeJob ? <JobCard job={activeJob} /> : null}
+                    </DragOverlay>
+                </DndContext>
+            </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', paddingRight: '10px' }}>
                 <button 

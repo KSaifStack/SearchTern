@@ -216,7 +216,7 @@ function Jobs() {
               paginated.map(job => (
                 <Table.Tr key={job.id}>
 
-                  <Table.Td className="company-cell">
+                  <Table.Td className="company-cell" data-label="Company">
                     <BookmarkSimpleIcon
                       size={25}
                       className="bookmark-icon"
@@ -232,13 +232,13 @@ function Jobs() {
                     />
                     {job.company}
                   </Table.Td>
-                  <Table.Td>
+                  <Table.Td data-label="Role">
                     <a href={job.link} target="_blank" rel="noreferrer" className="apply-link">
                       {job.role}
                     </a>
                   </Table.Td>
-                  <Table.Td>{job.location}</Table.Td>
-                  <Table.Td>{formatRelativeDate(job.date)}</Table.Td>
+                  <Table.Td data-label="Location">{job.location}</Table.Td>
+                  <Table.Td data-label="Date">{formatRelativeDate(job.date)}</Table.Td>
                 </Table.Tr>
               ))
             )}

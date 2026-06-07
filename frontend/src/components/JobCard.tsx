@@ -26,8 +26,8 @@ export const JobCard = ({ job, onClick }: { job: TrackedJob, onClick?: () => voi
             </div>
             <p className="card-role">{job.role}</p>
             <div className="card-footer">
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>{job.location}</span>
-                <span style={{ color: 'var(--text-light)', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{job.location}</span>
+                <span style={{ color: 'var(--text-light)', fontSize: '11px', whiteSpace: 'nowrap', marginLeft: '8px', flexShrink: 0 }}>
                     {job.dateApplied ? new Date(job.dateApplied).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Added today'}
                 </span>
             </div>

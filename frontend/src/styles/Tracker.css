@@ -1,20 +1,29 @@
-.tracker-board {
-    display: flex;
-    gap: 20px;
+.tracker-board-scroll {
+    width: 100%;
     overflow-x: auto;
     padding: 10px 0;
+}
+
+.tracker-board {
+    display: flex;
+    gap: 16px;
     min-height: 60vh;
     align-items: flex-start;
-    width: max-content;
-    max-width: 100%;
-    margin: 0 auto;
+    width: 100%;
+    min-width: fit-content;
+}
+
+.tracker-column-wrapper {
+    flex: 1;
+    display: flex;
+    min-width: 220px;
 }
 
 .tracker-column {
     background-color: var(--white);
     border-radius: 8px;
-    min-width: 300px;
-    width: 300px;
+    min-width: 220px;
+    flex: 1;
     display: flex;
     flex-direction: column;
     padding: 15px;
@@ -81,6 +90,7 @@
     align-items: center;
     font-size: 12px;
     color: var(--text-light);
+    min-width: 0;
 }
 
 .add-card-btn {
@@ -100,4 +110,59 @@
     color: var(--text-dark);
     box-shadow: none;
     transform: none;
+}
+
+.tracker-tab-strip { display: none; }
+
+@media (max-width: 640px) {
+  .tracker-stats { flex-direction: column !important; padding: 16px !important; }
+  .tracker-stats-numbers { justify-content: space-around; padding-right: 0 !important; width: 100%; margin-bottom: 20px; }
+  .tracker-divider { display: none; }
+  .tracker-ring { padding-left: 0 !important; justify-content: center; width: 100%; }
+
+  .tracker-tab-strip { 
+    display: flex; 
+    gap: 8px; 
+    overflow-x: auto; 
+    padding-bottom: 12px; 
+    margin-bottom: 10px;
+    width: 100%;
+  }
+  
+  .tracker-tab {
+    background: var(--white);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .tracker-tab.active {
+    background: var(--primary-green-light);
+    color: var(--primary-green);
+    border-color: var(--primary-green);
+  }
+  
+  .tab-count {
+    background: var(--badge-bg);
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+  
+  .tracker-tab.active .tab-count {
+    background: var(--primary-green);
+    color: var(--white);
+  }
+
+  .tracker-board { display: block; } 
+  .tracker-column-wrapper { display: none; }
+  .tracker-column-wrapper.active { display: block; width: 100%; }
+  .tracker-column { width: 100%; min-width: unset; }
 }
