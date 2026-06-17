@@ -200,7 +200,7 @@ function Home() {
             {/* ── Footer ── */}
             <footer className="home-footer">
                 <p className="home-footer-text">© 2026 SearchTern</p>
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', alignItems: 'center' }}>
                     <a href="https://github.com/KSaifStack/SearchTern" target="_blank" rel="noopener noreferrer" className="home-footer-link">
                         GitHub
                     </a>

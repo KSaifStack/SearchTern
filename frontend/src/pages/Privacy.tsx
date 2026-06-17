@@ -1,20 +1,20 @@
-import React from 'react';
+
 
 function Privacy() {
     return (
-        <div style={{ maxWidth: '800px', margin: '40px auto', padding: '0 20px', lineHeight: '1.6', color: '#333' }}>
-            <h1 style={{ fontSize: '2rem', marginBottom: '20px' }}>Privacy Policy</h1>
-            <p><strong>Last updated:</strong> June 17, 2026</p>
+        <div className="feature" style={{ maxWidth: '1100px', margin: '40px auto' }}>
+            <h1 style={{ fontSize: '2rem', marginBottom: '8px' }}>Privacy Policy</h1>
+            <p style={{ color: 'var(--text-muted)' }}><strong>Last updated:</strong> June 17, 2026</p>
 
             <h2 style={{ marginTop: '30px', fontSize: '1.5rem' }}>1. Introduction</h2>
             <p>Welcome to SearchTern. We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website and tell you about your privacy rights.</p>
 
             <h2 style={{ marginTop: '30px', fontSize: '1.5rem' }}>2. The data we collect about you</h2>
             <p>When you register and use SearchTern, we may collect, use, store and transfer different kinds of personal data about you, including:</p>
-            <ul>
-                <li><strong>Identity Data:</strong> includes your first name, last name, or username.</li>
-                <li><strong>Contact Data:</strong> includes your email address.</li>
-                <li><strong>Application Data:</strong> data related to the internships you track, notes you take, and statuses you update within the platform.</li>
+            <ul style={{ paddingLeft: '20px' }}>
+                <li style={{ marginBottom: '8px' }}><strong>Identity Data:</strong> includes your first name, last name, or username.</li>
+                <li style={{ marginBottom: '8px' }}><strong>Contact Data:</strong> includes your email address.</li>
+                <li style={{ marginBottom: '8px' }}><strong>Application Data:</strong> data related to the internships you track, notes you take, and statuses you update within the platform.</li>
             </ul>
 
             <h2 style={{ marginTop: '30px', fontSize: '1.5rem' }}>3. How we use your personal data</h2>
