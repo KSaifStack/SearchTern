@@ -1,11 +1,33 @@
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import "../styles/navbar.css"
-import { Link, useLocation } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import logo from "../assets/Logo.png"
+import { useAuth } from "./AuthContext"
+import { User, CaretDown, SignOut, SignIn, UserPlus } from "@phosphor-icons/react"
 
 function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false)
+    const [profileOpen, setProfileOpen] = useState(false)
     const location = useLocation()
+    const navigate = useNavigate()
+    const { user, signOut } = useAuth()
+    const dropdownRef = useRef<HTMLDivElement>(null)
+
+    // Google OAuth users store their info in user_metadata — fall back gracefully
+    const displayEmail = user?.email ?? user?.user_metadata?.email ?? ''
+    const displayName: string = user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? ''
+    const avatarLetter = (displayName?.[0] ?? displayEmail?.[0] ?? '?').toUpperCase()
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setProfileOpen(false)
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
+    }, [])
 
     return (
         <header>
@@ -28,6 +50,64 @@ function Navbar() {
                 <li><Link to="/jobs" className={location.pathname === '/jobs' ? 'active' : ''} onClick={() => setMenuOpen(false)}>Internships</Link></li>
                 <li><Link to="/tracker" className={location.pathname === '/tracker' ? 'active' : ''} onClick={() => setMenuOpen(false)}>Applications</Link></li>
             </ul>
+
+            <div className="nav-auth" ref={dropdownRef}>
+                <button
+                    className="nav-profile-trigger"
+                    onClick={() => setProfileOpen(!profileOpen)}
+                >
+                    {user ? (
+                        <div className="nav-avatar" title={displayEmail}>
+                            {avatarLetter}
+                        </div>
+                    ) : (
+                        <div className="nav-avatar-placeholder">
+                            <User weight="bold" />
+                        </div>
+                    )}
+                    <CaretDown weight="bold" className={`nav-caret ${profileOpen ? 'open' : ''}`} />
+                </button>
+
+                {profileOpen && (
+                    <div className="nav-profile-menu">
+                        {user ? (
+                            <>
+                                <div className="nav-profile-header">
+                                    {displayName && (
+                                        <span className="nav-profile-name">{displayName}</span>
+                                    )}
+                                    <span className="nav-profile-email">{displayEmail}</span>
+                                </div>
+                                <div className="nav-profile-divider" />
+                                <button
+                                    className="nav-profile-item"
+                                    onClick={() => { signOut(); setProfileOpen(false); setMenuOpen(false); }}
+                                >
+                                    <SignOut weight="bold" />
+                                    <span>Log Out</span>
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    className="nav-profile-item"
+                                    onClick={() => { navigate('/auth'); setProfileOpen(false); setMenuOpen(false); }}
+                                >
+                                    <SignIn weight="bold" />
+                                    <span>Log In</span>
+                                </button>
+                                <button
+                                    className="nav-profile-item"
+                                    onClick={() => { navigate('/auth'); setProfileOpen(false); setMenuOpen(false); }}
+                                >
+                                    <UserPlus weight="bold" />
+                                    <span>Sign Up</span>
+                                </button>
+                            </>
+                        )}
+                    </div>
+                )}
+            </div>
         </nav>
         </header>
     )

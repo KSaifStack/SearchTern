@@ -1,11 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 
 const api_key = import.meta.env.VITE_API_KEY;
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 // pulls update Backend data via fastapi (ThinkPad)
 export async function pullUpdateBackend() {

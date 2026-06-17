@@ -4,24 +4,31 @@ import Navbar from "./components/Navbar"
 import Home from "./pages/Home"
 import Jobs from "./pages/Jobs"
 import Tracker from "./pages/Tracker"
+import Auth from "./pages/Auth"
+import Privacy from "./pages/Privacy"
 import { TrackerProvider } from "./components/TrackerContext"
+import { AuthProvider } from "./components/AuthContext"
 
 function App() {
     return (
         <BrowserRouter>
-            <TrackerProvider>
-                <div>
-                    <Navbar />
-                    <div className="app-content">
-                        <Routes>
-                            <Route path="/" element={<Home />} />
-                            <Route path="/jobs" element={<main className="standard-layout"><Jobs /></main>} />
-                            <Route path="/tracker" element={<main className="full-width-layout"><Tracker /></main>} />
-                        </Routes>
+            <AuthProvider>
+                <TrackerProvider>
+                    <div>
+                        <Navbar />
+                        <div className="app-content">
+                            <Routes>
+                                <Route path="/" element={<Home />} />
+                                <Route path="/jobs" element={<main className="standard-layout"><Jobs /></main>} />
+                                <Route path="/tracker" element={<main className="full-width-layout"><Tracker /></main>} />
+                                <Route path="/auth" element={<main className="auth-wrapper"><Auth /></main>} />
+                                <Route path="/privacy" element={<main className="standard-layout"><Privacy /></main>} />
+                            </Routes>
+                        </div>
+                        <SpeedInsights />
                     </div>
-                    <SpeedInsights />
-                </div>
-            </TrackerProvider>
+                </TrackerProvider>
+            </AuthProvider>
         </BrowserRouter>
     )
 }
