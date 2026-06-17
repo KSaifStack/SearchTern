@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { Modal, Button, Text, Group } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { makeJobFingerprint } from '../utils/jobFingerprint';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
@@ -46,7 +48,6 @@ interface TrackerContextType {
 
 const TrackerContext = createContext<TrackerContextType | undefined>(undefined);
 
-// ── Local storage helpers ──────────────────────────────────────────────────────
 const LS_JOBS = 'searchtern_tracker_v2';
 const LS_ACTIVITY = 'searchtern_activity';
 
@@ -59,7 +60,6 @@ function loadLocal<T>(key: string, fallback: T): T {
     }
 }
 
-// ── Row shape from Supabase ────────────────────────────────────────────────────
 interface DbRow {
     fingerprint: string;
     company: string;
@@ -107,6 +107,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const [trackedJobs, setTrackedJobs] = useState<TrackedJob[]>(() => loadLocal<TrackedJob[]>(LS_JOBS, []));
     const [activityLog, setActivityLog] = useState<ActivityEvent[]>(() => loadLocal<ActivityEvent[]>(LS_ACTIVITY, []));
     const [syncing, setSyncing] = useState(false);
+    const [pendingMerge, setPendingMerge] = useState<{ local: TrackedJob[], cloud: TrackedJob[], userId: string } | null>(null);
 
     // ── Persist to localStorage whenever jobs change (guest fallback) ──────────
     useEffect(() => {
@@ -133,20 +134,18 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (data) {
             const cloudJobs = (data as DbRow[]).map(dbRowToJob);
 
-            // Merge: start with cloud jobs, then layer in any local-only jobs
+            // Merge logic: Check if there are local-only jobs
+            const cloudIds = new Set(cloudJobs.map(j => j.id));
             setTrackedJobs(prev => {
-                const cloudIds = new Set(cloudJobs.map(j => j.id));
                 const localOnly = prev.filter(j => !cloudIds.has(j.id));
-                // Upload local-only jobs to the cloud
-                if (localOnly.length > 0 && supabase) {
-                    supabase
-                        .from('tracked_jobs')
-                        .upsert(localOnly.map(j => jobToDbRow(j, userId)), { onConflict: 'user_id,fingerprint' })
-                        .then(({ error }) => {
-                            if (error) console.error('Error uploading local jobs to Supabase:', error);
-                        });
+                if (localOnly.length > 0) {
+                    // Instead of automatic upload, ask the user
+                    setPendingMerge({ local: localOnly, cloud: cloudJobs, userId });
+                    // Return prev for now while the modal is open
+                    return prev;
                 }
-                return [...cloudJobs, ...localOnly];
+                // If no local data, just load cloud data
+                return cloudJobs;
             });
         }
     }, []);
@@ -154,10 +153,35 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     useEffect(() => {
         if (user?.id) {
             fetchFromSupabase(user.id);
+        } else {
+            // Clear pending merge if the user logs out during the prompt
+            setPendingMerge(null);
         }
     }, [user?.id, fetchFromSupabase]);
 
-    // ── Activity log helper ────────────────────────────────────────────────────
+    const handleMerge = () => {
+        if (!pendingMerge || !supabase) return;
+        const { local, cloud, userId } = pendingMerge;
+
+        // Upload local data to Supabase
+        supabase
+            .from('tracked_jobs')
+            .upsert(local.map(j => jobToDbRow(j, userId)), { onConflict: 'user_id,fingerprint' })
+            .then(({ error }) => {
+                if (error) console.error('Error uploading merged jobs to Supabase:', error);
+            });
+
+        setTrackedJobs([...cloud, ...local]);
+        setPendingMerge(null);
+    };
+
+    const handleDiscard = () => {
+        if (!pendingMerge) return;
+        // Just overwrite with cloud data
+        setTrackedJobs(pendingMerge.cloud);
+        setPendingMerge(null);
+    };
+
     const logActivity = (event: Omit<ActivityEvent, 'id' | 'timestamp'>) => {
         setActivityLog(prev => {
             const recent = prev[0];
@@ -179,7 +203,6 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
     };
 
-    // ── CRUD helpers (optimistic local + async cloud) ──────────────────────────
     const addJob = (job: Omit<TrackedJob, 'id' | 'status' | 'dateAdded'>, status: JobStatus = 'Saved') => {
         const fingerprint = makeJobFingerprint(job.company, job.role, job.location);
         const newJob: TrackedJob = { ...job, id: fingerprint, status, dateAdded: new Date().toISOString() };
@@ -240,8 +263,10 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const removeJob = (id: string) => {
         const job = trackedJobs.find(j => j.id === id);
-        if (job) logActivity({ type: 'removed', company: job.company, role: job.role });
-        setTrackedJobs(prev => prev.filter(job => job.id !== id));
+        if (!job) return;
+
+        logActivity({ type: 'removed', company: job.company, role: job.role });
+        setTrackedJobs(prev => prev.filter(j => j.id !== id));
 
         if (supabase && user?.id) {
             supabase
@@ -251,6 +276,45 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 .eq('fingerprint', id)
                 .then(({ error }) => { if (error) console.error('Supabase removeJob error:', error); });
         }
+
+        const notificationId = `remove-${job.id}-${Date.now()}`;
+        notifications.show({
+            id: notificationId,
+            title: 'Removed',
+            color: 'gray',
+            autoClose: 5000,
+            message: (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                    <span style={{ fontSize: '14px' }}>{job.company} removed from tracker.</span>
+                    <button
+                        size="compact-xs"
+                        variant="subtle"
+                        onClick={() => {
+                            setTrackedJobs(prev => {
+                                if (prev.some(j => j.id === job.id)) return prev;
+                                return [...prev, job];
+                            });
+                            logActivity({ type: 'added', company: job.company, role: job.role, to: job.status });
+                            if (supabase && user?.id) {
+                                supabase
+                                    .from('tracked_jobs')
+                                    .upsert(jobToDbRow(job, user.id), { onConflict: 'user_id,fingerprint' })
+                                    .then(({ error }) => { if (error) console.error('Supabase restoreJob error:', error); });
+                            }
+                            notifications.hide(notificationId);
+                            notifications.show({
+                                title: 'Restored',
+                                message: `${job.company} has been restored.`,
+                                color: 'teal',
+                                autoClose: 3000
+                            });
+                        }}
+                    >
+                        Undo
+                    </button>
+                </div>
+            )
+        });
     };
 
     const isJobTracked = (company: string, role: string, location: string) => {
@@ -261,6 +325,27 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return (
         <TrackerContext.Provider value={{ trackedJobs, activityLog, syncing, addJob, updateJobStatus, editJob, removeJob, isJobTracked }}>
             {children}
+            <Modal
+                opened={pendingMerge !== null}
+                onClose={() => { }}
+                title={<Text fw={700} size="lg">Merge Saved Jobs?</Text>}
+                withCloseButton={false}
+                closeOnClickOutside={false}
+                closeOnEscape={false}
+                centered
+            >
+                <Text size="sm" mb="lg">
+                    You have <b>{pendingMerge?.local.length}</b> job(s) saved on this device. Would you like to merge them into your account, or discard them and load your account's saved jobs?
+                </Text>
+                <Group justify="flex-end">
+                    <Button variant="light" color="red" onClick={handleDiscard}>
+                        Discard Local Data
+                    </Button>
+                    <Button color="teal" onClick={handleMerge}>
+                        Keep & Merge
+                    </Button>
+                </Group>
+            </Modal>
         </TrackerContext.Provider>
     );
 };

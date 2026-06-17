@@ -3,7 +3,8 @@ import "../styles/navbar.css"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import logo from "../assets/Logo.png"
 import { useAuth } from "./AuthContext"
-import { User, CaretDown, SignOut, SignIn, UserPlus } from "@phosphor-icons/react"
+import { User, CaretDown, SignOut, UserPlus, Info } from "@phosphor-icons/react"
+import { notifications } from "@mantine/notifications"
 
 function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false)
@@ -81,7 +82,17 @@ function Navbar() {
                                 <div className="nav-profile-divider" />
                                 <button
                                     className="nav-profile-item"
-                                    onClick={() => { signOut(); setProfileOpen(false); setMenuOpen(false); }}
+                                    onClick={() => {
+                                        signOut();
+                                        setProfileOpen(false);
+                                        setMenuOpen(false);
+                                        notifications.show({
+                                            title: 'Signed Out',
+                                            message: 'You have been successfully signed out.',
+                                            color: 'blue',
+                                            icon: <Info size={18} weight="bold" />
+                                        });
+                                    }}
                                 >
                                     <SignOut weight="bold" />
                                     <span>Log Out</span>
@@ -93,15 +104,8 @@ function Navbar() {
                                     className="nav-profile-item"
                                     onClick={() => { navigate('/auth'); setProfileOpen(false); setMenuOpen(false); }}
                                 >
-                                    <SignIn weight="bold" />
-                                    <span>Log In</span>
-                                </button>
-                                <button
-                                    className="nav-profile-item"
-                                    onClick={() => { navigate('/auth'); setProfileOpen(false); setMenuOpen(false); }}
-                                >
                                     <UserPlus weight="bold" />
-                                    <span>Sign Up</span>
+                                    <span>Register</span>
                                 </button>
                             </>
                         )}
