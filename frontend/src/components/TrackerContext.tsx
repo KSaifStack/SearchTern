@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { makeJobFingerprint } from '../utils/jobFingerprint';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
 
 export type JobStatus = 'Saved' | 'Applied' | 'Interview' | 'Offer' | 'Rejected';
 
@@ -29,6 +31,7 @@ export interface ActivityEvent {
 interface TrackerContextType {
     trackedJobs: TrackedJob[];
     activityLog: ActivityEvent[];
+    syncing: boolean;
     /**
      * Add a job to the tracker. The stable fingerprint id is computed
      * internally from company + role + location — do NOT pass a DB id.
@@ -43,29 +46,120 @@ interface TrackerContextType {
 
 const TrackerContext = createContext<TrackerContextType | undefined>(undefined);
 
+// ── Local storage helpers ──────────────────────────────────────────────────────
+const LS_JOBS = 'searchtern_tracker_v2';
+const LS_ACTIVITY = 'searchtern_activity';
+
+function loadLocal<T>(key: string, fallback: T): T {
+    try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+// ── Row shape from Supabase ────────────────────────────────────────────────────
+interface DbRow {
+    fingerprint: string;
+    company: string;
+    role: string;
+    location: string;
+    link: string | null;
+    status: string;
+    date_added: string;
+    date_applied: string | null;
+    notes: string | null;
+}
+
+function dbRowToJob(row: DbRow): TrackedJob {
+    return {
+        id: row.fingerprint,
+        company: row.company,
+        role: row.role,
+        location: row.location,
+        link: row.link ?? undefined,
+        status: row.status as JobStatus,
+        dateAdded: row.date_added,
+        dateApplied: row.date_applied ?? undefined,
+        notes: row.notes ?? undefined,
+    };
+}
+
+function jobToDbRow(job: TrackedJob, userId: string) {
+    return {
+        user_id: userId,
+        fingerprint: job.id,
+        company: job.company,
+        role: job.role,
+        location: job.location,
+        link: job.link ?? null,
+        status: job.status,
+        date_added: job.dateAdded,
+        date_applied: job.dateApplied ?? null,
+        notes: job.notes ?? null,
+    };
+}
+
 export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [trackedJobs, setTrackedJobs] = useState<TrackedJob[]>(() => {
-        // v2 key: avoids collisions with stale v1 entries that used numeric DB ids.
-        const stored = localStorage.getItem('searchtern_tracker_v2');
-        return stored ? JSON.parse(stored) : [];
-    });
+    const { user } = useAuth();
 
-    const [activityLog, setActivityLog] = useState<ActivityEvent[]>(() => {
-        const stored = localStorage.getItem('searchtern_activity');
-        return stored ? JSON.parse(stored) : [];
-    });
+    const [trackedJobs, setTrackedJobs] = useState<TrackedJob[]>(() => loadLocal<TrackedJob[]>(LS_JOBS, []));
+    const [activityLog, setActivityLog] = useState<ActivityEvent[]>(() => loadLocal<ActivityEvent[]>(LS_ACTIVITY, []));
+    const [syncing, setSyncing] = useState(false);
 
+    // ── Persist to localStorage whenever jobs change (guest fallback) ──────────
     useEffect(() => {
-        localStorage.setItem('searchtern_tracker_v2', JSON.stringify(trackedJobs));
+        localStorage.setItem(LS_JOBS, JSON.stringify(trackedJobs));
     }, [trackedJobs]);
 
     useEffect(() => {
-        localStorage.setItem('searchtern_activity', JSON.stringify(activityLog));
+        localStorage.setItem(LS_ACTIVITY, JSON.stringify(activityLog));
     }, [activityLog]);
 
+    // ── Fetch all jobs from Supabase when user logs in ─────────────────────────
+    const fetchFromSupabase = useCallback(async (userId: string) => {
+        if (!supabase) return;
+        setSyncing(true);
+        const { data, error } = await supabase
+            .from('tracked_jobs')
+            .select('*')
+            .eq('user_id', userId);
+        setSyncing(false);
+        if (error) {
+            console.error('Error fetching tracked jobs from Supabase:', error);
+            return;
+        }
+        if (data) {
+            const cloudJobs = (data as DbRow[]).map(dbRowToJob);
+
+            // Merge: start with cloud jobs, then layer in any local-only jobs
+            setTrackedJobs(prev => {
+                const cloudIds = new Set(cloudJobs.map(j => j.id));
+                const localOnly = prev.filter(j => !cloudIds.has(j.id));
+                // Upload local-only jobs to the cloud
+                if (localOnly.length > 0 && supabase) {
+                    supabase
+                        .from('tracked_jobs')
+                        .upsert(localOnly.map(j => jobToDbRow(j, userId)), { onConflict: 'user_id,fingerprint' })
+                        .then(({ error }) => {
+                            if (error) console.error('Error uploading local jobs to Supabase:', error);
+                        });
+                }
+                return [...cloudJobs, ...localOnly];
+            });
+        }
+    }, []);
+
+    useEffect(() => {
+        if (user?.id) {
+            fetchFromSupabase(user.id);
+        }
+    }, [user?.id, fetchFromSupabase]);
+
+    // ── Activity log helper ────────────────────────────────────────────────────
     const logActivity = (event: Omit<ActivityEvent, 'id' | 'timestamp'>) => {
         setActivityLog(prev => {
-            // Deduplicate: skip if same type+company+to was logged within 2 seconds
             const recent = prev[0];
             if (
                 recent &&
@@ -85,20 +179,39 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
     };
 
+    // ── CRUD helpers (optimistic local + async cloud) ──────────────────────────
     const addJob = (job: Omit<TrackedJob, 'id' | 'status' | 'dateAdded'>, status: JobStatus = 'Saved') => {
         const fingerprint = makeJobFingerprint(job.company, job.role, job.location);
+        const newJob: TrackedJob = { ...job, id: fingerprint, status, dateAdded: new Date().toISOString() };
+
         setTrackedJobs(prev => {
             if (prev.some(j => j.id === fingerprint)) return prev;
-            return [...prev, { ...job, id: fingerprint, status, dateAdded: new Date().toISOString() }];
+            return [...prev, newJob];
         });
         logActivity({ type: 'added', company: job.company, role: job.role, to: status });
+
+        if (supabase && user?.id) {
+            supabase
+                .from('tracked_jobs')
+                .upsert(jobToDbRow(newJob, user.id), { onConflict: 'user_id,fingerprint' })
+                .then(({ error }) => { if (error) console.error('Supabase addJob error:', error); });
+        }
     };
 
     const updateJobStatus = (id: string, newStatus: JobStatus) => {
         setTrackedJobs(prev => prev.map(job => {
             if (job.id === id) {
                 logActivity({ type: 'status_change', company: job.company, role: job.role, from: job.status, to: newStatus });
-                return { ...job, status: newStatus };
+                const updated = { ...job, status: newStatus };
+                if (supabase && user?.id) {
+                    supabase
+                        .from('tracked_jobs')
+                        .update({ status: newStatus })
+                        .eq('user_id', user.id)
+                        .eq('fingerprint', id)
+                        .then(({ error }) => { if (error) console.error('Supabase updateStatus error:', error); });
+                }
+                return updated;
             }
             return job;
         }));
@@ -110,7 +223,16 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 if (updatedFields.status && updatedFields.status !== job.status) {
                     logActivity({ type: 'status_change', company: job.company, role: job.role, from: job.status, to: updatedFields.status });
                 }
-                return { ...job, ...updatedFields };
+                const updated = { ...job, ...updatedFields };
+                if (supabase && user?.id) {
+                    supabase
+                        .from('tracked_jobs')
+                        .update(jobToDbRow(updated, user.id))
+                        .eq('user_id', user.id)
+                        .eq('fingerprint', id)
+                        .then(({ error }) => { if (error) console.error('Supabase editJob error:', error); });
+                }
+                return updated;
             }
             return job;
         }));
@@ -120,6 +242,15 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const job = trackedJobs.find(j => j.id === id);
         if (job) logActivity({ type: 'removed', company: job.company, role: job.role });
         setTrackedJobs(prev => prev.filter(job => job.id !== id));
+
+        if (supabase && user?.id) {
+            supabase
+                .from('tracked_jobs')
+                .delete()
+                .eq('user_id', user.id)
+                .eq('fingerprint', id)
+                .then(({ error }) => { if (error) console.error('Supabase removeJob error:', error); });
+        }
     };
 
     const isJobTracked = (company: string, role: string, location: string) => {
@@ -128,7 +259,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     return (
-        <TrackerContext.Provider value={{ trackedJobs, activityLog, addJob, updateJobStatus, editJob, removeJob, isJobTracked }}>
+        <TrackerContext.Provider value={{ trackedJobs, activityLog, syncing, addJob, updateJobStatus, editJob, removeJob, isJobTracked }}>
             {children}
         </TrackerContext.Provider>
     );
