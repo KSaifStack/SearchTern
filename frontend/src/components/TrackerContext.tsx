@@ -287,8 +287,6 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
                     <span style={{ fontSize: '14px' }}>{job.company} removed from tracker.</span>
                     <button
-                        size="compact-xs"
-                        variant="subtle"
                         onClick={() => {
                             setTrackedJobs(prev => {
                                 if (prev.some(j => j.id === job.id)) return prev;
