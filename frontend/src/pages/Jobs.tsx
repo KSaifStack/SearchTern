@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { Table, Pagination, Menu, MenuDropdown, Popover, Text } from '@mantine/core'
+import { notifications } from '@mantine/notifications'
 import { checkHealth } from "../api/internships"
 import { BookmarkSimpleIcon } from '@phosphor-icons/react';
 import "../styles/Table.css"
@@ -137,6 +138,13 @@ function Jobs() {
       removeJob(fingerprint);
     } else {
       addJob({ company: job.company, role: job.role, location: job.location, link: job.link }, 'Saved');
+      notifications.show({
+        title: 'Saved',
+        message: `${job.company} added to tracker`,
+        color: 'teal',
+        icon: <BookmarkSimpleIcon size={18} weight="fill" />,
+        autoClose: 3000,
+      });
     }
   }
 

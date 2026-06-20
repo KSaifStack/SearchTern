@@ -3,7 +3,8 @@ import "../styles/navbar.css"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import logo from "../assets/Logo.png"
 import { useAuth } from "./AuthContext"
-import { User, CaretDown, SignOut, SignIn, UserPlus } from "@phosphor-icons/react"
+import { User, CaretDown, SignOut, UserPlus, Info } from "@phosphor-icons/react"
+import { notifications } from "@mantine/notifications"
 
 function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false)
@@ -49,6 +50,44 @@ function Navbar() {
             <ul className={`nav-left${menuOpen ? ' open' : ''}`}>
                 <li><Link to="/jobs" className={location.pathname === '/jobs' ? 'active' : ''} onClick={() => setMenuOpen(false)}>Internships</Link></li>
                 <li><Link to="/tracker" className={location.pathname === '/tracker' ? 'active' : ''} onClick={() => setMenuOpen(false)}>Applications</Link></li>
+                
+                {/* Mobile Auth Items */}
+                <li className="mobile-auth-container">
+                    {user ? (
+                        <>
+                            <div className="mobile-auth-header">
+                                {displayName && (
+                                    <span className="mobile-auth-name">{displayName}</span>
+                                )}
+                                <span className="mobile-auth-email">{displayEmail}</span>
+                            </div>
+                            <button
+                                className="nav-profile-item"
+                                onClick={() => {
+                                    signOut();
+                                    setMenuOpen(false);
+                                    notifications.show({
+                                        title: 'Signed Out',
+                                        message: 'You have been successfully signed out.',
+                                        color: 'blue',
+                                        icon: <Info size={18} weight="bold" />
+                                    });
+                                }}
+                            >
+                                <SignOut weight="bold" />
+                                <span>Log Out</span>
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            className="nav-profile-item"
+                            onClick={() => { navigate('/auth'); setMenuOpen(false); }}
+                        >
+                            <UserPlus weight="bold" />
+                            <span>Register</span>
+                        </button>
+                    )}
+                </li>
             </ul>
 
             <div className="nav-auth" ref={dropdownRef}>
@@ -81,7 +120,17 @@ function Navbar() {
                                 <div className="nav-profile-divider" />
                                 <button
                                     className="nav-profile-item"
-                                    onClick={() => { signOut(); setProfileOpen(false); setMenuOpen(false); }}
+                                    onClick={() => {
+                                        signOut();
+                                        setProfileOpen(false);
+                                        setMenuOpen(false);
+                                        notifications.show({
+                                            title: 'Signed Out',
+                                            message: 'You have been successfully signed out.',
+                                            color: 'blue',
+                                            icon: <Info size={18} weight="bold" />
+                                        });
+                                    }}
                                 >
                                     <SignOut weight="bold" />
                                     <span>Log Out</span>
@@ -93,15 +142,8 @@ function Navbar() {
                                     className="nav-profile-item"
                                     onClick={() => { navigate('/auth'); setProfileOpen(false); setMenuOpen(false); }}
                                 >
-                                    <SignIn weight="bold" />
-                                    <span>Log In</span>
-                                </button>
-                                <button
-                                    className="nav-profile-item"
-                                    onClick={() => { navigate('/auth'); setProfileOpen(false); setMenuOpen(false); }}
-                                >
                                     <UserPlus weight="bold" />
-                                    <span>Sign Up</span>
+                                    <span>Register</span>
                                 </button>
                             </>
                         )}
