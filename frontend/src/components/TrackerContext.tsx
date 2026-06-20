@@ -287,6 +287,7 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
                     <span style={{ fontSize: '14px' }}>{job.company} removed from tracker.</span>
                     <button
+                        style={{ padding: '6px 14px', fontSize: '13px', minHeight: 'unset', margin: 0 }}
                         onClick={() => {
                             setTrackedJobs(prev => {
                                 if (prev.some(j => j.id === job.id)) return prev;
@@ -335,14 +336,14 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 <Text size="sm" mb="lg">
                     You have <b>{pendingMerge?.local.length}</b> job(s) saved on this device. Would you like to merge them into your account, or discard them and load your account's saved jobs?
                 </Text>
-                <Group justify="flex-end">
-                    <Button variant="light" color="red" onClick={handleDiscard}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                    <button style={{ backgroundColor: '#fa5252', color: 'white' }} onClick={handleDiscard}>
                         Discard Local Data
-                    </Button>
-                    <Button color="teal" onClick={handleMerge}>
+                    </button>
+                    <button style={{ backgroundColor: '#20c997', color: 'white' }} onClick={handleMerge}>
                         Keep & Merge
-                    </Button>
-                </Group>
+                    </button>
+                </div>
             </Modal>
         </TrackerContext.Provider>
     );

@@ -26,6 +26,7 @@ function Auth() {
     const [tab, setTab] = useState<Tab>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -37,6 +38,7 @@ function Auth() {
     const reset = () => {
         setEmail('');
         setPassword('');
+        setConfirmPassword('');
         setLoading(false);
     };
 
@@ -82,6 +84,11 @@ function Auth() {
                 navigate('/tracker', { replace: true });
             }
         } else {
+            if (password !== confirmPassword) {
+                setLoading(false);
+                notifications.show({ title: 'Signup Failed', message: 'Passwords do not match.', color: 'red', icon: <WarningCircle size={18} /> });
+                return;
+            }
             const { error } = await supabase.auth.signUp({ email, password });
             setLoading(false);
             if (error) {
@@ -89,6 +96,7 @@ function Auth() {
             } else {
                 notifications.show({ title: 'Check Your Email', message: 'Please confirm your account via the link sent to your email, then log in.', color: 'teal', icon: <CheckCircle size={18} weight="fill" /> });
                 setPassword('');
+                setConfirmPassword('');
             }
         }
     };
@@ -209,6 +217,23 @@ function Auth() {
                                 minLength={6}
                             />
                         </div>
+
+                        {tab === 'signup' && (
+                            <div className="auth-field">
+                                <label className="auth-field-label" htmlFor="auth-confirm-password">Confirm Password</label>
+                                <input
+                                    id="auth-confirm-password"
+                                    className="auth-field-input"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    placeholder="Confirm your password"
+                                    value={confirmPassword}
+                                    onChange={e => setConfirmPassword(e.target.value)}
+                                    required
+                                    minLength={6}
+                                />
+                            </div>
+                        )}
 
                         <button
                             id="auth-submit-btn"

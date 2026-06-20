@@ -7,7 +7,24 @@ import './index.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
-  <MantineProvider>
+  <MantineProvider theme={{
+    colors: {
+      brand: [
+        '#ebf7f0',
+        '#d8ecdf',
+        '#b1d8be',
+        '#87c49b',
+        '#62b37d',
+        '#49a667',
+        '#379e59',
+        '#2d7a4f',
+        '#227b40',
+        '#166a34',
+      ]
+    },
+    primaryColor: 'brand',
+    primaryShade: 7
+  }}>
     <Notifications position="bottom-right" />
     <App />
   </MantineProvider>,

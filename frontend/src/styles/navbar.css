@@ -262,10 +262,15 @@ nav li a.active {
 .nav-hamburger.open span:nth-child(2) { opacity: 0; }
 .nav-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
+/* ── Mobile Auth Container (hidden on desktop) ───────────────── */
+.mobile-auth-container {
+    display: none;
+}
+
 /* ── Mobile nav ──────────────────────────────────────────── */
 @media (max-width: 640px) {
     nav {
-        grid-template-columns: 1fr auto auto;
+        grid-template-columns: 1fr auto;
         position: relative;
         gap: 8px;
     }
@@ -275,7 +280,47 @@ nav li a.active {
     }
 
     .nav-auth {
-        order: 2;
+        display: none;
+    }
+
+    .mobile-auth-container {
+        display: flex;
+        flex-direction: column;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border-light, #e0e0e0);
+    }
+
+    .mobile-auth-header {
+        display: flex;
+        flex-direction: column;
+        padding: 8px 16px;
+        margin-bottom: 4px;
+    }
+
+    .mobile-auth-name {
+        font-size: 14px;
+        color: var(--text-dark);
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .mobile-auth-email {
+        font-size: 12px;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .mobile-auth-container .nav-profile-item {
+        padding: 12px 16px;
+        margin: 2px 0;
+        border-radius: 6px;
+        width: 100%;
+        box-sizing: border-box;
     }
 
     .nav-left {
