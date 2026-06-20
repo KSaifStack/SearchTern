@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Modal, Button, Text, Group } from '@mantine/core';
+import { Modal, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { makeJobFingerprint } from '../utils/jobFingerprint';
 import { supabase } from '../lib/supabase';
