@@ -16,7 +16,7 @@ import scraper
 import read_db
 import os
 
-#Checks for api key
+# Checks for api key
 load_dotenv()
 API_KEY = os.environ.get("API_KEY")
 if not API_KEY:

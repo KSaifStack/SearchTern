@@ -4,6 +4,7 @@ import re
 import psycopg2
 import os
 from dotenv import load_dotenv
+from datetime import datetime, timezone
 
 load_dotenv()
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -18,25 +19,34 @@ def clean_text(text):
     return text
 
 def sort_date(date: str):
-    match = re.match(r'(\d+)([a-z]+)', date)
-    if not match:
-        return date
-    day = int(match.group(1))
-    type = match.group(2).lower()
-    if type == "mo":
-        day = day * 30
-        return str(day)
-    return str(day)
+    date = date.strip(" '\"")
+    if date.startswith(("202", "203")): 
+        try:
+            return str(max(0, (datetime.now(datetime.fromisoformat(date).tzinfo) - datetime.fromisoformat(date)).days))
+        except ValueError:
+            return "999"
+    match = re.match(r'(\d+)([a-z]+)', date.lower())
+    if match:
+        val, unit = int(match.group(1)), match.group(2)
+        return str(val * 30 if "m" in unit else val)
+    return date
+
 
 def target(datatable):
     # Scrapes SimplifyJobs Summer 2026 Internships from GitHub
     Simplify2026 = requests.get("https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/README.md")
+    # Scrapes SearchTern-Listings 
+    SearchTern = requests.get("https://raw.githubusercontent.com/KSaifStack/SearchTern-Listings/main/pages/listings.json", timeout=30)
 
-    if Simplify2026.status_code == 200:
+    
+    if Simplify2026.status_code == 200 and SearchTern.status_code == 200: 
         print("No Errors!")
     else:
         print("Error with pulling information — check status code for more details")
 
+    all_jobs = []
+
+    # Simplify 
     lines = Simplify2026.text
     Start = lines.find("<table>")
     End = lines.rfind("</table>") + len("</table>")
@@ -46,23 +56,43 @@ def target(datatable):
     rows = soup.find_all("tr")
     last_company = ""
 
-    id = 0
     for row in rows:
         cells = row.find_all("td")
         if cells:
-            id += 1
-            company  = clean_text(cells[0].get_text(strip=True))
-            role     = clean_text(cells[1].get_text(strip=True))
-            location = clean_text(cells[2].get_text(separator=", ", strip=True))
-            date     = clean_text(cells[-1].get_text(strip=True))
-            link_tag = cells[-2].find("a")
-            link = link_tag["href"] if link_tag else "N/A"
+            company = clean_text(cells[0].get_text(strip=True))
             if company == "":
                 company = last_company
             else:
                 last_company = company
-            date = sort_date(date)
-            datatable[id] = [company, role, location, date, link]
+
+            job = {
+                "company"  : company,
+                "role"    : clean_text(cells[1].get_text(strip=True)),
+                "location" : clean_text(cells[2].get_text(separator=", ", strip=True)),
+                "date"     : clean_text(cells[-1].get_text(strip=True)),
+                "link": cells[-2].find("a")["href"] if cells[-2].find("a") else "N/A"
+            }
+            all_jobs.append(job)
+    
+    listings = SearchTern.json()
+    for job in listings: 
+        all_jobs.append({
+                "company": job.get("company"),
+                "role": job.get("role"),
+                "location": job.get("location"),
+                "date": job.get("date"),
+                "link": job.get("link")
+            })
+    seen_rows = set()
+    current_id = max(datatable.keys()) if datatable else 0
+    for job in all_jobs:
+        row_tuple = (job["company"].lower(), job["role"].lower(), job["location"].lower())
+        if row_tuple in seen_rows:
+            continue
+        seen_rows.add(row_tuple)
+        current_id+=1
+        job_date=sort_date(job["date"])
+        datatable[current_id] = [job["company"], job["role"], job["location"], job_date, job["link"]]
 
 
 def update_database():
@@ -100,6 +130,4 @@ def update_database():
 
 
 if __name__ == "__main__":
-    target(data)
-    print(data)
     update_database()
