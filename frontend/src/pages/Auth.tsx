@@ -4,7 +4,7 @@ import { Button, Divider } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
-import { MagnifyingGlass, Kanban, CloudArrowUp, WarningCircle, CheckCircle } from '@phosphor-icons/react';
+import { MagnifyingGlass, Kanban, CloudArrowUp, WarningCircle, CheckCircle, MagnifyingGlassIcon, KanbanIcon, CloudArrowUpIcon } from '@phosphor-icons/react';
 import '../styles/Auth.css';
 
 type Tab = 'login' | 'signup';
@@ -115,15 +115,15 @@ function Auth() {
 
                     <div className="auth-panel-features">
                         <div className="auth-feature-item">
-                            <span className="auth-feature-icon"><MagnifyingGlass weight="bold" /></span>
-                            <span>Search 600+ internships</span>
+                            <span className="auth-feature-icon"><MagnifyingGlassIcon weight="bold" /></span>
+                            <span>Search 2000+ internships</span>
                         </div>
                         <div className="auth-feature-item">
-                            <span className="auth-feature-icon"><Kanban weight="bold" /></span>
+                            <span className="auth-feature-icon"><KanbanIcon weight="bold" /></span>
                             <span>Drag-and-drop application board</span>
                         </div>
                         <div className="auth-feature-item">
-                            <span className="auth-feature-icon"><CloudArrowUp weight="bold" /></span>
+                            <span className="auth-feature-icon"><CloudArrowUpIcon weight="bold" /></span>
                             <span>Cloud sync across all your devices</span>
                         </div>
                     </div>

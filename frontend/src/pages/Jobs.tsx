@@ -165,7 +165,8 @@ function Jobs() {
                 <>
                   <Text size="xs">Status: <span style={{ color: healthStatus.status === 'ok' ? 'green' : 'red' }}>{healthStatus.status}</span></Text>
                   <Text size="xs">Next Update: {formatNextUpdate(healthStatus.next_scrape)}</Text>
-                  <Text size="xs" mt={5} c="dimmed">Data Source: SimplifyJobs</Text>
+                  <Text size="xs" mt={5} c="dimmed">Data Sources: </Text>
+                  <Text size="xs" mt={5} c="dimmed">SimplifyJobs, SearchTern-Listings</Text>
                 </>
               ) : (
                 <Text size="xs">Loading...</Text>
