@@ -10,10 +10,7 @@
 
 ---
 
-
 <img width="1917" height="991" alt="image" src="https://github.com/user-attachments/assets/f5299847-5ad8-458d-8c85-9e1a52c79356" />
-
- 
 
 ## What it does
 
@@ -23,40 +20,40 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 
 ## How it works
 
-1. **Scraper** — APScheduler pulls from the [Simplify ](https://github.com/SimplifyJobs/Summer2026-Internships) repo hourly and stores results in a PostgreSQL database
-2. **Backend** — FastAPI serves the data with rate limiting and input validation
+1. **Scraper** — APScheduler pulls from the [Simplify](https://github.com/SimplifyJobs/Summer2026-Internships) repo and additional sources hourly, using bulk upserts to keep the database fresh without downtime
+2. **Backend** — FastAPI serves the data with rate limiting and input validation, hosted on Railway
 3. **Frontend** — React/TypeScript dashboard with live search, sorting, and a drag-and-drop Kanban tracker
-4. **Infrastructure** — Self-hosted on a Fedora Linux server using Systemd services, routed securely via a Cloudflare Tunnel
+4. **Infrastructure** — Backend hosted on Railway, frontend on Vercel, database on Supabase PostgreSQL
 
 ---
 
 ## Features
 
 <table>
-  <tr>
-    <td><strong>Job Board</strong></td>
-    <td>Hundreds of internships, refreshed hourly</td>
-  </tr>
-  <tr>
-    <td><strong>Search & Filter</strong></td>
-    <td>Filter by company, role, or location</td>
-  </tr>
-  <tr>
-    <td><strong>Application Tracker</strong></td>
-    <td>Drag-and-drop Kanban across Saved → Applied → Interview → Offer → Rejected</td>
-  </tr>
-  <tr>
-    <td><strong>Analytics</strong></td>
-    <td>Reply rate, offer count, rejection breakdown</td>
-  </tr>
-  <tr>
-    <td><strong>Saved Jobs</strong></td>
-    <td>Bookmark from the board, sync to your tracker</td>
-  </tr>
-  <tr>
-    <td><strong>CSV Export</strong></td>
-    <td>Export your full pipeline, Excel-compatible</td>
-  </tr>
+<tr>
+<td><strong>Job Board</strong></td>
+<td>Thousands of internships, refreshed hourly</td>
+</tr>
+<tr>
+<td><strong>Search & Filter</strong></td>
+<td>Filter by company, role, or location</td>
+</tr>
+<tr>
+<td><strong>Application Tracker</strong></td>
+<td>Drag-and-drop Kanban across Saved → Applied → Interview → Offer → Rejected</td>
+</tr>
+<tr>
+<td><strong>Analytics</strong></td>
+<td>Reply rate, offer count, rejection breakdown</td>
+</tr>
+<tr>
+<td><strong>Saved Jobs</strong></td>
+<td>Bookmark from the board, sync to your tracker</td>
+</tr>
+<tr>
+<td><strong>CSV Export</strong></td>
+<td>Export your full pipeline, Excel-compatible</td>
+</tr>
 </table>
 
 > **Coming soon:** AI resume grader, resource hub, user accounts
@@ -66,26 +63,26 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 ## Tech Stack
 
 <table>
-  <tr>
-    <td><strong>Scraper</strong></td>
-    <td>Python, BeautifulSoup4, APScheduler</td>
-  </tr>
-  <tr>
-    <td><strong>Database</strong></td>
-    <td>PostgreSQL</td>
-  </tr>
-  <tr>
-    <td><strong>Backend</strong></td>
-    <td>FastAPI, Uvicorn, SlowAPI</td>
-  </tr>
-  <tr>
-    <td><strong>Frontend</strong></td>
-    <td>React, TypeScript, Vite, Mantine UI, @dnd-kit</td>
-  </tr>
-  <tr>
-    <td><strong>Infrastructure</strong></td>
-    <td>Fedora Server, Systemd, Cloudflare Tunnels, Vercel</td>
-  </tr>
+<tr>
+<td><strong>Scraper</strong></td>
+<td>Python, BeautifulSoup4, APScheduler, psycopg2</td>
+</tr>
+<tr>
+<td><strong>Database</strong></td>
+<td>PostgreSQL (Supabase)</td>
+</tr>
+<tr>
+<td><strong>Backend</strong></td>
+<td>FastAPI, Uvicorn, SlowAPI</td>
+</tr>
+<tr>
+<td><strong>Frontend</strong></td>
+<td>React, TypeScript, Vite, Mantine UI, @dnd-kit</td>
+</tr>
+<tr>
+<td><strong>Infrastructure</strong></td>
+<td>Railway (backend), Vercel (frontend), Supabase (database), Cloudflare (DNS)</td>
+</tr>
 </table>
 
 ---
