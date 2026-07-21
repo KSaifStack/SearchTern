@@ -35,7 +35,8 @@ export async function pullRecent(){
   const { data, error } = await supabase
     .from('internships')
     .select('*')
-    .order('date');
+    .order('date')
+    .limit(5000);
   
   if (error) {
     console.error("Error fetching from Supabase:", error);
@@ -62,7 +63,8 @@ export async function pullLocation(searchterm:String){
     .from('internships')
     .select('*')
     .ilike('location', `%${searchterm}%`)
-    .order('date');
+    .order('date')
+    .limit(5000);
 
   if (error) {
     console.error("Error fetching location from Supabase:", error);
@@ -89,7 +91,8 @@ export async function pullKeyword(searchterm:String){
     .from('internships')
     .select('*')
     .ilike('role', `%${searchterm}%`)
-    .order('date');
+    .order('date')
+    .limit(5000); 
 
   if (error) {
     console.error("Error fetching keyword from Supabase:", error);
