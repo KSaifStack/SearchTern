@@ -19,6 +19,13 @@ def clean_text(text):
     text = text.strip()
     return text
 
+def is_duplicate(seen: set, company: str, role: str, location: str, link: str) -> bool:
+    key = (company.lower(), role.lower(), location.lower(), link.lower())
+    if key in seen:
+        return True
+    seen.add(key)
+    return False
+
 def sort_date(date: str):
     date = date.strip(" '\"")
     if date.startswith(("202", "203")):
@@ -65,9 +72,9 @@ def target(datatable):
                 last_company = company
 
             job = {
-                "company":  company.lower(),
-                "role":     clean_text(cells[1].get_text(strip=True)).lower(),
-                "location": clean_text(cells[2].get_text(separator=", ", strip=True)).lower(),
+                "company":  company,
+                "role":     clean_text(cells[1].get_text(strip=True)),
+                "location": clean_text(cells[2].get_text(separator=", ", strip=True)),
                 "date":     clean_text(cells[-1].get_text(strip=True)),
                 "link":     cells[-2].find("a")["href"] if cells[-2].find("a") else "N/A"
             }
@@ -85,12 +92,10 @@ def target(datatable):
 
     seen_rows = set()
     for job in all_jobs:
-        row_tuple = (job["company"], job["role"], job["location"], job["link"])
-        if row_tuple in seen_rows:
+        if is_duplicate(seen_rows, job["company"], job["role"], job["location"], job["link"]):
             continue
-        seen_rows.add(row_tuple)
         job["date"] = sort_date(job["date"])
-        datatable[row_tuple] = job
+        datatable[(job["company"], job["role"], job["location"], job["link"])] = job
 
 
 def update_database():
