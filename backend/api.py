@@ -66,6 +66,7 @@ app.add_middleware(
 
 #Checks health 
 @app.get("/health")
+@app.head("/health")
 def health():
     next_run = scheduler.get_jobs()[0].next_run_time if scheduler.get_jobs() else None
     return {
