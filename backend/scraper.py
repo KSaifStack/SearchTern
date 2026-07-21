@@ -115,8 +115,7 @@ def update_database():
     """)
 
     # Clear old data and repopulate
-    cursor.execute("DELETE FROM internships")
-    cursor.execute("ALTER SEQUENCE internships_id_seq RESTART WITH 1")
+    cursor.execute("TRUNCATE TABLE internships RESTART IDENTITY")
 
     for id, info in data.items():
         cursor.execute(
