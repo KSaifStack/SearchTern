@@ -4,7 +4,7 @@ import { Button, Divider } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
-import { MagnifyingGlass, Kanban, CloudArrowUp, WarningCircle, CheckCircle } from '@phosphor-icons/react';
+import {WarningCircleIcon, CheckCircleIcon, MagnifyingGlassIcon, KanbanIcon, CloudArrowUpIcon } from '@phosphor-icons/react';
 import '../styles/Auth.css';
 
 type Tab = 'login' | 'signup';
@@ -49,7 +49,7 @@ function Auth() {
 
     const handleGoogleLogin = async () => {
         if (!supabase) {
-            notifications.show({ title: 'Configuration Error', message: 'Supabase is not configured.', color: 'red', icon: <WarningCircle size={18} /> });
+            notifications.show({ title: 'Configuration Error', message: 'Supabase is not configured.', color: 'red', icon: <WarningCircleIcon size={18} /> });
             return;
         }
         setGoogleLoading(true);
@@ -60,7 +60,7 @@ function Auth() {
             },
         });
         if (error) {
-            notifications.show({ title: 'Authentication Error', message: error.message, color: 'red', icon: <WarningCircle size={18} /> });
+            notifications.show({ title: 'Authentication Error', message: error.message, color: 'red', icon: <WarningCircleIcon size={18} /> });
             setGoogleLoading(false);
         }
         // On success Supabase redirects the browser — no manual navigation needed
@@ -69,7 +69,7 @@ function Auth() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!supabase) {
-            notifications.show({ title: 'Configuration Error', message: 'Supabase is not configured.', color: 'red', icon: <WarningCircle size={18} /> });
+            notifications.show({ title: 'Configuration Error', message: 'Supabase is not configured.', color: 'red', icon: <WarningCircleIcon size={18} /> });
             return;
         }
         setLoading(true);
@@ -78,23 +78,23 @@ function Auth() {
             const { error } = await supabase.auth.signInWithPassword({ email, password });
             setLoading(false);
             if (error) {
-                notifications.show({ title: 'Login Failed', message: error.message, color: 'red', icon: <WarningCircle size={18} /> });
+                notifications.show({ title: 'Login Failed', message: error.message, color: 'red', icon: <WarningCircleIcon size={18} /> });
             } else {
-                notifications.show({ title: 'Welcome Back!', message: 'Successfully logged in.', color: 'teal', icon: <CheckCircle size={18} weight="fill" /> });
+                notifications.show({ title: 'Welcome Back!', message: 'Successfully logged in.', color: 'teal', icon: <CheckCircleIcon size={18} weight="fill" /> });
                 navigate('/tracker', { replace: true });
             }
         } else {
             if (password !== confirmPassword) {
                 setLoading(false);
-                notifications.show({ title: 'Signup Failed', message: 'Passwords do not match.', color: 'red', icon: <WarningCircle size={18} /> });
+                notifications.show({ title: 'Signup Failed', message: 'Passwords do not match.', color: 'red', icon: <WarningCircleIcon size={18} /> });
                 return;
             }
             const { error } = await supabase.auth.signUp({ email, password });
             setLoading(false);
             if (error) {
-                notifications.show({ title: 'Signup Failed', message: error.message, color: 'red', icon: <WarningCircle size={18} /> });
+                notifications.show({ title: 'Signup Failed', message: error.message, color: 'red', icon: <WarningCircleIcon size={18} /> });
             } else {
-                notifications.show({ title: 'Check Your Email', message: 'Please confirm your account via the link sent to your email, then log in.', color: 'teal', icon: <CheckCircle size={18} weight="fill" /> });
+                notifications.show({ title: 'Check Your Email', message: 'Please confirm your account via the link sent to your email, then log in.', color: 'teal', icon: <CheckCircleIcon size={18} weight="fill" /> });
                 setPassword('');
                 setConfirmPassword('');
             }
@@ -115,15 +115,15 @@ function Auth() {
 
                     <div className="auth-panel-features">
                         <div className="auth-feature-item">
-                            <span className="auth-feature-icon"><MagnifyingGlass weight="bold" /></span>
-                            <span>Search 600+ internships</span>
+                            <span className="auth-feature-icon"><MagnifyingGlassIcon weight="bold" /></span>
+                            <span>Search 2000+ internships</span>
                         </div>
                         <div className="auth-feature-item">
-                            <span className="auth-feature-icon"><Kanban weight="bold" /></span>
+                            <span className="auth-feature-icon"><KanbanIcon weight="bold" /></span>
                             <span>Drag-and-drop application board</span>
                         </div>
                         <div className="auth-feature-item">
-                            <span className="auth-feature-icon"><CloudArrowUp weight="bold" /></span>
+                            <span className="auth-feature-icon"><CloudArrowUpIcon weight="bold" /></span>
                             <span>Cloud sync across all your devices</span>
                         </div>
                     </div>

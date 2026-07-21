@@ -7,6 +7,7 @@ from slowapi.errors import RateLimitExceeded
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
+import threading
 import sys
 import logging
 from pathlib import Path
@@ -16,7 +17,7 @@ import scraper
 import read_db
 import os
 
-#Checks for api key
+# Checks for api key
 load_dotenv()
 API_KEY = os.environ.get("API_KEY")
 if not API_KEY:
@@ -41,7 +42,8 @@ scheduler = BackgroundScheduler()
 async def lifespan(app: FastAPI):
     scheduler.add_job(scheduled_scrape, CronTrigger(minute=0))
     scheduler.start()
-    scheduled_scrape()
+    threading.Thread(target=scheduled_scrape, daemon=True).start()
+    yield
     yield
     scheduler.shutdown()
 
