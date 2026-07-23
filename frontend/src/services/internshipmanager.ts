@@ -60,11 +60,36 @@ export async function getRecent() {
         return { success: true, data: recentCache, lastRefreshed }
     }
 
+    try {
+        const stored = localStorage.getItem("recentCache");
+        const storedTime = localStorage.getItem("lastRefreshed");
+        if (stored && storedTime) {
+            const parsedTime = new Date(storedTime);
+            // Cache is valid for the current hour
+            if (parsedTime.getHours() === currentHour && (new Date().getTime() - parsedTime.getTime()) < 3600000) {
+                console.log("Loaded from localStorage.");
+                recentCache = JSON.parse(stored);
+                lastRefreshed = parsedTime;
+                return { success: true, data: recentCache, lastRefreshed };
+            }
+        }
+    } catch (e) {
+        console.error("Failed to read from localStorage", e);
+    }
+
     const result = await pullRecent()
     if (!result) return { success: false, data: [], lastRefreshed: null }
 
     recentCache = result
     lastRefreshed = new Date()
+
+    try {
+        localStorage.setItem("recentCache", JSON.stringify(recentCache));
+        localStorage.setItem("lastRefreshed", lastRefreshed.toISOString());
+    } catch (e) {
+        console.error("Failed to write to localStorage", e);
+    }
+
     return { success: true, data: recentCache, lastRefreshed }
 }
 
