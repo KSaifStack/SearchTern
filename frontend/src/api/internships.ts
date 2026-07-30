@@ -14,14 +14,14 @@ export async function pullUpdateBackend() {
   return data.result
 }
 
-// pulls recent internships via FastAPI backend
+// pulls all recent listings via FastAPI backend
 export async function pullRecent(){
   try {
     const res = await fetch(`${BASE_URL}/recent`);
     const data = await res.json();
     return data.result || [];
   } catch (e) {
-    console.error("Error fetching recent internships from backend:", e);
+    console.error("Error fetching recent listings from backend:", e);
     return [];
   }
 }

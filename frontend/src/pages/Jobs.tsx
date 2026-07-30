@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react"
-import { Table, Pagination, Menu, MenuDropdown, Popover, Text } from '@mantine/core'
+import { useState, useEffect, useRef, useMemo } from "react"
+import { Table, Pagination, Popover, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth } from "../api/internships"
 import { BookmarkSimpleIcon } from '@phosphor-icons/react';
 import "../styles/Table.css"
-import { getRecent } from "../services/internshipmanager"
+import { getRecent, clearCache, getCacheRemaining } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
 import { makeJobFingerprint } from "../utils/jobFingerprint"
 
@@ -15,108 +15,95 @@ interface Job {
   location: string
   date: string
   link: string
+  type?: string
+  season?: string
 }
 
+const seasonLabels: Record<string, string> = {
+  '2026': 'Summer 2026',
+  '2027': 'Summer 2027',
+  'offseason': 'Off-Season',
+}
+
+const REFRESH_INTERVAL = 3600 // 1 hour in seconds
+
 function Jobs() {
-  const [jobs, setJobs] = useState<Job[]>([])
+  const [allJobs, setAllJobs] = useState<Job[]>([])
   const [search, setSearch] = useState('')
   const { addJob, removeJob, isJobTracked } = useTracker()
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [timeRemaining, setTimeRemaining] = useState("1:00:00")
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
   const [healthStatus, setHealthStatus] = useState<any>(null)
   const [popoverOpened, setPopoverOpened] = useState(false)
+  const [refreshCountdown, setRefreshCountdown] = useState(() => getCacheRemaining() || REFRESH_INTERVAL)
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const [searchText, setSearchText] = useState('')
 
   const perPage = 15;
-
-  const fetchHealth = async () => {
-    if (!popoverOpened) {
-      const data = await checkHealth()
-      setHealthStatus(data)
-    }
-    setPopoverOpened((o) => !o)
-  }
-
-  const formatNextUpdate = (dateString: string) => {
-    if (!dateString || dateString === 'unknown') return 'Unknown';
-    try {
-      const d = new Date(dateString.replace(' ', 'T'));
-      if (isNaN(d.getTime())) return dateString;
-      return d.toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true });
-    } catch (e) {
-      return dateString;
-    }
-  }
-
 
   useEffect(() => {
     getRecent().then(res => {
       if (res.success) {
-        setJobs([...res.data])
-
+        setAllJobs(res.data)
+        setRefreshCountdown(getCacheRemaining() || REFRESH_INTERVAL)
       }
       setLoading(false)
     })
   }, [])
 
   useEffect(() => {
-    const getSecondsUntilNextHour = () => {
-      const now = new Date()
-      const secondsElapsed = now.getMinutes() * 60 + now.getSeconds()
-      return 3600 - secondsElapsed
-    }
-    let seconds = getSecondsUntilNextHour()
-
-    const format = (s: number) => {
-      const m = Math.floor(s / 60).toString().padStart(2, '0')
-      const sec = (s % 60).toString().padStart(2, '0')
-      return `${m}:${sec}`
-    }
-
-
-
-    setTimeRemaining(format(seconds))
-    const interval = setInterval(async () => {
-      seconds -= 1
-      if (seconds <= 0) {
-        seconds = getSecondsUntilNextHour()
-        const res = await getRecent()
-        if (res.success) setJobs([...res.data])
+    const interval = setInterval(() => {
+      const remaining = getCacheRemaining()
+      if (remaining <= 0) {
+        clearCache()
+        getRecent().then(res => {
+          if (res.success) setAllJobs(res.data)
+        })
+        setRefreshCountdown(REFRESH_INTERVAL)
+      } else {
+        setRefreshCountdown(remaining)
       }
-      setTimeRemaining(format(seconds))
     }, 1000)
-
     return () => clearInterval(interval)
-
   }, [])
 
-  const DatetoNum = (val: string | number) => {
-    if (typeof val === 'number') return val;
-    const parsed = parseFloat(val);
-    return !isNaN(parsed) ? parsed : 999;
+  const filtered = useMemo(() => {
+    let jobs = allJobs.filter(j => j && j.company)
+    if (searchText) {
+      const q = searchText.toLowerCase()
+      jobs = jobs.filter(j =>
+        j.company.toLowerCase().includes(q) ||
+        j.role.toLowerCase().includes(q) ||
+        j.location.toLowerCase().includes(q)
+      )
+    }
+    return jobs.sort((a, b) => {
+      const aNum = parseFloat(String(a.date)) || 999
+      const bNum = parseFloat(String(b.date)) || 999
+      return aNum - bNum
+    })
+  }, [allJobs, searchText])
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
+  const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [totalPages, page])
+
+  const onSearchChange = (val: string) => {
+    setSearch(val)
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setSearchText(val)
+      setPage(1)
+    }, 200)
   }
 
-  // Filter jobs based on active filters
-  const applyFilters = (jobs: Job[]): Job[] => {
-    return jobs
-      .filter((job: any) => job && job.company)
-      .filter(job => {
-        // Text search
-        return job.company.toLowerCase().includes(search.toLowerCase()) ||
-          job.role.toLowerCase().includes(search.toLowerCase()) ||
-          job.location.toLowerCase().includes(search.toLowerCase());
-      })
-      .sort((a, b) => {
-        const aNum = DatetoNum(a.date);
-        const bNum = DatetoNum(b.date);
-        return sortOrder === 'newest' ? aNum - bNum : bNum - aNum;
-      });
-  };
-
   const formatRelativeDate = (val: string | number) => {
-    const days = DatetoNum(val);
-
+    if (typeof val === 'number') return "N/A";
+    const parsed = parseFloat(val);
+    const days = !isNaN(parsed) ? parsed : 999;
     if (days === 999) return "N/A";
     if (days === 0) return "24 hours ago ";
     if (days > 0 && days < 1) return "< 1 day ago";
@@ -127,10 +114,6 @@ function Jobs() {
     }
     return `${days} days ago`;
   }
-
-  const filtered = applyFilters(jobs);
-
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
   function toggleSave(job: Job) {
     const fingerprint = makeJobFingerprint(job.company, job.role, job.location);
@@ -148,25 +131,24 @@ function Jobs() {
     }
   }
 
-
-
-
   return (
     <>
       <section className="feature">
         <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <p className="result-count" style={{ margin: 0 }}>Refreshes in: {timeRemaining}</p>
+          <p className="result-count" style={{ margin: 0 }}>Refreshes in: {String(Math.floor(refreshCountdown / 60)).padStart(2, '0')}:{String(refreshCountdown % 60).padStart(2, '0')}</p>
           <Popover width={250} position="bottom-start" withArrow shadow="md" opened={popoverOpened} onChange={setPopoverOpened}>
             <Popover.Target>
-              <button className="health_btn" onClick={fetchHealth}>...</button>
+              <button className="health_btn" onClick={() => {
+                if (!popoverOpened) checkHealth().then(setHealthStatus)
+                setPopoverOpened((o) => !o)
+              }}>...</button>
             </Popover.Target>
             <Popover.Dropdown>
               {healthStatus ? (
                 <>
                   <Text size="xs">Status: <span style={{ color: healthStatus.status === 'ok' ? 'green' : 'red' }}>{healthStatus.status}</span></Text>
-                  <Text size="xs">Next Update: {formatNextUpdate(healthStatus.next_scrape)}</Text>
-                  <Text size="xs" mt={5} c="dimmed">Data Sources: </Text>
-                  <Text size="xs" mt={5} c="dimmed">SimplifyJobs, SearchTern-Listings</Text>
+                  <Text size="xs">Next Update: {healthStatus.next_scrape !== 'unknown' ? new Date(healthStatus.next_scrape.replace(' ', 'T')).toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true }) : 'Unknown'}</Text>
+                  <Text size="xs" mt={5} c="dimmed">Data Sources: SimplifyJobs, SearchTern-Listings</Text>
                 </>
               ) : (
                 <Text size="xs">Loading...</Text>
@@ -175,35 +157,16 @@ function Jobs() {
           </Popover>
         </div>
 
-
-
         <input
           className="search-input"
           placeholder="Search by company, role, or location..."
           value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1) }}
+          onChange={e => onSearchChange(e.target.value)}
         />
 
         <div className="results-header">
-          <p className="result-count">{filtered.length} internships found</p>
-          <Menu shadow="md" width={200}>
-            <Menu.Target>
-              <button className="sort_btn">
-                Sort By: {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
-              </button>
-            </Menu.Target>
-            <MenuDropdown>
-              <Menu.Item onClick={() => setSortOrder('newest')}>
-                Newest Listing
-              </Menu.Item>
-              <Menu.Item onClick={() => setSortOrder('oldest')}>
-                Oldest Listing
-              </Menu.Item>
-            </MenuDropdown>
-          </Menu>
-        </div>
-
-        <Table striped highlightOnHover mt="md">
+          <p className="result-count">{loading ? 'Loading...' : `${filtered.length} internships found`}</p>
+        </div><Table striped highlightOnHover mt="md">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Company</Table.Th>
@@ -215,16 +178,15 @@ function Jobs() {
           <Table.Tbody>
             {loading ? (
               <Table.Tr>
-                <Table.Td colSpan={5} className="empty-state">Loading...</Table.Td>
+                <Table.Td colSpan={4} className="empty-state">Loading...</Table.Td>
               </Table.Tr>
             ) : paginated.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={5} className="empty-state">No internships found!</Table.Td>
+                <Table.Td colSpan={4} className="empty-state">No listings found!</Table.Td>
               </Table.Tr>
             ) : (
               paginated.map(job => (
                 <Table.Tr key={job.id}>
-
                   <Table.Td className="company-cell" data-label="Company">
                     <BookmarkSimpleIcon
                       size={25}
@@ -240,6 +202,24 @@ function Jobs() {
                       alt=""
                     />
                     {job.company}
+                    {job.type && (
+                      <span style={{
+                        fontSize: '10px', padding: '1px 6px', borderRadius: '8px', marginLeft: '6px',
+                        background: job.type === 'newgrad' ? '#d3f9d8' : '#e7f5ff',
+                        color: job.type === 'newgrad' ? '#2b8a3e' : '#1971c2',
+                        fontWeight: 600, verticalAlign: 'middle',
+                      }}>
+                        {job.type === 'newgrad' ? 'New Grad' : 'Internship'}
+                      </span>
+                    )}
+                    {job.season && job.season !== 'searchtern' && (
+                      <span style={{
+                        fontSize: '9px', padding: '1px 5px', borderRadius: '6px', marginLeft: '4px',
+                        background: '#f1f3f5', color: '#868e96', fontWeight: 500, verticalAlign: 'middle',
+                      }}>
+                        {seasonLabels[job.season] || job.season}
+                      </span>
+                    )}
                   </Table.Td>
                   <Table.Td data-label="Role">
                     <a href={job.link} target="_blank" rel="noreferrer" className="apply-link">
@@ -255,8 +235,8 @@ function Jobs() {
         </Table>
 
         <Pagination
-          total={Math.ceil(filtered.length / perPage)}
-          value={page}
+          total={totalPages}
+          value={Math.min(page, totalPages)}
           onChange={setPage}
           mt="md"
         />

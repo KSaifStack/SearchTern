@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 def scheduled_scrape():
     try:
         result = scraper.update_database()
-        read_db.invalidate_cache()
         logger.info(f"Scheduler: {result}")
     except Exception as e:
         logger.error(f"Scheduler: scrape failed — {e}")
@@ -81,8 +80,8 @@ def health():
 @app.post("/update")
 @limiter.limit("5/minute")
 def update_base(request: Request, verified=Depends(verify_key)):
-    scraper.update_database()
     read_db.invalidate_cache()
+    scraper.update_database()
     return {"result": read_db.recent_internships()}
 
 #Search recent internships

@@ -2,17 +2,41 @@
 import psycopg2
 import psycopg2.extras
 import os
+from time import time
 from dotenv import load_dotenv
 
 load_dotenv()
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-_cached_recent = None
-_cache_time = None
-from datetime import datetime, timedelta
+_cache: list | None = None
+_cache_time: float = 0
+_CACHE_TTL = 3300  # 55 minutes (refresh before the hourly scrape)
 
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
+
+
+def invalidate_cache():
+    global _cache, _cache_time
+    _cache = None
+    _cache_time = 0
+
+
+# Get all internships ordered by date (cached in memory)
+def recent_internships():
+    global _cache, _cache_time
+    now = time()
+    if _cache is not None and now - _cache_time < _CACHE_TTL:
+        return _cache
+    conn = get_conn()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SELECT * FROM internships ORDER BY date")
+        rows = cur.fetchall()
+    conn.close()
+    _cache = [dict(row) for row in rows]
+    _cache_time = now
+    return _cache
+
 
 # Search by location
 def search_location(x):
@@ -25,29 +49,6 @@ def search_location(x):
         rows = cur.fetchall()
     conn.close()
     return [dict(row) for row in rows]
-
-
-# Get all internships ordered by date
-def recent_internships():
-    global _cached_recent, _cache_time
-    if _cached_recent is not None and _cache_time is not None:
-        if datetime.now() - _cache_time < timedelta(hours=1):
-            return _cached_recent
-
-    conn = get_conn()
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute("SELECT * FROM internships ORDER BY date")
-        rows = cur.fetchall()
-    conn.close()
-    
-    _cached_recent = [dict(row) for row in rows]
-    _cache_time = datetime.now()
-    return _cached_recent
-
-def invalidate_cache():
-    global _cached_recent, _cache_time
-    _cached_recent = None
-    _cache_time = None
 
 
 # Search by role keywords

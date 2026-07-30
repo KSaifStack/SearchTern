@@ -1,5 +1,5 @@
 // This will handles job data from api
-import { pullUpdateBackend,pullRecent,pullLocation,pullKeyword } from "../api/internships.ts"; 
+import { pullUpdateBackend, pullRecent, pullLocation, pullKeyword } from "../api/internships.ts"; 
 
 interface Job{
     id: number,
@@ -7,107 +7,55 @@ interface Job{
     role: string,
     location: string,
     date: string,
-    link: string   
+    link: string,
+    type?: string,
+    season?: string
 }
 
-const jobCache: Record<string, Job[]> = {}
-let lastRefreshed: Date | null = null;
-let recentCache: Job[] = []
+let cache: { data: Job[]; time: number } | null = null
+const CACHE_TTL = 3600_000 // 1 hour
 
-function getCacheKey(searchterm: string): string {
-    const hour = new Date().getHours()
-    return `${searchterm}-${hour}`
+export async function getRecent() {
+    const now = Date.now()
+    if (cache && now - cache.time < CACHE_TTL) {
+        return { success: true, data: cache.data } as const
+    }
+    const result = await pullRecent()
+    if (!result) return { success: false, data: [] } as const
+    cache = { data: result, time: now }
+    return { success: true, data: result } as const
 }
 
 export async function searchByLocation(searchterm: string){
-    const key = getCacheKey(searchterm);
-    if(jobCache[key]){
-        console.log("Loaded from cache.");
-        return {success: true,data: jobCache[key],lastRefreshed: null}
-    }
     const result = await pullLocation(searchterm);
-    if(!result){
-        return { success: false, data: [], lastRefreshed: null }
-    }
-    jobCache[key] = result
-    lastRefreshed = new Date()
-    return { success: true, data: result, lastRefreshed }
-    
+    if(!result) return { success: false, data: [] } as const
+    return { success: true, data: result } as const
 }
 
 export async function searchByKeyword(searchterm: string){
-    const key = getCacheKey(searchterm);
-    if(jobCache[key]){
-        console.log("Loaded from cache.");
-        return {success: true,data: jobCache[key],lastRefreshed: null}
-    }
     const result = await pullKeyword(searchterm);
-    if(!result){
-        return { success: false, data: [], lastRefreshed: null }
-    }
-    jobCache[key] = result
-    lastRefreshed = new Date()
-    return { success: true, data: result, lastRefreshed }
-    
-}
-
-export async function getRecent() {
-    const currentHour = new Date().getHours()
-    const lastHour = lastRefreshed?.getHours()
-
-    if (recentCache.length > 0 && lastHour === currentHour) {
-        console.log("Loaded from cache.")
-        return { success: true, data: recentCache, lastRefreshed }
-    }
-
-    try {
-        const stored = localStorage.getItem("recentCache");
-        const storedTime = localStorage.getItem("lastRefreshed");
-        if (stored && storedTime) {
-            const parsedTime = new Date(storedTime);
-            // Cache is valid for the current hour
-            if (parsedTime.getHours() === currentHour && (new Date().getTime() - parsedTime.getTime()) < 3600000) {
-                console.log("Loaded from localStorage.");
-                recentCache = JSON.parse(stored);
-                lastRefreshed = parsedTime;
-                return { success: true, data: recentCache, lastRefreshed };
-            }
-        }
-    } catch (e) {
-        console.error("Failed to read from localStorage", e);
-    }
-
-    const result = await pullRecent()
-    if (!result) return { success: false, data: [], lastRefreshed: null }
-
-    recentCache = result
-    lastRefreshed = new Date()
-
-    try {
-        localStorage.setItem("recentCache", JSON.stringify(recentCache));
-        localStorage.setItem("lastRefreshed", lastRefreshed.toISOString());
-    } catch (e) {
-        console.error("Failed to write to localStorage", e);
-    }
-
-    return { success: true, data: recentCache, lastRefreshed }
+    if(!result) return { success: false, data: [] } as const
+    return { success: true, data: result } as const
 }
 
 export async function getDatabase() {
     const result = await pullUpdateBackend()
-    console.log("raw result:", result)
-    if (!result) return { success: false, data: [] }
-    recentCache = result  
-    lastRefreshed = new Date()
-    return { success: true, data: result }
+    if (!result) return { success: false, data: [] } as const
+    cache = { data: result, time: Date.now() }
+    return { success: true, data: result } as const
 }
-
 
 export function clearCache() {
-  recentCache = []
-  lastRefreshed = null
-  Object.keys(jobCache).forEach(key => delete jobCache[key])  
+    cache = null
 }
+
+export function getCacheRemaining(): number {
+    if (!cache) return 0
+    const elapsed = Date.now() - cache.time
+    return Math.max(0, Math.round((CACHE_TTL - elapsed) / 1000))
+}
+
+export { CACHE_TTL }
 
 
 
