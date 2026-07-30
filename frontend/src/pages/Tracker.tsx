@@ -61,6 +61,12 @@ function Tracker() {
         setModalOpen(false);
     };
 
+    const columnCounts = useMemo(() => {
+        const counts: Record<JobStatus, number> = { Saved: 0, Applied: 0, Interview: 0, Offer: 0, Rejected: 0 };
+        trackedJobs.forEach(job => counts[job.status]++);
+        return counts;
+    }, [trackedJobs]);
+
     const columns = useMemo(() => {
         const cols: Record<JobStatus, TrackedJob[]> = {
             Saved: [], Applied: [], Interview: [], Offer: [], Rejected: []
@@ -250,6 +256,7 @@ function Tracker() {
                                 onAdd={openModal}
                                 searchValue={columnSearch[status]}
                                 onSearchChange={val => setColumnSearch(prev => ({ ...prev, [status]: val }))}
+                                totalCount={columnCounts[status]}
                             />
                         </div>
                     ))}
