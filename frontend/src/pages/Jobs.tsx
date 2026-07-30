@@ -36,7 +36,7 @@ function Jobs() {
   const [healthStatus, setHealthStatus] = useState<any>(null)
   const [popoverOpened, setPopoverOpened] = useState(false)
   const [refreshCountdown, setRefreshCountdown] = useState(() => getCacheRemaining() || REFRESH_INTERVAL)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [searchText, setSearchText] = useState('')
 
   const perPage = 15;
