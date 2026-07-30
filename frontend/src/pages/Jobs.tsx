@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { Table, Pagination, Popover, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth } from "../api/internships"
-import { BookmarkSimpleIcon, Funnel } from '@phosphor-icons/react';
+import { BookmarkSimpleIcon } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
@@ -32,9 +32,8 @@ function Jobs() {
   const [searchText, setSearchText] = useState('')
   const [sortOrder, setSortOrder] = useState('newest')
   const [typeFilters, setTypeFilters] = useState({ internship: true, offseason: true, newgrad: true })
-  const [filterOpen, setFilterOpen] = useState(false)
-  const [draftSort, setDraftSort] = useState('newest')
-  const [draftType, setDraftType] = useState({ internship: true, offseason: true, newgrad: true })
+  const [sortOpen, setSortOpen] = useState(false)
+  const [typeOpen, setTypeOpen] = useState(false)
 
   const perPage = 15;
 
@@ -163,33 +162,38 @@ function Jobs() {
 
         <div className="results-header">
           <p className="result-count">{loading ? 'Loading...' : `${filtered.length} internships found`}</p>
-          <Popover opened={filterOpen} onChange={setFilterOpen} width={220} position="bottom-end" withArrow shadow="md">
-            <Popover.Target>
-              <button className="sort_btn" onClick={() => {
-                setDraftSort(sortOrder)
-                setDraftType({ ...typeFilters })
-                setFilterOpen(o => !o)
-              }}>
-                <Funnel size={16} weight="bold" />
-              </button>
-            </Popover.Target>
-            <Popover.Dropdown>
-              <div style={{ padding: '4px 0', fontSize: '13px' }}>
-                <div style={{ fontWeight: 600, marginBottom: 6, color: '#495057' }}>Sort By</div>
-                {['newest', 'oldest', 'company-az', 'company-za'].map(opt => (
-                  <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="sort"
-                      checked={draftSort === opt}
-                      onChange={() => setDraftSort(opt)}
-                      style={{ accentColor: 'var(--primary-green)' }}
-                    />
-                    {opt === 'newest' ? 'Newest' : opt === 'oldest' ? 'Oldest' : opt === 'company-az' ? 'Company (A-Z)' : 'Company (Z-A)'}
-                  </label>
-                ))}
-                <div style={{ borderTop: '1px solid #e9ecef', marginTop: 8, paddingTop: 8 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 6, color: '#495057' }}>Type</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Popover opened={sortOpen} onChange={setSortOpen} width={180} position="bottom-end" withArrow shadow="md">
+              <Popover.Target>
+                <button className="sort_btn" onClick={() => setSortOpen(o => !o)}>
+                  Sort By
+                </button>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <div style={{ padding: '4px 0', fontSize: '13px' }}>
+                  {['newest', 'oldest', 'company-az', 'company-za'].map(opt => (
+                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="sort"
+                        checked={sortOrder === opt}
+                        onChange={() => { setSortOrder(opt); setSortOpen(false) }}
+                        style={{ accentColor: 'var(--primary-green)' }}
+                      />
+                      {opt === 'newest' ? 'Newest' : opt === 'oldest' ? 'Oldest' : opt === 'company-az' ? 'Company (A-Z)' : 'Company (Z-A)'}
+                    </label>
+                  ))}
+                </div>
+              </Popover.Dropdown>
+            </Popover>
+            <Popover opened={typeOpen} onChange={setTypeOpen} width={160} position="bottom-end" withArrow shadow="md">
+              <Popover.Target>
+                <button className="sort_btn" onClick={() => setTypeOpen(o => !o)}>
+                  Type
+                </button>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <div style={{ padding: '4px 0', fontSize: '13px' }}>
                   {[
                     { key: 'internship' as const, label: 'Internship' },
                     { key: 'newgrad' as const, label: 'New Grad' },
@@ -198,28 +202,17 @@ function Jobs() {
                     <label key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
                       <input
                         type="checkbox"
-                        checked={draftType[t.key]}
-                        onChange={() => setDraftType(prev => ({ ...prev, [t.key]: !prev[t.key] }))}
+                        checked={typeFilters[t.key]}
+                        onChange={() => setTypeFilters(prev => ({ ...prev, [t.key]: !prev[t.key] }))}
                         style={{ accentColor: 'var(--primary-green)' }}
                       />
                       {t.label}
                     </label>
                   ))}
                 </div>
-                <button
-                  onClick={() => {
-                    setSortOrder(draftSort)
-                    setTypeFilters(draftType)
-                    setPage(1)
-                    setFilterOpen(false)
-                  }}
-                  style={{ width: '100%', marginTop: 10, padding: '6px 0', fontWeight: 600, fontSize: 13, background: 'var(--primary-green)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-                >
-                  Apply
-                </button>
-              </div>
-            </Popover.Dropdown>
-          </Popover>
+              </Popover.Dropdown>
+            </Popover>
+          </div>
         </div>
         <Table striped highlightOnHover mt="md">
           <Table.Thead>
