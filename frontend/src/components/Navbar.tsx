@@ -3,7 +3,7 @@ import "../styles/navbar.css"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import logo from "../assets/Logo.png"
 import { useAuth } from "./AuthContext"
-import { User, CaretDown, SignOut, UserPlus, Info } from "@phosphor-icons/react"
+import { User, CaretDown, SignOut, SignIn, UserPlus, Info } from "@phosphor-icons/react"
 import { notifications } from "@mantine/notifications"
 
 function Navbar() {
@@ -84,6 +84,7 @@ function Navbar() {
                                     className="nav-profile-item"
                                     onClick={() => { navigate('/auth'); setMenuOpen(false); }}
                                 >
+                                    <SignIn weight="bold" />
                                     <span>Log In</span>
                                 </button>
                                 <button
@@ -150,6 +151,7 @@ function Navbar() {
                                     className="nav-profile-item"
                                     onClick={() => { navigate('/auth'); setProfileOpen(false); setMenuOpen(false); }}
                                 >
+                                    <SignIn weight="bold" />
                                     <span>Log In</span>
                                 </button>
                                 <div className="nav-profile-divider" />
