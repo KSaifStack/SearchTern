@@ -13,6 +13,8 @@ interface Job {
     location: string;
     date: string;
     link: string;
+    type?: string;
+    season?: string;
 }
 
 function formatTimeAgo(isoString: string): string {
@@ -70,18 +72,17 @@ function Home() {
     const recentActivity = activityLog.slice(0, 6);
     const todayCount = jobs.filter(j => parseFloat(String(j.date)) === 0).length;
 
-
-
     return (
         <div className="standard-layout home-layout">
 
             {/* ── Stat Bar ── */}
             <section className="feature stat-bar">
                 <div className="stat-item">
-                    <Text className="stat-item-title" c="dimmed" size="xs" tt="uppercase" fw={600} mb={6}>Total Internships</Text>
+                    <Text className="stat-item-title" c="dimmed" size="xs" tt="uppercase" fw={600} mb={6}>Total Listings</Text>
                     <Text className="stat-item-value" fw={800} c="var(--text-dark)">
                         {loading ? '—' : jobs.length}
                     </Text>
+
                 </div>
                 <Divider orientation="vertical" className="stat-divider" />
                 <div className="stat-item">

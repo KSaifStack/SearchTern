@@ -21,6 +21,9 @@ function Tracker() {
     const { trackedJobs, updateJobStatus, addJob, editJob, removeJob } = useTracker();
     const [activeId, setActiveId] = React.useState<string | null>(null);
     const [activeColumn, setActiveColumn] = useState<JobStatus>('Saved');
+    const [columnSearch, setColumnSearch] = useState<Record<JobStatus, string>>({
+        Saved: '', Applied: '', Interview: '', Offer: '', Rejected: ''
+    });
 
     // Modal State
     const [modalOpen, setModalOpen] = useState(false);
@@ -58,13 +61,28 @@ function Tracker() {
         setModalOpen(false);
     };
 
+    const columnCounts = useMemo(() => {
+        const counts: Record<JobStatus, number> = { Saved: 0, Applied: 0, Interview: 0, Offer: 0, Rejected: 0 };
+        trackedJobs.forEach(job => counts[job.status]++);
+        return counts;
+    }, [trackedJobs]);
+
     const columns = useMemo(() => {
         const cols: Record<JobStatus, TrackedJob[]> = {
             Saved: [], Applied: [], Interview: [], Offer: [], Rejected: []
         };
-        trackedJobs.forEach(job => cols[job.status].push(job));
+        trackedJobs.forEach(job => {
+            const q = columnSearch[job.status].toLowerCase()
+            if (!q ||
+                job.company.toLowerCase().includes(q) ||
+                job.role.toLowerCase().includes(q) ||
+                job.location.toLowerCase().includes(q)
+            ) {
+                cols[job.status].push(job)
+            }
+        });
         return cols;
-    }, [trackedJobs]);
+    }, [trackedJobs, columnSearch]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -231,7 +249,15 @@ function Tracker() {
                 <div className="tracker-board">
                     {STATUSES.map(status => (
                         <div key={status} className={`tracker-column-wrapper ${activeColumn === status ? 'active' : ''}`}>
-                            <Column status={status} jobs={columns[status]} onEdit={openModal} onAdd={openModal} />
+                            <Column
+                                status={status}
+                                jobs={columns[status]}
+                                onEdit={openModal}
+                                onAdd={openModal}
+                                searchValue={columnSearch[status]}
+                                onSearchChange={val => setColumnSearch(prev => ({ ...prev, [status]: val }))}
+                                totalCount={columnCounts[status]}
+                            />
                         </div>
                     ))}
                 </div>
