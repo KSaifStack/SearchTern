@@ -31,7 +31,7 @@ function Jobs() {
   const debounceRef = useRef<number | undefined>(undefined)
   const [searchText, setSearchText] = useState('')
   const [sortOrder, setSortOrder] = useState('newest')
-  const [typeFilters, setTypeFilters] = useState({ internship: true, offseason: true, newgrad: true })
+  const [typeFilters, setTypeFilters] = useState({ internship: true, newgrad: true })
   const [sortOpen, setSortOpen] = useState(false)
   const [typeOpen, setTypeOpen] = useState(false)
 
@@ -70,7 +70,6 @@ function Jobs() {
     }
     if (!typeFilters.internship) jobs = jobs.filter(j => j.type === 'newgrad')
     if (!typeFilters.newgrad) jobs = jobs.filter(j => j.type !== 'newgrad')
-    if (!typeFilters.offseason) jobs = jobs.filter(j => j.season !== 'offseason')
     return [...jobs].sort((a, b) => {
       if (sortOrder === 'company-az') return a.company.localeCompare(b.company)
       if (sortOrder === 'company-za') return b.company.localeCompare(a.company)
@@ -166,7 +165,7 @@ function Jobs() {
             <Popover opened={sortOpen} onChange={setSortOpen} width={180} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
                 <button className="sort_btn" onClick={() => setSortOpen(o => !o)}>
-                  <ArrowsDownUp size={16} weight="bold" />
+                  <ArrowsDownUp size={17} weight="bold" />
                 </button>
               </Popover.Target>
               <Popover.Dropdown>
@@ -189,7 +188,7 @@ function Jobs() {
             <Popover opened={typeOpen} onChange={setTypeOpen} width={160} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
                 <button className="sort_btn" onClick={() => setTypeOpen(o => !o)}>
-                  <FunnelSimple size={16} weight="bold" />
+                  <FunnelSimple size={17} weight="bold" />
                 </button>
               </Popover.Target>
               <Popover.Dropdown>
@@ -197,7 +196,6 @@ function Jobs() {
                   {[
                     { key: 'internship' as const, label: 'Internship' },
                     { key: 'newgrad' as const, label: 'New Grad' },
-                    { key: 'offseason' as const, label: 'Off-Season' },
                   ].map(t => (
                     <label key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
                       <input
