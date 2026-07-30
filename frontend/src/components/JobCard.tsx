@@ -59,7 +59,7 @@ export const SortableJobCard = ({ job, onEdit }: { job: TrackedJob, onEdit: (job
     );
 };
 
-export const Column = ({ status, jobs, onEdit }: { status: JobStatus, jobs: TrackedJob[], onEdit: (job: TrackedJob) => void, onAdd: (status: JobStatus) => void }) => {
+export const Column = ({ status, jobs, onEdit, searchValue, onSearchChange }: { status: JobStatus, jobs: TrackedJob[], onEdit: (job: TrackedJob) => void, onAdd: (status: JobStatus) => void, searchValue?: string, onSearchChange?: (val: string) => void }) => {
     const { setNodeRef } = useDroppable({
         id: status,
         data: {
@@ -74,6 +74,13 @@ export const Column = ({ status, jobs, onEdit }: { status: JobStatus, jobs: Trac
                 <span>{status}</span>
                 <span className="column-count" style={{ backgroundColor: `${STATUS_COLORS[status]}22`, color: STATUS_COLORS[status] }}>{jobs.length}</span>
             </div>
+
+            <input
+                className="tracker-column-search"
+                placeholder="Search..."
+                value={searchValue || ''}
+                onChange={e => onSearchChange?.(e.target.value)}
+            />
             
             <SortableContext items={jobs.map(j => j.id)} strategy={verticalListSortingStrategy}>
                 <div ref={setNodeRef} style={{ flexGrow: 1, minHeight: '150px' }}>
