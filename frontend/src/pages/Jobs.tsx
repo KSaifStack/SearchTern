@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { Table, Pagination, Popover, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth } from "../api/internships"
-import { BookmarkSimpleIcon } from '@phosphor-icons/react';
+import { BookmarkSimpleIcon, Funnel } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
@@ -170,7 +170,7 @@ function Jobs() {
                 setDraftType({ ...typeFilters })
                 setFilterOpen(o => !o)
               }}>
-                Sort By
+                <Funnel size={16} weight="bold" />
               </button>
             </Popover.Target>
             <Popover.Dropdown>
