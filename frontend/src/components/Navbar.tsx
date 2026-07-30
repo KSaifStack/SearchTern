@@ -79,13 +79,21 @@ function Navbar() {
                             </button>
                         </>
                     ) : (
-                        <button
-                            className="nav-profile-item"
-                            onClick={() => { navigate('/auth'); setMenuOpen(false); }}
-                        >
-                            <UserPlus weight="bold" />
-                            <span>Register</span>
-                        </button>
+                            <>
+                                <button
+                                    className="nav-profile-item"
+                                    onClick={() => { navigate('/auth'); setMenuOpen(false); }}
+                                >
+                                    <span>Log In</span>
+                                </button>
+                                <button
+                                    className="nav-profile-item"
+                                    onClick={() => { navigate('/auth?tab=signup'); setMenuOpen(false); }}
+                                >
+                                    <UserPlus weight="bold" />
+                                    <span>Sign Up</span>
+                                </button>
+                            </>
                     )}
                 </li>
             </ul>
@@ -142,8 +150,15 @@ function Navbar() {
                                     className="nav-profile-item"
                                     onClick={() => { navigate('/auth'); setProfileOpen(false); setMenuOpen(false); }}
                                 >
+                                    <span>Log In</span>
+                                </button>
+                                <div className="nav-profile-divider" />
+                                <button
+                                    className="nav-profile-item"
+                                    onClick={() => { navigate('/auth?tab=signup'); setProfileOpen(false); setMenuOpen(false); }}
+                                >
                                     <UserPlus weight="bold" />
-                                    <span>Register</span>
+                                    <span>Sign Up</span>
                                 </button>
                             </>
                         )}

@@ -23,7 +23,8 @@ const GoogleIcon = () => (
 function Auth() {
     const navigate = useNavigate();
     const { user } = useAuth();
-    const [tab, setTab] = useState<Tab>('login');
+    const params = new URLSearchParams(window.location.search);
+    const [tab, setTab] = useState<Tab>((params.get('tab') as Tab) || 'login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
