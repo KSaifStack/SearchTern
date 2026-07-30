@@ -19,12 +19,6 @@ interface Job {
   season?: string
 }
 
-const seasonLabels: Record<string, string> = {
-  '2026': 'Summer 2026',
-  '2027': 'Summer 2027',
-  'offseason': 'Off-Season',
-}
-
 function Jobs() {
   const [allJobs, setAllJobs] = useState<Job[]>([])
   const [search, setSearch] = useState('')
@@ -212,24 +206,6 @@ function Jobs() {
                       alt=""
                     />
                     {job.company}
-                    {job.type && (
-                      <span style={{
-                        fontSize: '10px', padding: '1px 6px', borderRadius: '8px', marginLeft: '6px',
-                        background: job.type === 'newgrad' ? '#d3f9d8' : '#e7f5ff',
-                        color: job.type === 'newgrad' ? '#2b8a3e' : '#1971c2',
-                        fontWeight: 600, verticalAlign: 'middle',
-                      }}>
-                        {job.type === 'newgrad' ? 'New Grad' : 'Internship'}
-                      </span>
-                    )}
-                    {job.season && job.season !== 'searchtern' && (
-                      <span style={{
-                        fontSize: '9px', padding: '1px 5px', borderRadius: '6px', marginLeft: '4px',
-                        background: '#f1f3f5', color: '#868e96', fontWeight: 500, verticalAlign: 'middle',
-                      }}>
-                        {seasonLabels[job.season] || job.season}
-                      </span>
-                    )}
                   </Table.Td>
                   <Table.Td data-label="Role">
                     <a href={job.link} target="_blank" rel="noreferrer" className="apply-link">
