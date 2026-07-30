@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react"
-import { Table, Pagination, Popover, Text, Menu, MenuDropdown } from '@mantine/core'
+import { Table, Pagination, Popover, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth } from "../api/internships"
 import { BookmarkSimpleIcon } from '@phosphor-icons/react';
@@ -30,7 +30,11 @@ function Jobs() {
   const [refreshCountdown, setRefreshCountdown] = useState(() => getSecondsUntilNextHour())
   const debounceRef = useRef<number | undefined>(undefined)
   const [searchText, setSearchText] = useState('')
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
+  const [sortOrder, setSortOrder] = useState('newest')
+  const [typeFilters, setTypeFilters] = useState({ internship: true, offseason: true, newgrad: true })
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [draftSort, setDraftSort] = useState('newest')
+  const [draftType, setDraftType] = useState({ internship: true, offseason: true, newgrad: true })
 
   const perPage = 15;
 
@@ -65,12 +69,17 @@ function Jobs() {
         j.location.toLowerCase().includes(q)
       )
     }
+    if (!typeFilters.internship) jobs = jobs.filter(j => j.type === 'newgrad')
+    if (!typeFilters.newgrad) jobs = jobs.filter(j => j.type !== 'newgrad')
+    if (!typeFilters.offseason) jobs = jobs.filter(j => j.season !== 'offseason')
     return [...jobs].sort((a, b) => {
+      if (sortOrder === 'company-az') return a.company.localeCompare(b.company)
+      if (sortOrder === 'company-za') return b.company.localeCompare(a.company)
       const aNum = parseFloat(String(a.date)) || 999
       const bNum = parseFloat(String(b.date)) || 999
       return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
-  }, [allJobs, searchText, sortOrder])
+  }, [allJobs, searchText, sortOrder, typeFilters])
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
@@ -154,21 +163,61 @@ function Jobs() {
 
         <div className="results-header">
           <p className="result-count">{loading ? 'Loading...' : `${filtered.length} internships found`}</p>
-          <Menu shadow="md" width={200}>
-            <Menu.Target>
-              <button className="sort_btn">
-                Sort By: {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
+          <Popover opened={filterOpen} onChange={setFilterOpen} width={220} position="bottom-end" withArrow shadow="md">
+            <Popover.Target>
+              <button className="sort_btn" onClick={() => {
+                setDraftSort(sortOrder)
+                setDraftType({ ...typeFilters })
+                setFilterOpen(o => !o)
+              }}>
+                Sort & Filter
               </button>
-            </Menu.Target>
-            <MenuDropdown>
-              <Menu.Item onClick={() => setSortOrder('newest')}>
-                Newest Listing
-              </Menu.Item>
-              <Menu.Item onClick={() => setSortOrder('oldest')}>
-                Oldest Listing
-              </Menu.Item>
-            </MenuDropdown>
-          </Menu>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <div style={{ padding: '4px 0', fontSize: '13px' }}>
+                <div style={{ fontWeight: 600, marginBottom: 6, color: '#495057' }}>Sort By</div>
+                {['newest', 'oldest', 'company-az', 'company-za'].map(opt => (
+                  <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="sort"
+                      checked={draftSort === opt}
+                      onChange={() => setDraftSort(opt)}
+                    />
+                    {opt === 'newest' ? 'Newest' : opt === 'oldest' ? 'Oldest' : opt === 'company-az' ? 'Company (A-Z)' : 'Company (Z-A)'}
+                  </label>
+                ))}
+                <div style={{ borderTop: '1px solid #e9ecef', marginTop: 8, paddingTop: 8 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 6, color: '#495057' }}>Type</div>
+                  {[
+                    { key: 'internship' as const, label: 'Internship' },
+                    { key: 'newgrad' as const, label: 'New Grad' },
+                    { key: 'offseason' as const, label: 'Off-Season' },
+                  ].map(t => (
+                    <label key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={draftType[t.key]}
+                        onChange={() => setDraftType(prev => ({ ...prev, [t.key]: !prev[t.key] }))}
+                      />
+                      {t.label}
+                    </label>
+                  ))}
+                </div>
+                <button
+                  onClick={() => {
+                    setSortOrder(draftSort)
+                    setTypeFilters(draftType)
+                    setPage(1)
+                    setFilterOpen(false)
+                  }}
+                  style={{ width: '100%', marginTop: 10, padding: '6px 0', fontWeight: 600, fontSize: 13, background: 'var(--primary-green)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                >
+                  Apply
+                </button>
+              </div>
+            </Popover.Dropdown>
+          </Popover>
         </div>
         <Table striped highlightOnHover mt="md">
           <Table.Thead>
