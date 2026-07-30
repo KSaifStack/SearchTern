@@ -170,7 +170,7 @@ function Jobs() {
                 setDraftType({ ...typeFilters })
                 setFilterOpen(o => !o)
               }}>
-                Sort & Filter
+                Sort By
               </button>
             </Popover.Target>
             <Popover.Dropdown>
@@ -183,6 +183,7 @@ function Jobs() {
                       name="sort"
                       checked={draftSort === opt}
                       onChange={() => setDraftSort(opt)}
+                      style={{ accentColor: 'var(--primary-green)' }}
                     />
                     {opt === 'newest' ? 'Newest' : opt === 'oldest' ? 'Oldest' : opt === 'company-az' ? 'Company (A-Z)' : 'Company (Z-A)'}
                   </label>
@@ -199,6 +200,7 @@ function Jobs() {
                         type="checkbox"
                         checked={draftType[t.key]}
                         onChange={() => setDraftType(prev => ({ ...prev, [t.key]: !prev[t.key] }))}
+                        style={{ accentColor: 'var(--primary-green)' }}
                       />
                       {t.label}
                     </label>
