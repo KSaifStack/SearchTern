@@ -4,7 +4,7 @@ import { notifications } from '@mantine/notifications'
 import { checkHealth } from "../api/internships"
 import { BookmarkSimpleIcon } from '@phosphor-icons/react';
 import "../styles/Table.css"
-import { getRecent, clearCache, getCacheRemaining } from "../services/internshipmanager"
+import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
 import { makeJobFingerprint } from "../utils/jobFingerprint"
 
@@ -25,8 +25,6 @@ const seasonLabels: Record<string, string> = {
   'offseason': 'Off-Season',
 }
 
-const REFRESH_INTERVAL = 3600 // 1 hour in seconds
-
 function Jobs() {
   const [allJobs, setAllJobs] = useState<Job[]>([])
   const [search, setSearch] = useState('')
@@ -35,7 +33,7 @@ function Jobs() {
   const [loading, setLoading] = useState(true)
   const [healthStatus, setHealthStatus] = useState<any>(null)
   const [popoverOpened, setPopoverOpened] = useState(false)
-  const [refreshCountdown, setRefreshCountdown] = useState(() => getCacheRemaining() || REFRESH_INTERVAL)
+  const [refreshCountdown, setRefreshCountdown] = useState(() => getSecondsUntilNextHour())
   const debounceRef = useRef<number | undefined>(undefined)
   const [searchText, setSearchText] = useState('')
 
@@ -43,26 +41,21 @@ function Jobs() {
 
   useEffect(() => {
     getRecent().then(res => {
-      if (res.success) {
-        setAllJobs(res.data)
-        setRefreshCountdown(getCacheRemaining() || REFRESH_INTERVAL)
-      }
+      if (res.success) setAllJobs(res.data)
       setLoading(false)
     })
   }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const remaining = getCacheRemaining()
-      if (remaining <= 0) {
+      const remaining = getSecondsUntilNextHour()
+      if (remaining >= 3599) {
         clearCache()
         getRecent().then(res => {
           if (res.success) setAllJobs(res.data)
         })
-        setRefreshCountdown(REFRESH_INTERVAL)
-      } else {
-        setRefreshCountdown(remaining)
       }
+      setRefreshCountdown(remaining)
     }, 1000)
     return () => clearInterval(interval)
   }, [])
