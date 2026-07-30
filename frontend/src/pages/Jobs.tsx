@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { Table, Pagination, Popover, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth } from "../api/internships"
-import { BookmarkSimpleIcon } from '@phosphor-icons/react';
+import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
@@ -166,7 +166,7 @@ function Jobs() {
             <Popover opened={sortOpen} onChange={setSortOpen} width={180} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
                 <button className="sort_btn" onClick={() => setSortOpen(o => !o)}>
-                  Sort By
+                  <ArrowsDownUp size={16} weight="bold" />
                 </button>
               </Popover.Target>
               <Popover.Dropdown>
@@ -189,7 +189,7 @@ function Jobs() {
             <Popover opened={typeOpen} onChange={setTypeOpen} width={160} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
                 <button className="sort_btn" onClick={() => setTypeOpen(o => !o)}>
-                  Type
+                  <FunnelSimple size={16} weight="bold" />
                 </button>
               </Popover.Target>
               <Popover.Dropdown>
