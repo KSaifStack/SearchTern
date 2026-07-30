@@ -71,10 +71,6 @@ function Home() {
 
     const recentActivity = activityLog.slice(0, 6);
     const todayCount = jobs.filter(j => parseFloat(String(j.date)) === 0).length;
-    const internshipCount = jobs.filter(j => j.type !== 'newgrad').length;
-    const newgradCount = jobs.filter(j => j.type === 'newgrad').length;
-
-
 
     return (
         <div className="standard-layout home-layout">
@@ -86,11 +82,7 @@ function Home() {
                     <Text className="stat-item-value" fw={800} c="var(--text-dark)">
                         {loading ? '—' : jobs.length}
                     </Text>
-                    {!loading && internshipCount > 0 && newgradCount > 0 && (
-                        <Text size="xs" c="dimmed" mt={2}>
-                            {internshipCount} internships, {newgradCount} new grad
-                        </Text>
-                    )}
+
                 </div>
                 <Divider orientation="vertical" className="stat-divider" />
                 <div className="stat-item">

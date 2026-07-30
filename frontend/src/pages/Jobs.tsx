@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react"
-import { Table, Pagination, Popover, Text } from '@mantine/core'
+import { Table, Pagination, Popover, Text, Menu, MenuDropdown } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth } from "../api/internships"
 import { BookmarkSimpleIcon } from '@phosphor-icons/react';
@@ -36,6 +36,7 @@ function Jobs() {
   const [refreshCountdown, setRefreshCountdown] = useState(() => getSecondsUntilNextHour())
   const debounceRef = useRef<number | undefined>(undefined)
   const [searchText, setSearchText] = useState('')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
 
   const perPage = 15;
 
@@ -70,12 +71,12 @@ function Jobs() {
         j.location.toLowerCase().includes(q)
       )
     }
-    return jobs.sort((a, b) => {
+    return [...jobs].sort((a, b) => {
       const aNum = parseFloat(String(a.date)) || 999
       const bNum = parseFloat(String(b.date)) || 999
-      return aNum - bNum
+      return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
-  }, [allJobs, searchText])
+  }, [allJobs, searchText, sortOrder])
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
@@ -159,7 +160,23 @@ function Jobs() {
 
         <div className="results-header">
           <p className="result-count">{loading ? 'Loading...' : `${filtered.length} internships found`}</p>
-        </div><Table striped highlightOnHover mt="md">
+          <Menu shadow="md" width={200}>
+            <Menu.Target>
+              <button className="sort_btn">
+                Sort By: {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
+              </button>
+            </Menu.Target>
+            <MenuDropdown>
+              <Menu.Item onClick={() => setSortOrder('newest')}>
+                Newest Listing
+              </Menu.Item>
+              <Menu.Item onClick={() => setSortOrder('oldest')}>
+                Oldest Listing
+              </Menu.Item>
+            </MenuDropdown>
+          </Menu>
+        </div>
+        <Table striped highlightOnHover mt="md">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Company</Table.Th>
