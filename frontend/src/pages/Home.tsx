@@ -78,7 +78,7 @@ function Home() {
             {/* ── Stat Bar ── */}
             <section className="feature stat-bar">
                 <div className="stat-item">
-                    <Text className="stat-item-title" c="dimmed" size="xs" tt="uppercase" fw={600} mb={6}>Total Listings</Text>
+                    <Text className="stat-item-title" c="dimmed" size="xs" fw={600} mb={6}>Total Listings</Text>
                     <Text className="stat-item-value" fw={800} c="var(--text-dark)">
                         {loading ? '—' : jobs.length}
                     </Text>
@@ -86,14 +86,14 @@ function Home() {
                 </div>
                 <Divider orientation="vertical" className="stat-divider" />
                 <div className="stat-item">
-                    <Text className="stat-item-title" c="dimmed" size="xs" tt="uppercase" fw={600} mb={6}>Added Today</Text>
+                    <Text className="stat-item-title" c="dimmed" size="xs" fw={600} mb={6}>Added Today</Text>
                     <Text className="stat-item-value" fw={800} c="var(--text-dark)">
                         {loading ? '—' : todayCount}
                     </Text>
                 </div>
                 <Divider orientation="vertical" className="stat-divider" />
                 <div className="stat-item">
-                    <Text className="stat-item-title" c="dimmed" size="xs" tt="uppercase" fw={600} mb={6}>Tracked Apps</Text>
+                    <Text className="stat-item-title" c="dimmed" size="xs" fw={600} mb={6}>Tracked Apps</Text>
                     <Text className="stat-item-value" fw={800} c="var(--text-dark)">
                         {trackedJobs.length}
                     </Text>
@@ -108,7 +108,7 @@ function Home() {
                         label={
                             <div className="stat-ring-label">
                                 <Text fw={800} size="xl" lh={1}>{total > 0 ? total : 0}</Text>
-                                <Text c="dimmed" size="xs" tt="uppercase" fw={700} mt={2}>Total</Text>
+                                <Text c="dimmed" size="xs" fw={700} mt={2}>Total</Text>
                             </div>
                         }
                     />

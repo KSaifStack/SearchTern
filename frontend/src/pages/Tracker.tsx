@@ -184,19 +184,19 @@ function Tracker() {
             <section className="feature tracker-stats" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px', margin: '0 0 20px 0', boxSizing: 'border-box' }}>
                 <div className="tracker-stats-numbers" style={{ display: 'flex', flexGrow: 1, justifyContent: 'space-around', paddingRight: '40px' }}>
                     <div style={{ textAlign: 'center' }}>
-                        <Text c="dimmed" size="xs" tt="uppercase" fw={700}>Applied</Text>
+                        <Text c="dimmed" size="xs" fw={700}>Applied</Text>
                         <Text fw={700} size="xl">{totalApplied}</Text>
                     </div>
                     <div style={{ textAlign: 'center' }}>
-                        <Text c="dimmed" size="xs" tt="uppercase" fw={700}>Reply Rate</Text>
+                        <Text c="dimmed" size="xs" fw={700}>Reply Rate</Text>
                         <Text fw={700} size="xl">{responseRate}%</Text>
                     </div>
                     <div style={{ textAlign: 'center' }}>
-                        <Text c="dimmed" size="xs" tt="uppercase" fw={700}>Offers</Text>
+                        <Text c="dimmed" size="xs" fw={700}>Offers</Text>
                         <Text fw={700} size="xl" c="green">{offers}</Text>
                     </div>
                     <div style={{ textAlign: 'center' }}>
-                        <Text c="dimmed" size="xs" tt="uppercase" fw={700}>Rejected</Text>
+                        <Text c="dimmed" size="xs" fw={700}>Rejected</Text>
                         <Text fw={700} size="xl" c="red">{stats.rejected}</Text>
                     </div>
                 </div>
@@ -212,7 +212,7 @@ function Tracker() {
                         label={
                             <div style={{ textAlign: 'center', marginTop: '-4px' }}>
                                 <Text fw={800} size="xl" lh={1}>{totalTracked > 0 ? totalTracked : 0}</Text>
-                                <Text c="dimmed" size="xs" tt="uppercase" fw={700} mt={2}>Total</Text>
+                                <Text c="dimmed" size="xs" fw={700} mt={2}>Total</Text>
                             </div>
                         }
                     />
