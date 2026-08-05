@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { SpeedInsights } from "@vercel/speed-insights/react"
+import { Analytics } from "@vercel/analytics/react"
 import Navbar from "./components/Navbar"
 import Home from "./pages/Home"
 import Jobs from "./pages/Jobs"
@@ -26,6 +27,7 @@ function App() {
                             </Routes>
                         </div>
                         <SpeedInsights />
+                        <Analytics />
                     </div>
                 </TrackerProvider>
             </AuthProvider>

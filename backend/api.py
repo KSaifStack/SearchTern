@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import Depends, FastAPI, HTTPException, Request, Header
+from fastapi import Depends, FastAPI, HTTPException, Request, Header, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 import threading
 import sys
 import logging
+import hashlib
+import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -87,8 +89,17 @@ def update_base(request: Request, verified=Depends(verify_key)):
 #Search recent internships
 @app.get("/recent")
 @limiter.limit("30/minute")
-def pull_recent(request: Request):
-    return {"result": read_db.recent_internships()}
+def pull_recent(request: Request, response: Response):
+    data = read_db.recent_internships()
+    body = json.dumps({"result": data}, default=str).encode()
+    etag = '"' + hashlib.md5(body).hexdigest() + '"'
+    headers = {
+        "ETag": etag,
+        "Cache-Control": "public, max-age=300, must-revalidate",
+    }
+    if request.headers.get("If-None-Match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=body, media_type="application/json", headers=headers)
 
 #Search location
 @app.get("/location")
