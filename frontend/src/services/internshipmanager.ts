@@ -1,5 +1,5 @@
 // This will handles job data from api
-import { pullUpdateBackend, pullRecent, pullLocation, pullKeyword } from "../api/internships.ts"; 
+import { pullUpdateBackend, pullRecent, pullLocation, pullKeyword } from "../api/internships.ts";
 
 interface Job{
     id: number,
@@ -13,13 +13,24 @@ interface Job{
 }
 
 let cached: Job[] | null = null
+let cachedAt = 0
+
+function isCurrentHour(ts: number): boolean {
+    const hourStart = new Date()
+    hourStart.setMinutes(0, 0, 0)
+    return ts >= hourStart.getTime()
+}
 
 export async function getRecent() {
-    if (cached) return { success: true, data: cached } as const
+    if (cached && isCurrentHour(cachedAt)) {
+        return { success: true, data: cached } as const
+    }
     const result = await pullRecent()
-    if (!result) return { success: false, data: [] } as const
-    cached = result
-    return { success: true, data: result } as const
+    if (result && result.length > 0) {
+        cached = result
+        cachedAt = Date.now()
+    }
+    return { success: Boolean(result), data: result || [] } as const
 }
 
 export async function searchByLocation(searchterm: string){
@@ -38,19 +49,16 @@ export async function getDatabase() {
     const result = await pullUpdateBackend()
     if (!result) return { success: false, data: [] } as const
     cached = result
+    cachedAt = Date.now()
     return { success: true, data: result } as const
 }
 
 export function clearCache() {
     cached = null
+    cachedAt = 0
 }
 
 export function getSecondsUntilNextHour(): number {
     const now = new Date()
     return 3600 - (now.getMinutes() * 60 + now.getSeconds())
 }
-
-
-
-
-
