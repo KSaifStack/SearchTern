@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from "react"
-import { Table, Pagination, Popover, Text } from '@mantine/core'
+import { Table, Pagination, Popover, Text, Select } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth } from "../api/internships"
-import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple } from '@phosphor-icons/react';
+import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple, GlobeSimple } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
 import { makeJobFingerprint } from "../utils/jobFingerprint"
+import { parseLocation, US_STATES } from "../utils/locationFilter"
+import type { ParsedLocation } from "../utils/locationFilter"
 
 interface Job {
   id: number
@@ -34,6 +36,9 @@ function Jobs() {
   const [typeFilters, setTypeFilters] = useState({ internship: true, newgrad: true })
   const [sortOpen, setSortOpen] = useState(false)
   const [typeOpen, setTypeOpen] = useState(false)
+  const [locOpen, setLocOpen] = useState(false)
+  const [countryFilter, setCountryFilter] = useState('')
+  const [stateFilter, setStateFilter] = useState('')
 
   const perPage = 15;
 
@@ -58,6 +63,33 @@ function Jobs() {
     return () => clearInterval(interval)
   }, [])
 
+  const parsedLocations = useMemo(() => {
+    const map = new Map<number, ParsedLocation>()
+    for (const j of allJobs) map.set(j.id, parseLocation(j.location))
+    return map
+  }, [allJobs])
+
+  const countryOptions = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const parsed of parsedLocations.values()) {
+      for (const c of parsed.countries) counts[c] = (counts[c] || 0) + 1
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }))
+  }, [parsedLocations])
+
+  const stateOptions = useMemo(() => {
+    if (countryFilter !== 'United States') return []
+    const counts: Record<string, number> = {}
+    for (const parsed of parsedLocations.values()) {
+      for (const s of parsed.states) counts[s] = (counts[s] || 0) + 1
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([abbr]) => abbr)
+  }, [parsedLocations, countryFilter])
+
   const filtered = useMemo(() => {
     let jobs = allJobs.filter(j => j && j.company)
     if (searchText) {
@@ -68,6 +100,8 @@ function Jobs() {
         j.location.toLowerCase().includes(q)
       )
     }
+    if (countryFilter) jobs = jobs.filter(j => parsedLocations.get(j.id)?.countries.includes(countryFilter))
+    if (stateFilter) jobs = jobs.filter(j => parsedLocations.get(j.id)?.states.includes(stateFilter))
     if (!typeFilters.internship) jobs = jobs.filter(j => j.type === 'newgrad')
     if (!typeFilters.newgrad) jobs = jobs.filter(j => j.type !== 'newgrad')
     return [...jobs].sort((a, b) => {
@@ -77,7 +111,7 @@ function Jobs() {
       const bNum = parseFloat(String(b.date)) || 999
       return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
-  }, [allJobs, searchText, sortOrder, typeFilters])
+  }, [allJobs, searchText, sortOrder, typeFilters, countryFilter, stateFilter, parsedLocations])
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
@@ -207,6 +241,51 @@ function Jobs() {
                       {t.label}
                     </label>
                   ))}
+                </div>
+              </Popover.Dropdown>
+            </Popover>
+            <Popover opened={locOpen} onChange={setLocOpen} width={250} position="bottom-end" withArrow shadow="md">
+              <Popover.Target>
+                <button className="sort_btn" onClick={() => setLocOpen(o => !o)} title="Country / state filter">
+                  <GlobeSimple size={17} weight="bold" />
+                </button>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <div style={{ padding: '4px 0', fontSize: '13px' }}>
+                  <Select
+                    label="Country"
+                    placeholder="All countries"
+                    size="xs"
+                    searchable
+                    clearable
+                    data={countryOptions.map(o => ({ value: o.name, label: `${o.name} (${o.count})` }))}
+                    value={countryFilter || null}
+                    onChange={val => { setCountryFilter(val || ''); setStateFilter(''); setPage(1) }}
+                    maxDropdownHeight={220}
+                    mb={10}
+                  />
+                  {countryFilter === 'United States' && (
+                    <Select
+                      label="State"
+                      placeholder="All states"
+                      size="xs"
+                      searchable
+                      clearable
+                      data={stateOptions.map(s => ({ value: s, label: `${US_STATES[s] || s} (${s})` }))}
+                      value={stateFilter || null}
+                      onChange={val => { setStateFilter(val || ''); setPage(1) }}
+                      maxDropdownHeight={220}
+                      mb={10}
+                    />
+                  )}
+                  {(countryFilter || stateFilter) && (
+                    <button
+                      className="btn-clear"
+                      onClick={() => { setCountryFilter(''); setStateFilter(''); setPage(1) }}
+                    >
+                      Clear location filter
+                    </button>
+                  )}
                 </div>
               </Popover.Dropdown>
             </Popover>

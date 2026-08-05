@@ -56,6 +56,78 @@ def sort_date(date: str):
     return date
 
 
+US_STATES = {
+    "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas", "CA": "California",
+    "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware", "FL": "Florida", "GA": "Georgia",
+    "HI": "Hawaii", "ID": "Idaho", "IL": "Illinois", "IN": "Indiana", "IA": "Iowa",
+    "KS": "Kansas", "KY": "Kentucky", "LA": "Louisiana", "ME": "Maine", "MD": "Maryland",
+    "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota", "MS": "Mississippi", "MO": "Missouri",
+    "MT": "Montana", "NE": "Nebraska", "NV": "Nevada", "NH": "New Hampshire", "NJ": "New Jersey",
+    "NM": "New Mexico", "NY": "New York", "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio",
+    "OK": "Oklahoma", "OR": "Oregon", "PA": "Pennsylvania", "RI": "Rhode Island", "SC": "South Carolina",
+    "SD": "South Dakota", "TN": "Tennessee", "TX": "Texas", "UT": "Utah", "VT": "Vermont",
+    "VA": "Virginia", "WA": "Washington", "WV": "West Virginia", "WI": "Wisconsin", "WY": "Wyoming",
+    "DC": "District of Columbia",
+}
+US_STATE_NAMES = {name.lower(): abbr for abbr, name in US_STATES.items()}
+US_STATE_ABBR = set(US_STATES.keys())
+
+CITY_TO_STATE = {
+    "nyc": "NY", "new york": "NY", "sf": "CA", "san francisco": "CA", "la": "CA",
+    "los angeles": "CA", "philly": "PA", "washington dc": "DC", "washington d.c.": "DC",
+    "st louis": "MO", "new orleans": "LA", "silicon valley": "CA",
+}
+
+NON_US_COUNTRIES = [
+    ("United Kingdom", ["united kingdom", "uk", "england", "scotland", "wales", "britain", "london", "edinburgh", "manchester", "birmingham"]),
+    ("Canada", ["canada", "toronto", "vancouver", "montreal", "ottawa", "calgary", "ontario", "quebec"]),
+    ("Germany", ["germany", "berlin", "munich", "hamburg", "stuttgart"]),
+    ("India", ["india", "bangalore", "bengaluru", "hyderabad", "mumbai", "pune", "chennai", "gurgaon"]),
+    ("Singapore", ["singapore"]),
+    ("France", ["france", "paris"]),
+    ("Netherlands", ["netherlands", "amsterdam"]),
+    ("Switzerland", ["switzerland", "zurich", "geneva"]),
+    ("Ireland", ["ireland", "dublin"]),
+    ("Australia", ["australia", "sydney", "melbourne", "canberra", "perth"]),
+    ("Japan", ["japan", "tokyo", "osaka"]),
+    ("Mexico", ["mexico", "mexico city"]),
+    ("China", ["china", "hong kong", "shanghai", "beijing", "shenzhen"]),
+    ("UAE", ["uae", "dubai", "abu dhabi"]),
+    ("Brazil", ["brazil", "sao paulo", "são paulo"]),
+    ("Spain", ["spain", "madrid", "barcelona"]),
+    ("Italy", ["italy", "milan", "rome"]),
+    ("Poland", ["poland", "warsaw", "krakow"]),
+    ("Sweden", ["sweden", "stockholm"]),
+    ("South Korea", ["south korea", "seoul"]),
+    ("Israel", ["israel", "tel aviv"]),
+]
+
+US_MARKERS = ["united states", "usa", "u.s.a.", "america", "states"]
+
+
+def is_us_only(location: str) -> bool:
+    lower = (location or "").strip().lower()
+    if not lower:
+        return True
+
+    for _, keywords in NON_US_COUNTRIES:
+        for kw in keywords:
+            if re.search(rf"\b{re.escape(kw)}\b", lower):
+                return False
+
+    for marker in US_MARKERS:
+        if re.search(rf"\b{re.escape(marker)}\b", lower):
+            return True
+
+    tokens = re.split(r"[;,\n/\-]", lower)
+    for token in tokens:
+        token = token.strip()
+        if token.upper() in US_STATE_ABBR or token in US_STATE_NAMES or token in CITY_TO_STATE:
+            return True
+
+    return True
+
+
 def scrape_simplify_readme(url, job_type, season):
     response = requests.get(url)
     if response.status_code != 200:
@@ -137,6 +209,12 @@ def update_database():
 
     print(f"Total after dedup: {len(deduped)}")
 
+    us_jobs = [job for job in deduped if is_us_only(job["location"])]
+    filtered = len(deduped) - len(us_jobs)
+    if filtered:
+        print(f"Removed {filtered} non-US listings")
+    print(f"US-only listings: {len(us_jobs)}")
+
     conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
     current_run_time = datetime.now(timezone.utc)
@@ -153,19 +231,35 @@ def update_database():
             season TEXT,
             last_seen_at TIMESTAMPTZ DEFAULT NOW(),
             CONSTRAINT internships_unique_job UNIQUE (company, role, location, link)
-        );
-        CREATE INDEX IF NOT EXISTS idx_last_seen ON internships(last_seen_at);
-        CREATE INDEX IF NOT EXISTS idx_internships_date ON internships(date);
-        CREATE INDEX IF NOT EXISTS idx_internships_role ON internships(role);
-        CREATE INDEX IF NOT EXISTS idx_internships_location ON internships(location);
+        )
     """)
 
     cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS type TEXT")
     cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS season TEXT")
+    cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT NOW()")
+
+    cursor.execute("SELECT 1 FROM pg_constraint WHERE conname = 'internships_unique_job'")
+    if cursor.fetchone() is None:
+        cursor.execute("""
+            DELETE FROM internships a
+            USING internships b
+            WHERE a.id > b.id
+              AND a.company = b.company AND a.role = b.role
+              AND a.location = b.location AND a.link = b.link
+        """)
+        cursor.execute("""
+            ALTER TABLE internships
+            ADD CONSTRAINT internships_unique_job UNIQUE (company, role, location, link)
+        """)
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_last_seen ON internships(last_seen_at)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_date ON internships(date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_role ON internships(role)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_location ON internships(location)")
 
     records = [
         (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], current_run_time)
-        for job in deduped
+        for job in us_jobs
     ]
 
     upsert_query = """
@@ -187,7 +281,7 @@ def update_database():
 
     conn.commit()
     conn.close()
-    return f"Done! {len(deduped)} listings upserted."
+    return f"Done! {len(us_jobs)} listings upserted."
 
 
 if __name__ == "__main__":

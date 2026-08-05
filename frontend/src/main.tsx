@@ -8,6 +8,7 @@ import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <MantineProvider theme={{
+    fontFamily: "'Lexend', sans-serif",
     colors: {
       brand: [
         '#ebf7f0',
