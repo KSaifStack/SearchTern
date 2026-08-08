@@ -10,7 +10,7 @@
 
 ---
 
-<img width="1917" height="991" alt="image" src="https://github.com/user-attachments/assets/f5299847-5ad8-458d-8c85-9e1a52c79356" />
+<img width="2882" height="1922" alt="image" src="https://github.com/user-attachments/assets/f5aaafae-11d6-4641-bc21-26f30cb6c1ba" />
 
 ## What it does
 
@@ -23,8 +23,6 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 1. **Scraper** — APScheduler pulls from the [Simplify](https://github.com/SimplifyJobs/Summer2026-Internships) repo and additional sources hourly, using bulk upserts to keep the database fresh without downtime
 2. **Backend** — FastAPI serves the data with rate limiting and input validation, hosted on Railway
 3. **Frontend** — React/TypeScript dashboard with live search, sorting, and a drag-and-drop Kanban tracker
-4. **Infrastructure** — Backend hosted on Railway, frontend on Vercel, database on Supabase PostgreSQL
-
 ---
 
 ## Features
@@ -56,7 +54,7 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 </tr>
 </table>
 
-> **Coming soon:** AI resume grader, resource hub, user accounts
+> **Coming soon:** AI resume grader, resource hub
 
 ---
 
@@ -78,10 +76,6 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 <tr>
 <td><strong>Frontend</strong></td>
 <td>React, TypeScript, Vite, Mantine UI, @dnd-kit</td>
-</tr>
-<tr>
-<td><strong>Infrastructure</strong></td>
-<td>Railway (backend), Vercel (frontend), Supabase (database), Cloudflare (DNS)</td>
 </tr>
 </table>
 
