@@ -74,7 +74,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 def health():
     next_run = scheduler.get_jobs()[0].next_run_time if scheduler.get_jobs() else None
     return {
-        "status": "ok",
+        "status": "Active",
         "next_scrape": str(next_run) if next_run else "unknown"
     }
 
