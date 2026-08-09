@@ -175,7 +175,7 @@ function Jobs() {
             <Popover.Dropdown>
               {healthStatus ? (
                 <>
-                  <Text size="xs">Status: <span style={{ color: healthStatus.status === 'ok' ? 'green' : 'red' }}>{healthStatus.status}</span></Text>
+                  <Text size="xs">Status: <span style={{ color: healthStatus.status === 'Active' ? 'green' : 'red' }}>{healthStatus.status}</span></Text>
                   <Text size="xs">Next Update: {healthStatus.next_scrape !== 'unknown' ? new Date(healthStatus.next_scrape.replace(' ', 'T')).toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true }) : 'Unknown'}</Text>
                   <Text size="xs" mt={5} c="dimmed">Data Sources: SimplifyJobs, SearchTern-Listings</Text>
                 </>
