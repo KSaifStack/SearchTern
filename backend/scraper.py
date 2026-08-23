@@ -21,11 +21,6 @@ SIMPLIFY_SOURCES = [
         "type": "internship",
         "season": "offseason",
     },
-    {
-        "url": "https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/README.md",
-        "type": "newgrad",
-        "season": "2026",
-    },
 ]
 
 MARKDOWN_SOURCES = [
