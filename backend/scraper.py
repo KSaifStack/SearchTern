@@ -12,11 +12,6 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 SIMPLIFY_SOURCES = [
     {
-        "url": "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/README.md",
-        "type": "internship",
-        "season": "2026",
-    },
-    {
         "url": "https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/README.md",
         "type": "internship",
         "season": "2027",
@@ -30,6 +25,24 @@ SIMPLIFY_SOURCES = [
         "url": "https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/README.md",
         "type": "newgrad",
         "season": "2026",
+    },
+]
+
+MARKDOWN_SOURCES = [
+    {
+        "url": "https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/README.md",
+        "type": "internship",
+        "season": "2027",
+    },
+    {
+        "url": "https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/OFFSEASON_README.md",
+        "type": "internship",
+        "season": "offseason",
+    },
+    {
+        "url": "https://raw.githubusercontent.com/vanshb03/New-Grad-2027/dev/README.md",
+        "type": "newgrad",
+        "season": "2027",
     },
 ]
 
@@ -163,6 +176,84 @@ def scrape_simplify_readme(url, job_type, season):
     return jobs
 
 
+def scrape_markdown_readme(url, job_type, season):
+    """Parser for repos that use pure Markdown pipe tables (e.g. vanshb03)."""
+    response = requests.get(url, timeout=30)
+    if response.status_code != 200:
+        print(f"  Error {response.status_code} — {url}")
+        return []
+
+    jobs = []
+    last_company = ""
+    in_table = False
+
+    for line in response.text.splitlines():
+        stripped = line.strip()
+
+        # Detect table boundaries
+        if not stripped.startswith("|"):
+            in_table = False
+            continue
+
+        # Skip header and separator rows
+        if re.match(r"^\|\s*[-:]+\s*\|", stripped) or re.match(r"^\|\s*Company\s*\|", stripped, re.IGNORECASE):
+            in_table = True
+            continue
+
+        if not in_table and "|" in stripped:
+            in_table = True
+
+        cells = [c.strip() for c in stripped.split("|")[1:-1]]
+        if len(cells) < 5:
+            continue
+
+        # Company — strip HTML tags and emoji flags
+        raw_company = re.sub(r"<[^>]+>", "", cells[0]).strip()
+        company = clean_text(raw_company)
+        if not company or company == "" :
+            company = last_company
+        else:
+            last_company = company
+
+        # Role — strip HTML and sponsorship emoji (🛂 🇺🇸 🔒 etc.)
+        raw_role = re.sub(r"<[^>]+>", "", cells[1]).strip()
+        role = clean_text(raw_role)
+
+        # Location — strip HTML, handle <details> summaries
+        raw_location = re.sub(r"<[^>]+>", "", cells[2]).strip()
+        # Collapse </br> separators that survived tag stripping
+        raw_location = re.sub(r"\s*\n\s*", ", ", raw_location)
+        location = clean_text(raw_location)
+
+        # Link — extract href from the anchor in cell 3
+        link_match = re.search(r'href="([^"]+)"', cells[3])
+        if link_match:
+            link = link_match.group(1)
+        else:
+            # Closed listing (🔒) or no link — skip
+            continue
+
+        # Date — cell 4, strip HTML
+        raw_date = re.sub(r"<[^>]+>", "", cells[4]).strip()
+        date = clean_text(raw_date)
+
+        if not company or not role:
+            continue
+
+        jobs.append({
+            "company":  company,
+            "role":     role,
+            "location": location,
+            "date":     date,
+            "link":     link,
+            "type":     job_type,
+            "season":   season,
+        })
+
+    print(f"  {len(jobs)} rows from {job_type} ({season}) [markdown]")
+    return jobs
+
+
 def scrape_searchtern_listings(url):
     response = requests.get(url, timeout=30)
     if response.status_code != 200:
@@ -194,13 +285,17 @@ def update_database():
     for source in SIMPLIFY_SOURCES:
         all_jobs.extend(scrape_simplify_readme(source["url"], source["type"], source["season"]))
 
+    print("Scraping Markdown READMEs...")
+    for source in MARKDOWN_SOURCES:
+        all_jobs.extend(scrape_markdown_readme(source["url"], source["type"], source["season"]))
+
     print("Scraping SearchTern-Listings...")
     all_jobs.extend(scrape_searchtern_listings(SEARCHTERN_LISTINGS_URL))
 
     seen = set()
     deduped = []
     for job in all_jobs:
-        key = (job["company"].lower(), job["role"].lower(), job["location"].lower(), job["link"].lower())
+        key = (job["company"].lower(), job["role"].lower(), job["link"].lower())
         if key in seen:
             continue
         seen.add(key)
@@ -230,7 +325,7 @@ def update_database():
             type TEXT,
             season TEXT,
             last_seen_at TIMESTAMPTZ DEFAULT NOW(),
-            CONSTRAINT internships_unique_job UNIQUE (company, role, location, link)
+            CONSTRAINT internships_unique_job UNIQUE (company, role, link)
         )
     """)
 
