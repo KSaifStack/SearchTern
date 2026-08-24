@@ -210,7 +210,7 @@ def scrape_markdown_readme(url, job_type, season):
         else:
             last_company = company
 
-        # Role — strip HTML and sponsorship emoji (🛂 🇺🇸 🔒 etc.)
+        # Role — strip HTML and sponsorship emoji
         raw_role = re.sub(r"<[^>]+>", "", cells[1]).strip()
         role = clean_text(raw_role)
 
@@ -290,7 +290,7 @@ def update_database():
     seen = set()
     deduped = []
     for job in all_jobs:
-        key = (job["company"].lower(), job["role"].lower(), job["link"].lower())
+        key = (job["company"].lower(), job["role"].lower(), job["location"].lower())
         if key in seen:
             continue
         seen.add(key)
