@@ -46,22 +46,67 @@ SEARCHTERN_LISTINGS_URL = "https://raw.githubusercontent.com/KSaifStack/SearchTe
 
 def clean_text(text):
     text = text.replace("\u21b3", "")
+    text = re.sub(r"\*+|`+|~+", "", text)
     text = re.sub(r'[^\x00-\x7F]+', "", text)
-    return text.strip()
+    return re.sub(r"\s+", " ", text).strip()
 
 
-def sort_date(date: str):
-    date = date.strip(" '\"")
-    if date.startswith(("202", "203")):
+MONTHS = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+
+def sort_date(date: str) -> str:
+    """Normalize any source date into 'days ago' as a string, or '999' when unknown."""
+    date = str(date).strip(" '\"").strip()
+    if not date:
+        return "999"
+
+    # Already a plain day count
+    if date.isdigit():
+        return date
+
+    # ISO dates/timestamps e.g. 2026-07-31T00:00:00+00:00 / ...Z / 2026-07-31
+    if re.match(r"^\d{4}-\d{2}-\d{2}", date):
         try:
-            return str(max(0, (datetime.now(datetime.fromisoformat(date).tzinfo) - datetime.fromisoformat(date)).days))
+            dt = datetime.fromisoformat(date.replace("Z", "+00:00"))
+            now = datetime.now(dt.tzinfo) if dt.tzinfo else datetime.now()
+            return str(max(0, (now - dt).days))
         except ValueError:
-            return "999"
-    match = re.match(r"(\d+)([a-z]+)", date.lower())
+            pass
+
+    # Relative ages e.g. 3d, 21d, 7mo, 2w
+    match = re.fullmatch(r"(\d+)\s*([a-z]+)", date.lower())
     if match:
         val, unit = int(match.group(1)), match.group(2)
-        return str(val * 30 if "m" in unit else val)
-    return date
+        if unit.startswith("d"):
+            return str(val)
+        if unit.startswith("w"):
+            return str(val * 7)
+        if unit.startswith("m"):
+            return str(val * 30)
+        if unit.startswith("h"):
+            return "0"
+        return "999"
+
+    # Month-day without year e.g. Jul 24 / Sept 03 — infer the year.
+    # If it lands more than a week in the future it belongs to last year's cycle.
+    match = re.fullmatch(r"([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2})", date)
+    if match:
+        month = MONTHS.get(match.group(1).lower())
+        day = int(match.group(2))
+        if month:
+            try:
+                today = datetime.now()
+                dt = datetime(today.year, month, day)
+                if (dt - today).days > 7:
+                    dt = datetime(today.year - 1, month, day)
+                return str(max(0, (today - dt).days))
+            except ValueError:
+                pass
+
+    return "999"
 
 
 US_STATES = {
@@ -214,11 +259,15 @@ def scrape_markdown_readme(url, job_type, season):
         raw_role = re.sub(r"<[^>]+>", "", cells[1]).strip()
         role = clean_text(raw_role)
 
-        # Location — strip HTML, handle <details> summaries
-        raw_location = re.sub(r"<[^>]+>", "", cells[2]).strip()
-        # Collapse </br> separators that survived tag stripping
+        # Location — normalize <br>/<br/>/</br> variants to ", " first, then drop
+        # <details><summary>**N locations**</summary> chips, strip remaining HTML/markdown
+        raw_location = re.sub(r"(?i)</?\s*br\s*/?>", ", ", cells[2])
+        raw_location = re.sub(r"(?is)<summary>.*?</summary>", "", raw_location)
+        raw_location = re.sub(r"<[^>]+>", "", raw_location)
+        # Collapse leftover newlines that survived tag stripping
         raw_location = re.sub(r"\s*\n\s*", ", ", raw_location)
         location = clean_text(raw_location)
+        location = re.sub(r"\s*,\s*(,\s*)+", ", ", location).strip(" ,")
 
         # Link — extract href from the anchor in cell 3
         link_match = re.search(r'href="([^"]+)"', cells[3])
@@ -260,10 +309,10 @@ def scrape_searchtern_listings(url):
     for job in listings:
         jt = job.get("job_type", "internship")
         jobs.append({
-            "company":  job.get("company", ""),
-            "role":     job.get("role", ""),
-            "location": job.get("location", ""),
-            "date":     job.get("date", ""),
+            "company":  clean_text(str(job.get("company", ""))),
+            "role":     clean_text(str(job.get("role", ""))),
+            "location": clean_text(str(job.get("location", ""))),
+            "date":     str(job.get("date", "")).strip(),
             "link":     job.get("link", "N/A"),
             "type":     jt if jt in ("internship", "newgrad") else "internship",
             "season":   "searchtern",

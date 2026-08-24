@@ -107,8 +107,10 @@ function Jobs() {
     return [...jobs].sort((a, b) => {
       if (sortOrder === 'company-az') return a.company.localeCompare(b.company)
       if (sortOrder === 'company-za') return b.company.localeCompare(a.company)
-      const aNum = parseFloat(String(a.date)) || 999
-      const bNum = parseFloat(String(b.date)) || 999
+      const aParsed = parseFloat(String(a.date))
+      const bParsed = parseFloat(String(b.date))
+      const aNum = isNaN(aParsed) ? 999 : aParsed
+      const bNum = isNaN(bParsed) ? 999 : bParsed
       return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
   }, [allJobs, searchText, sortOrder, typeFilters, countryFilter, stateFilter, parsedLocations])
