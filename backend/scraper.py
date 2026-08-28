@@ -12,11 +12,13 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 SIMPLIFY_SOURCES = [
     {
+        "name": "SimplifyJobs — Summer 2027 Internships",
         "url": "https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/README.md",
         "type": "internship",
         "season": "2027",
     },
     {
+        "name": "SimplifyJobs — Off-Season",
         "url": "https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/README-Off-Season.md",
         "type": "internship",
         "season": "offseason",
@@ -25,16 +27,19 @@ SIMPLIFY_SOURCES = [
 
 MARKDOWN_SOURCES = [
     {
+        "name": "vanshb03 — Summer 2027 Internships",
         "url": "https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/README.md",
         "type": "internship",
         "season": "2027",
     },
     {
+        "name": "vanshb03 — Off-Season",
         "url": "https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/OFFSEASON_README.md",
         "type": "internship",
         "season": "offseason",
     },
     {
+        "name": "vanshb03 — New Grad 2027",
         "url": "https://raw.githubusercontent.com/vanshb03/New-Grad-2027/dev/README.md",
         "type": "newgrad",
         "season": "2027",
@@ -42,6 +47,25 @@ MARKDOWN_SOURCES = [
 ]
 
 SEARCHTERN_LISTINGS_URL = "https://raw.githubusercontent.com/KSaifStack/SearchTern-Listings/main/pages/listings.json"
+
+SEARCHTERN_SOURCE = {
+    "name": "SearchTern-Listings",
+    "url": SEARCHTERN_LISTINGS_URL,
+    "type": "internship/newgrad",
+    "season": "searchtern",
+}
+
+# All sources the scraper pulls from, in scrape order. Used by the
+# /sources endpoint and the frontend "Data Sources" panel.
+ALL_SOURCES = [
+    *SIMPLIFY_SOURCES,
+    *MARKDOWN_SOURCES,
+    SEARCHTERN_SOURCE,
+]
+
+# Listings older than this many days are dropped on every scrape run.
+# Tune via SCRAPER_MAX_AGE_DAYS env var; defaults to 90 days.
+MAX_AGE_DAYS = int(os.environ.get("SCRAPER_MAX_AGE_DAYS", "90"))
 
 
 def clean_text(text):
@@ -354,6 +378,21 @@ def update_database():
         print(f"Removed {filtered} non-US listings")
     print(f"US-only listings: {len(us_jobs)}")
 
+    in_range = []
+    too_old = 0
+    for job in us_jobs:
+        try:
+            days = float(job["date"])
+        except (TypeError, ValueError):
+            days = -1  # unknown date -> keep
+        if days >= 0 and days > MAX_AGE_DAYS:
+            too_old += 1
+        else:
+            in_range.append(job)
+    if too_old:
+        print(f"Removed {too_old} listings older than {MAX_AGE_DAYS} days")
+    print(f"Listings within {MAX_AGE_DAYS} days: {len(in_range)}")
+
     conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
     current_run_time = datetime.now(timezone.utc)
@@ -398,8 +437,14 @@ def update_database():
 
     records = [
         (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], current_run_time)
-        for job in us_jobs
+        for job in in_range
     ]
+
+    # Purge existing rows older than the age cap (numeric dates only)
+    cursor.execute(
+        r"DELETE FROM internships WHERE date ~ '^[0-9]+(\.[0-9]+)?$' AND date::numeric > %s",
+        (MAX_AGE_DAYS,),
+    )
 
     upsert_query = """
         INSERT INTO internships (company, role, location, date, link, type, season, last_seen_at)
@@ -420,7 +465,7 @@ def update_database():
 
     conn.commit()
     conn.close()
-    return f"Done! {len(us_jobs)} listings upserted."
+    return f"Done! {len(in_range)} listings upserted."
 
 
 if __name__ == "__main__":

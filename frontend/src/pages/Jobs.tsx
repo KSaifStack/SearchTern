@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Table, Pagination, Popover, Text, Select } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { checkHealth } from "../api/internships"
+import { checkHealth, fetchSources } from "../api/internships"
 import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple, GlobeSimple } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
@@ -28,6 +28,7 @@ function Jobs() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [healthStatus, setHealthStatus] = useState<any>(null)
+  const [sources, setSources] = useState<{ name: string; type: string; season: string }[]>([])
   const [popoverOpened, setPopoverOpened] = useState(false)
   const [refreshCountdown, setRefreshCountdown] = useState(() => getSecondsUntilNextHour())
   const debounceRef = useRef<number | undefined>(undefined)
@@ -136,9 +137,8 @@ function Jobs() {
     const parsed = parseFloat(val);
     const days = !isNaN(parsed) ? parsed : 999;
     if (days === 999) return "N/A";
-    if (days === 0) return "24 hours ago ";
-    if (days > 0 && days < 1) return "< 1 day ago";
-    if (days === 1) return "1 day ago";
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
     if (days >= 30) {
       const months = Math.floor(days / 30);
       return `${months} month${months > 1 ? 's' : ''} ago`;
@@ -170,7 +170,10 @@ function Jobs() {
           <Popover width={250} position="bottom-start" withArrow shadow="md" opened={popoverOpened} onChange={setPopoverOpened}>
             <Popover.Target>
               <button className="health_btn" onClick={() => {
-                if (!popoverOpened) checkHealth().then(setHealthStatus)
+                if (!popoverOpened) {
+                  checkHealth().then(setHealthStatus)
+                  fetchSources().then(setSources)
+                }
                 setPopoverOpened((o) => !o)
               }}>...</button>
             </Popover.Target>
@@ -179,7 +182,19 @@ function Jobs() {
                 <>
                   <Text size="xs">Status: <span style={{ color: healthStatus.status === 'Active' ? 'green' : 'red' }}>{healthStatus.status}</span></Text>
                   <Text size="xs">Next Update: {healthStatus.next_scrape !== 'unknown' ? new Date(healthStatus.next_scrape.replace(' ', 'T')).toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true }) : 'Unknown'}</Text>
-                  <Text size="xs" mt={5} c="dimmed">Data Sources: SimplifyJobs, SearchTern-Listings</Text>
+                  <Text size="xs" mt={5} c="dimmed">Data Sources ({sources.length || '—'}):</Text>
+                  {sources.length > 0 ? (
+                    <div style={{ marginTop: 4 }}>
+                      {sources.map((s) => (
+                        <Text key={s.name} size="xs" c="dimmed" style={{ paddingLeft: 8, paddingTop: 2 }}>
+                          • {s.name}
+                          <span style={{ color: 'var(--text-muted)' }}> ({s.type}{s.season && s.season !== 'searchtern' ? ` · ${s.season}` : ''})</span>
+                        </Text>
+                      ))}
+                    </div>
+                  ) : (
+                    <Text size="xs" c="dimmed" style={{ paddingLeft: 8 }}>Unavailable</Text>
+                  )}
                 </>
               ) : (
                 <Text size="xs">Loading...</Text>

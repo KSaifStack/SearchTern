@@ -60,3 +60,16 @@ export async function checkHealth() {
     return { status: "error", next_scrape: "unknown" };
   }
 }
+
+// pulls the list of data sources the backend scrapes from
+export async function fetchSources() {
+  try {
+    const res = await fetch(`${BASE_URL}/sources`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data?.sources) ? data.sources : [];
+  } catch (err) {
+    console.error("Error fetching data sources from backend:", err);
+    return [];
+  }
+}
