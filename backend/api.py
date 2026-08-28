@@ -78,6 +78,23 @@ def health():
         "next_scrape": str(next_run) if next_run else "unknown"
     }
 
+#Lists the data sources the scraper pulls from
+@app.get("/sources")
+@limiter.limit("60/minute")
+def sources(request: Request):
+    return {
+        "count": len(scraper.ALL_SOURCES),
+        "sources": [
+            {
+                "name": s["name"],
+                "url": s["url"],
+                "type": s["type"],
+                "season": s["season"],
+            }
+            for s in scraper.ALL_SOURCES
+        ],
+    }
+
 #Update DataBase
 @app.post("/update")
 @limiter.limit("5/minute")
