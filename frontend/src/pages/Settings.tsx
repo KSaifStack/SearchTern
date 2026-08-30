@@ -39,7 +39,7 @@ import {
     fetchAgentKeys,
     createAgentKey,
     revokeAgentKey,
-    fetchAgentSettings,
+    fetchAgentSettingsProbe,
     setAgentSettings,
     fetchAgentActivity,
     type AgentKey,
@@ -83,6 +83,7 @@ function Settings() {
 
     const userId = user?.id ?? ""
     const [agentsAvailable, setAgentsAvailable] = useState<boolean | null>(null)
+const [agentError, setAgentError] = useState<string | null>(null)
     const [agentEnabled, setAgentEnabled] = useState<boolean | null>(null)
     const [showTrackerTab, setShowTrackerTab] = useState(false)
     const [agentKeys, setAgentKeys] = useState<AgentKey[]>([])
@@ -101,15 +102,18 @@ function Settings() {
             setActivity([])
             return
         }
-        const [settings, keys] = await Promise.all([
-            fetchAgentSettings(userId),
-            fetchAgentKeys(userId),
-        ])
-        if (settings === null) {
+        const probe = await fetchAgentSettingsProbe(userId)
+        if (probe.settings === null) {
             setAgentsAvailable(false)
+            setAgentError(probe.status === null ? "network" : `HTTP ${probe.status}`)
             return
         }
         setAgentsAvailable(true)
+        setAgentError(null)
+        const { settings } = probe
+        const [keys] = await Promise.all([
+            fetchAgentKeys(userId),
+        ])
         setAgentEnabled(settings.enabled)
         setShowTrackerTab(settings.showTrackerTab)
         setAgentKeys(keys)
@@ -436,11 +440,7 @@ function Settings() {
                 ) : !agentsAvailable ? (
                     <div className="settings-agent-unavailable">
                         <WarningCircle size={20} weight="bold" className="settings-agent-unavailable-icon" />
-                        <p className="settings-muted">
-                            Agent tools are unavailable right now. Make sure the backend is running
-                            and that <code>VITE_API_KEY</code> in <code>frontend/.env.local</code> matches
-                            <code> API_KEY</code> in <code>backend/.env</code>.
-                        </p>
+                        <p className="settings-muted">Backend error ({agentError ?? "unknown"}). Please try again.</p>
                         <button className="settings-btn settings-btn-secondary" onClick={() => void loadAgentData()} disabled={!loadAgentData}>
                             <ArrowClockwise size={16} weight="bold" />
                             Retry

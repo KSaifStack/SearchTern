@@ -160,6 +160,31 @@ export async function fetchAgentSettings(userId: string): Promise<AgentSettings 
     }
 }
 
+export interface AgentSettingsProbe {
+    settings: AgentSettings | null;
+    status: number | null; // HTTP status, or null when the request never reached the backend
+}
+
+export async function fetchAgentSettingsProbe(userId: string): Promise<AgentSettingsProbe> {
+    try {
+        const res = await fetch(
+            `${BASE_URL}/agent/settings?user_id=${encodeURIComponent(userId)}`,
+            { headers: appHeaders() }
+        );
+        if (!res.ok) return { settings: null, status: res.status };
+        const data = await res.json();
+        return {
+            settings: {
+                enabled: Boolean(data?.enabled),
+                showTrackerTab: Boolean(data?.show_tracker_tab),
+            },
+            status: res.status,
+        };
+    } catch {
+        return { settings: null, status: null };
+    }
+}
+
 export async function setAgentSettings(
     userId: string,
     patch: Partial<AgentSettings>
