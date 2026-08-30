@@ -10,7 +10,7 @@
 
 ---
 
-<img width="1917" height="991" alt="image" src="https://github.com/user-attachments/assets/f5299847-5ad8-458d-8c85-9e1a52c79356" />
+<img width="2882" height="1922" alt="image" src="https://github.com/user-attachments/assets/f5aaafae-11d6-4641-bc21-26f30cb6c1ba" />
 
 ## What it does
 
