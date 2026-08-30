@@ -35,7 +35,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
 RESUME_BUCKET = "resumes"
-_SAFE_PATH_RE = re.compile(r"^[A-Za-z0-9._ -]+$")
+_SAFE_PATH_RE = re.compile(r"^[A-Za-z0-9 ._\-'()&+,]+$")
 
 def _supabase_configured():
     return bool(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)
