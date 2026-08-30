@@ -474,10 +474,11 @@ def agent_settings_set(request: Request, payload: dict = Body(...), verified=Dep
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id is required.")
     enforce_signin(request, user_id)
+    show = payload.get("show_tracker_tab", payload.get("showTrackerTab"))
     saved = read_db.set_agent_settings(
         user_id,
         enabled=payload.get("enabled") if "enabled" in payload else None,
-        show_tracker_tab=payload.get("show_tracker_tab") if "show_tracker_tab" in payload else None,
+        show_tracker_tab=show if show is not None else None,
     )
     return {"user_id": user_id, **saved}
 

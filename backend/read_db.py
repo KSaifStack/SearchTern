@@ -1,10 +1,12 @@
 # read_db.py
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool as pgpool
 import json
 import hashlib
 import secrets
 import os
+from threading import Lock
 from time import time
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -20,11 +22,50 @@ _agent_tables_ready = False
 _agent_tables_checked_at = 0.0
 _AGENT_TABLES_RECHECK_S = 600
 
+_pool: pgpool.ThreadedConnectionPool | None = None
+_pool_init_lock = Lock()
+
+def _get_pool():
+    global _pool
+    if _pool is None:
+        with _pool_init_lock:
+            if _pool is None:
+                # Reuse connections across requests: the DB is remote, and a
+                # fresh TLS handshake per query chain is what dominates latency.
+                _pool = pgpool.ThreadedConnectionPool(1, 8, DATABASE_URL)
+    return _pool
+
+class _PooledConn:
+    __slots__ = ("_conn", "_returned")
+
+    def __init__(self, conn):
+        self._conn = conn
+        self._returned = False
+
+    def cursor(self, *a, **k):
+        return self._conn.cursor(*a, **k)
+
+    def commit(self):
+        if not self._returned:
+            self._conn.commit()
+
+    def rollback(self):
+        if not self._returned:
+            self._conn.rollback()
+
+    def close(self):
+        if not self._returned:
+            self._returned = True
+            _get_pool().putconn(self._conn)
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
 def now():
     return datetime.now(timezone.utc)
 
 def get_conn():
-    return psycopg2.connect(DATABASE_URL)
+    return _PooledConn(_get_pool().getconn())
 
 
 def invalidate_cache():
