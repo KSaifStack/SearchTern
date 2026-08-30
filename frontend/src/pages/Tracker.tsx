@@ -11,16 +11,24 @@ import {
 } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { Robot } from '@phosphor-icons/react';
 import { useTracker } from '../components/TrackerContext';
 import type { JobStatus, TrackedJob } from '../components/TrackerContext';
+import { useAuth } from '../components/AuthContext';
+import { AgentPanel } from '../components/AgentPanel';
+import { fetchAgentSettings, fetchPendingAgentProposals } from '../api/agent';
 import { Column, JobCard } from '../components/JobCard';
 import { JobModal, STATUSES } from '../components/JobModal';
 import "../styles/Tracker.css";
 
 function Tracker() {
+    const { user } = useAuth();
     const { trackedJobs, updateJobStatus, addJob, editJob, removeJob } = useTracker();
     const [activeId, setActiveId] = React.useState<string | null>(null);
     const [activeColumn, setActiveColumn] = useState<JobStatus>('Saved');
+    const [showAgentTab, setShowAgentTab] = useState(false);
+    const [agentTabOpen, setAgentTabOpen] = useState(false);
+    const [pendingCount, setPendingCount] = useState(0);
     const [columnSearch, setColumnSearch] = useState<Record<JobStatus, string>>({
         Saved: '', Applied: '', Interview: '', Offer: '', Rejected: ''
     });
@@ -88,6 +96,41 @@ function Tracker() {
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
+
+    // The Agent hub tab only appears when enabled in Settings → AI Agents.
+    React.useEffect(() => {
+        if (!user) {
+            setShowAgentTab(false);
+            setPendingCount(0);
+            return;
+        }
+        const userId = user.id;
+        let cancelled = false;
+        const check = async () => {
+            const settings = await fetchAgentSettings(userId);
+            if (!cancelled) setShowAgentTab(Boolean(settings?.showTrackerTab));
+        };
+        void check();
+        const onFocus = () => void check();
+        window.addEventListener('focus', onFocus);
+        return () => { cancelled = true; window.removeEventListener('focus', onFocus); };
+    }, [user]);
+
+    // Red badge on the Agent hub button whenever actions await approval.
+    React.useEffect(() => {
+        if (!user?.id || !showAgentTab) return;
+        const userId = user.id;
+        let cancelled = false;
+        const tick = async () => {
+            const list = await fetchPendingAgentProposals(userId);
+            if (!cancelled) setPendingCount(list.length);
+        };
+        void tick();
+        const id = window.setInterval(tick, 8000);
+        const onFocus = () => void tick();
+        window.addEventListener('focus', onFocus);
+        return () => { cancelled = true; window.clearInterval(id); window.removeEventListener('focus', onFocus); };
+    }, [showAgentTab, user]);
 
     const onDragStart = (event: DragStartEvent) => {
         setActiveId(event.active.id as string);
@@ -178,7 +221,50 @@ function Tracker() {
         <div style={{ width: '100%', maxWidth: '1580px', margin: '0 auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', marginTop: '10px' }}>
                 <Text size="xl" fw={800} c="var(--text-dark)" style={{ fontSize: '1.75rem' }}>Application Tracker</Text>
-                <button onClick={() => openModal()} style={{ padding: '10px 24px', fontWeight: 600 }}>+ Add Application</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {showAgentTab && (
+                        <button
+                            onClick={() => setAgentTabOpen(o => !o)}
+                            style={{
+                                padding: '10px 18px',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                backgroundColor: agentTabOpen ? 'var(--accent)' : 'transparent',
+                                color: agentTabOpen ? '#fff' : 'var(--text-dark)',
+                                border: agentTabOpen ? '1px solid var(--accent)' : '1px solid var(--border)',
+                            }}
+                        >
+                            <Robot size={18} weight={agentTabOpen ? 'fill' : 'bold'} />
+                            Agent hub
+                            {pendingCount > 0 && (
+                                <span
+                                    style={{
+                                        marginLeft: '2px',
+                                        minWidth: '20px',
+                                        height: '20px',
+                                        padding: '0 6px',
+                                        borderRadius: '999px',
+                                        backgroundColor: '#fa5252',
+                                        color: '#fff',
+                                        fontSize: '12px',
+                                        fontWeight: 800,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        lineHeight: 1,
+                                        boxShadow: '0 0 0 3px rgba(250, 82, 82, 0.22)',
+                                    }}
+                                    title={`${pendingCount} action${pendingCount > 1 ? "s" : ""} awaiting your approval`}
+                                >
+                                    {pendingCount}
+                                </span>
+                            )}
+                        </button>
+                    )}
+                    <button onClick={() => openModal()} style={{ padding: '10px 24px', fontWeight: 600 }}>+ Add Application</button>
+                </div>
             </div>
 
             <section className="feature tracker-stats" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px', margin: '0 0 20px 0', boxSizing: 'border-box' }}>
@@ -276,6 +362,8 @@ function Tracker() {
                     Export tracking data to CSV
                 </button>
             </div>
+
+            {user && <AgentPanel open={agentTabOpen} onClose={() => setAgentTabOpen(false)} />}
 
             <JobModal 
                 opened={modalOpen} 

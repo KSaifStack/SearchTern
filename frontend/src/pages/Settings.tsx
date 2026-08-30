@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Link } from "react-router-dom"
-import { Modal } from "@mantine/core"
+import { Modal, Switch } from "@mantine/core"
 import { notifications } from "@mantine/notifications"
 import {
     CloudArrowUp,
@@ -15,6 +15,11 @@ import {
     UserCircle,
     ShieldCheck,
     Info,
+    Robot,
+    Key,
+    Plus,
+    Copy,
+    X,
 } from "@phosphor-icons/react"
 import { useAuth } from "../components/AuthContext"
 import "../styles/Settings.css"
@@ -30,6 +35,17 @@ import {
     cloudAvailable,
     isValidResumeFile,
 } from "../services/resumeStorage"
+import {
+    fetchAgentKeys,
+    createAgentKey,
+    revokeAgentKey,
+    fetchAgentSettings,
+    setAgentSettings,
+    fetchAgentActivity,
+    type AgentKey,
+    type AgentProposal,
+    type CreatedAgentKey,
+} from "../api/agent"
 
 function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
@@ -45,6 +61,18 @@ function formatDate(iso: string): string {
     })
 }
 
+function describeActivity(p: AgentProposal): string {
+    const { company, role, location } = p.payload
+    switch (p.tool) {
+        case "add_to_tracker":
+            return `Save ${role} at ${company}${location ? ` (${location})` : ""}`
+        case "update_status":
+            return `Move ${role} at ${company} to ${p.payload.status}`
+        case "apply":
+            return `Apply for ${role} at ${company}${location ? ` (${location})` : ""}`
+    }
+}
+
 function Settings() {
     const { user, signOut } = useAuth()
     const [resume, setResume] = useState<ResumeRecord | null>(null)
@@ -53,8 +81,47 @@ function Settings() {
     const [preview, setPreview] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
+    const userId = user?.id ?? ""
+    const [agentsAvailable, setAgentsAvailable] = useState(false)
+    const [agentEnabled, setAgentEnabled] = useState<boolean | null>(null)
+    const [showTrackerTab, setShowTrackerTab] = useState(false)
+    const [agentKeys, setAgentKeys] = useState<AgentKey[]>([])
+    const [keyName, setKeyName] = useState("")
+    const [creating, setCreating] = useState(false)
+    const [createdKey, setCreatedKey] = useState<CreatedAgentKey | null>(null)
+    const [activity, setActivity] = useState<AgentProposal[]>([])
+
     const displayName: string = user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? ''
     const displayEmail = user?.email ?? user?.user_metadata?.email ?? ''
+
+    const loadAgentData = useCallback(async () => {
+        if (!userId) {
+            setAgentsAvailable(false)
+            setAgentKeys([])
+            setActivity([])
+            return
+        }
+        const [settings, keys] = await Promise.all([
+            fetchAgentSettings(userId),
+            fetchAgentKeys(userId),
+        ])
+        if (settings === null) {
+            setAgentsAvailable(false)
+            return
+        }
+        setAgentsAvailable(true)
+        setAgentEnabled(settings.enabled)
+        setShowTrackerTab(settings.showTrackerTab)
+        setAgentKeys(keys)
+        setActivity(await fetchAgentActivity(userId))
+    }, [userId])
+
+    useEffect(() => {
+        void loadAgentData()
+        const onFocus = () => void loadAgentData()
+        window.addEventListener("focus", onFocus)
+        return () => { window.removeEventListener("focus", onFocus) }
+    }, [loadAgentData])
 
     useEffect(() => {
         let cancelled = false
@@ -156,6 +223,70 @@ function Settings() {
         onDrop: handleDrop,
     }
 
+    const handleToggleAgents = useCallback(async (enabled: boolean) => {
+        const next = await setAgentSettings(userId, { enabled })
+        if (next === null) {
+            notifications.show({ title: 'Update failed', message: 'Could not update agent settings.', color: 'red', icon: <WarningCircle size={18} /> })
+            return
+        }
+        const { enabled: nextEnabled } = next
+        setAgentEnabled(nextEnabled)
+        notifications.show({
+            title: nextEnabled ? 'Agents enabled' : 'Agents disabled',
+            message: nextEnabled ? 'Your agent can now propose actions for your approval.' : 'Agents can no longer propose actions.',
+            color: nextEnabled ? 'teal' : 'blue',
+            icon: <Robot size={18} weight="bold" />,
+        })
+    }, [userId])
+
+    const handleToggleTrackerTab = useCallback(async (show: boolean) => {
+        const next = await setAgentSettings(userId, { showTrackerTab: show })
+        if (next === null) {
+            notifications.show({ title: 'Update failed', message: 'Could not update agent settings.', color: 'red', icon: <WarningCircle size={18} /> })
+            return
+        }
+        setShowTrackerTab(next.showTrackerTab)
+        if (next.showTrackerTab) {
+            notifications.show({ title: 'Agent hub enabled', message: 'The Agent hub tab now appears at the top of the Application Tracker.', color: 'teal', icon: <Robot size={18} weight="bold" /> })
+        }
+    }, [userId])
+
+    const handleCreateKey = useCallback(async () => {
+        if (creating) return
+        setCreating(true)
+        const name = keyName.trim() || "agent"
+        const created = await createAgentKey(userId, name)
+        setCreating(false)
+        if (!created) {
+            notifications.show({ title: 'Key creation failed', message: 'Could not generate an agent key.', color: 'red', icon: <WarningCircle size={18} /> })
+            return
+        }
+        setCreatedKey(created)
+        setKeyName("")
+        setAgentKeys(prev => [
+            { id: created.id, name: created.name, key_prefix: created.key_prefix, active: true, created_at: new Date().toISOString(), last_used_at: null },
+            ...prev,
+        ])
+    }, [creating, keyName, userId])
+
+    const handleRevokeKey = useCallback(async (keyId: number) => {
+        if (!window.confirm('Revoke this agent key? Agents using it will be disconnected immediately.')) return
+        const ok = await revokeAgentKey(userId, keyId)
+        if (!ok) {
+            notifications.show({ title: 'Revoke failed', message: 'Could not revoke the key.', color: 'red', icon: <WarningCircle size={18} /> })
+            return
+        }
+        setAgentKeys(prev => prev.filter(k => k.id !== keyId))
+        notifications.show({ title: 'Key revoked', message: 'The agent key was revoked.', color: 'blue', icon: <CheckCircle size={18} /> })
+    }, [userId])
+
+    const copyKey = useCallback(async (text: string, label: string) => {
+        navigator.clipboard.writeText(text).then(
+            () => notifications.show({ title: 'Copied', message: label, color: 'teal', icon: <CheckCircle size={18} /> }),
+            () => notifications.show({ title: 'Copy failed', message: 'Clipboard access was blocked by the browser.', color: 'red', icon: <WarningCircle size={18} /> }),
+        )
+    }, [])
+
     return (
         <div className="standard-layout">
             <div className="settings-header">
@@ -189,7 +320,7 @@ function Settings() {
                 ) : (
                     <div className="settings-account settings-account-guest">
                         <span className="settings-account-email">
-                            You are browsing as a guest — your resume is stored only on this device.
+                            You are browsing as a guest. Your resume is stored only on this device.
                         </span>
                         <Link to="/auth" className="settings-btn settings-btn-primary">
                             <SignIn size={16} weight="bold" />
@@ -285,10 +416,141 @@ function Settings() {
                 />
             </section>
 
+            {/* AI Agents */}
+            <section className="feature settings-section">
+                <div className="settings-section-header">
+                    <Robot size={24} weight="bold" className="settings-section-icon" />
+                    <h3 className="settings-section-title">AI Agents</h3>
+                </div>
+
+                {!user ? (
+                    <div className="settings-agent-unavailable">
+                        <p className="settings-muted">
+                            Login/sign in to use AI Agents
+                        </p>
+                    </div>
+                ) : !agentsAvailable ? (
+                    <div className="settings-agent-unavailable">
+                        <WarningCircle size={20} weight="bold" className="settings-agent-unavailable-icon" />
+                        <p className="settings-muted">
+                            Agent tools are unavailable right now. Make sure the backend is running
+                            and that <code>VITE_API_KEY</code> in <code>frontend/.env.local</code> matches
+                            <code> API_KEY</code> in <code>backend/.env</code>.
+                        </p>
+                        <button className="settings-btn settings-btn-secondary" onClick={() => void loadAgentData()} disabled={!loadAgentData}>
+                            <ArrowClockwise size={16} weight="bold" />
+                            Retry
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="settings-agent-row">
+                                <div className="settings-agent-info">
+                                    <span className="settings-agent-row-title">Allow agents to act on my account</span>
+                                    <span className="settings-agent-row-desc">
+                                        Agents (Hermes, Claude Code, opencode…) can search jobs and propose actions; you approve each one before it happens.
+                                    </span>
+                                </div>
+                                <Switch
+                                    checked={Boolean(agentEnabled)}
+                                    onChange={(e) => { void handleToggleAgents(e.currentTarget.checked) }}
+                                    size="lg"
+                                    color="teal"
+                                />
+                            </div>
+
+                        <div className="settings-agent-row">
+                            <div className="settings-agent-info">
+                                <span className="settings-agent-row-title">Show Agent hub in the tracker</span>
+                                <span className="settings-agent-row-desc">
+                                    Adds an "Agent hub" tab to the Application Tracker where you review actions, manage rules for what the agent may do, and see activity.
+                                </span>
+                            </div>
+                            <Switch
+                                checked={showTrackerTab}
+                                onChange={(e) => { void handleToggleTrackerTab(e.currentTarget.checked) }}
+                                size="lg"
+                                color="teal"
+                            />
+                        </div>
+
+                        {createdKey && (
+                                    <div className="settings-key-callout">
+                                        <Key size={18} weight="bold" className="settings-key-callout-icon" />
+                                        <div className="settings-key-callout-body">
+                                            <span className="settings-key-callout-title">Your new agent key: copy it now</span>
+                                            <code className="settings-key-raw">{createdKey.key}</code>
+                                            <span className="settings-key-callout-warn">
+                                                This is the only time the full key is shown. Store it somewhere safe.
+                                            </span>
+                                        </div>
+                                        <div className="settings-key-callout-actions">
+                                            <button className="settings-btn settings-btn-secondary" onClick={() => copyKey(createdKey.key, 'Agent key copied to clipboard.')}>
+                                                <Copy size={16} weight="bold" /> Copy
+                                            </button>
+                                            <button className="settings-btn settings-btn-ghost" onClick={() => setCreatedKey(null)} title="Dismiss">
+                                                <X size={16} weight="bold" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="settings-agent-create">
+                                    <input
+                                        className="settings-key-input"
+                                        placeholder="Key name, e.g. Claude Code laptop"
+                                        value={keyName}
+                                        onChange={(e) => setKeyName(e.target.value)}
+                                        maxLength={60}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateKey() }}
+                                    />
+                                    <button className="settings-btn settings-btn-primary" onClick={() => void handleCreateKey()} disabled={creating}>
+                                        <Plus size={16} weight="bold" />
+                                        {creating ? 'Generating…' : 'Generate key'}
+                                    </button>
+                                </div>
+
+                                {agentKeys.length > 0 && (
+                                    <div className="settings-keys">
+                                        {agentKeys.map(k => (
+                                            <div className="settings-key-row" key={k.id}>
+                                                <span className="settings-key-name">{k.name}</span>
+                                                {!k.active && <span className="settings-agent-status settings-agent-status-cancelled">revoked</span>}
+                                                <code className="settings-key-prefix">{k.key_prefix}…</code>
+                                                <span className="settings-key-meta">
+                                                    created {formatDate(k.created_at)}
+                                                    {k.last_used_at ? ` · used ${formatDate(k.last_used_at)}` : ' · never used'}
+                                                </span>
+                                                <button className="settings-btn settings-btn-danger settings-key-revoke" onClick={() => void handleRevokeKey(k.id)}>
+                                                    <Trash size={15} weight="bold" /> Revoke
+                                                </button>
+                                            </div>
+                                        ))}
+</div>
+                            )}
+
+                        {activity.length > 0 && (
+                            <div className="settings-agent-activity">
+                                <span className="settings-agent-activity-title">Recent agent activity</span>
+                                {activity.slice(0, 10).map(p => (
+                                    <div className="settings-agent-event" key={p.id}>
+                                        <span className={`settings-agent-status settings-agent-status-${p.status}`}>{p.status}</span>
+                                        <span className="settings-agent-event-desc">{describeActivity(p)}</span>
+                                        <span className="settings-agent-event-date">
+                                            {new Date(p.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+            </section>
+
             <Modal
                 opened={Boolean(preview)}
                 onClose={() => setPreview(null)}
-                title={`Resume — ${resume?.name ?? ''}`}
+                title={`Resume - ${resume?.name ?? ''}`}
                 size="lg"
                 centered
                 styles={{ body: { padding: 0 } }}

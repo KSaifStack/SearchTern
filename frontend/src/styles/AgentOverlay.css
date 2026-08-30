@@ -1,0 +1,191 @@
+.agent-overlay {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 400;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+/* Panel */
+.agent-panel {
+    width: min(380px, calc(100vw - 40px));
+    max-height: min(520px, 70vh);
+    background: var(--white);
+    border: 1px solid var(--border-medium);
+    border-radius: 14px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.agent-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-slate);
+}
+
+.agent-panel-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-dark);
+}
+
+.agent-panel-title svg {
+    color: var(--accent-color);
+}
+
+.agent-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.agent-close:hover { background: var(--menu-hover-bg); color: var(--text-dark); }
+
+.agent-empty {
+    padding: 18px 14px;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* List */
+.agent-list {
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.agent-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--border-slate);
+    border-radius: 10px;
+    background: var(--page-bg);
+}
+
+.agent-item-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--primary-green-light);
+    color: var(--accent-color);
+}
+
+.agent-item-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    flex: 1;
+}
+
+.agent-item-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-dark);
+}
+
+.agent-item-desc {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-slate);
+}
+
+.agent-item-link {
+    font-size: 12px;
+    color: var(--accent-color);
+    text-decoration: none;
+}
+.agent-item-link:hover { text-decoration: underline; }
+
+.agent-item-note {
+    font-size: 12px;
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+.agent-item-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.agent-approve,
+.agent-reject {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+.agent-approve { background: #e7f5ec; color: var(--accent-color); }
+.agent-approve:hover { background: #d2eee0; }
+.agent-reject { background: #fbeae8; color: #c0392b; }
+.agent-reject:hover { background: #f6d8d4; }
+.agent-approve:disabled, .agent-reject:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Floating button */
+.agent-fab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border: none;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--button-color), var(--accent-color));
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(45, 122, 79, 0.35);
+    transition: transform 0.15s ease;
+}
+.agent-fab:hover { transform: translateY(-2px); }
+.agent-fab.open { background: var(--text-dark); }
+
+.agent-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 5px;
+    border-radius: 11px;
+    background: #c0392b;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
