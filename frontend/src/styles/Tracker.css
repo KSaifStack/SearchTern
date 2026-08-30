@@ -4,19 +4,6 @@
     padding: 10px 0;
 }
 
-/* Agent hub opens as a side panel: compress the tracker (not cover it).
-   The drawer is 480px wide (min(480px, 100vw)); on small screens fall back
-   to the old overlay behaviour (no compression). */
-.tracker-hub-open {
-    padding-right: min(480px, 40vw);
-}
-
-@media (max-width: 900px) {
-    .tracker-hub-open {
-        padding-right: 0;
-    }
-}
-
 .tracker-board {
     display: flex;
     gap: 16px;
