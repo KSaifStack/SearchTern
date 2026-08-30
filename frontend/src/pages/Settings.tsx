@@ -82,7 +82,7 @@ function Settings() {
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const userId = user?.id ?? ""
-    const [agentsAvailable, setAgentsAvailable] = useState(false)
+    const [agentsAvailable, setAgentsAvailable] = useState<boolean | null>(null)
     const [agentEnabled, setAgentEnabled] = useState<boolean | null>(null)
     const [showTrackerTab, setShowTrackerTab] = useState(false)
     const [agentKeys, setAgentKeys] = useState<AgentKey[]>([])
@@ -429,6 +429,10 @@ function Settings() {
                             Login/sign in to use AI Agents
                         </p>
                     </div>
+                ) : agentsAvailable === null ? (
+                    <p className="settings-muted">
+                        Loading agent settings…
+                    </p>
                 ) : !agentsAvailable ? (
                     <div className="settings-agent-unavailable">
                         <WarningCircle size={20} weight="bold" className="settings-agent-unavailable-icon" />
