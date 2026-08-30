@@ -218,7 +218,10 @@ function Tracker() {
     };
 
     return (
-        <div style={{ width: '100%', maxWidth: '1580px', margin: '0 auto' }}>
+        <div
+            className={agentTabOpen ? 'tracker-hub-open' : undefined}
+            style={{ width: '100%', maxWidth: '1580px', margin: '0 auto', transition: 'padding-right 0.3s ease-in-out' }}
+        >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', marginTop: '10px' }}>
                 <Text size="xl" fw={800} c="var(--text-dark)" style={{ fontSize: '1.75rem' }}>Application Tracker</Text>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
