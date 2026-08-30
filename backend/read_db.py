@@ -149,6 +149,29 @@ def ensure_agent_tables():
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )
         """)
+        # Agent data is managed exclusively by the backend through its DB
+        # connection (the table owner, which bypasses RLS unless FORCE is set).
+        # The browser never reads/writes these tables directly, so we enable RLS
+        # with no policies: anon/authenticated (PostgREST) are denied entirely.
+        for t in ("agent_proposals", "agent_keys", "agent_settings", "agent_policies", "agent_health"):
+            cur.execute(f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY")
+        # Defense in depth: drop any direct grants to Supabase roles so PostgREST
+        # does not even expose these tables. No-op on non-Supabase databases.
+        cur.execute("""
+            DO $$
+            DECLARE r text;
+            BEGIN
+                FOREACH r IN ARRAY ARRAY['anon', 'authenticated']
+                LOOP
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+                        EXECUTE format(
+                            'REVOKE ALL PRIVILEGES ON agent_proposals, agent_keys, agent_settings, agent_policies, agent_health FROM %I',
+                            r
+                        );
+                    END IF;
+                END LOOP;
+            END $$;
+        """)
     conn.commit()
     conn.close()
 
@@ -342,21 +365,19 @@ def get_agent_health(user_id):
 def set_agent_settings(user_id, enabled=None, show_tracker_tab=None):
     """Partial update; None leaves a field unchanged. Returns the saved settings."""
     ensure_agent_tables()
+    prev = get_agent_settings(user_id)
+    new_enabled = bool(enabled) if enabled is not None else prev["enabled"]
+    new_show = bool(show_tracker_tab) if show_tracker_tab is not None else prev["show_tracker_tab"]
     conn = get_conn()
     with conn.cursor() as cur:
-        sets, params = [], [user_id]
-        if enabled is not None:
-            sets.append("enabled = %s")
-            params.append(bool(enabled))
-        if show_tracker_tab is not None:
-            sets.append("show_tracker_tab = %s")
-            params.append(bool(show_tracker_tab))
-        sets.append("updated_at = now()")
         cur.execute(
-            f"INSERT INTO agent_settings (user_id, enabled, show_tracker_tab) "
-            f"VALUES (%s, true, false) "
-            f"ON CONFLICT (user_id) DO UPDATE SET {', '.join(sets)}",
-            params,
+            "INSERT INTO agent_settings (user_id, enabled, show_tracker_tab) "
+            "VALUES (%s, %s, %s) "
+            "ON CONFLICT (user_id) DO UPDATE SET "
+            "enabled = excluded.enabled, "
+            "show_tracker_tab = excluded.show_tracker_tab, "
+            "updated_at = now()",
+            (user_id, new_enabled, new_show),
         )
     conn.commit()
     conn.close()

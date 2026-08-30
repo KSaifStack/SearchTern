@@ -228,8 +228,11 @@ const [agentError, setAgentError] = useState<string | null>(null)
     }
 
     const handleToggleAgents = useCallback(async (enabled: boolean) => {
+        const prev = agentEnabled
+        setAgentEnabled(enabled)
         const next = await setAgentSettings(userId, { enabled })
         if (next === null) {
+            setAgentEnabled(prev)
             notifications.show({ title: 'Update failed', message: 'Could not update agent settings.', color: 'red', icon: <WarningCircle size={18} /> })
             return
         }
@@ -241,11 +244,14 @@ const [agentError, setAgentError] = useState<string | null>(null)
             color: nextEnabled ? 'teal' : 'blue',
             icon: <Robot size={18} weight="bold" />,
         })
-    }, [userId])
+    }, [userId, agentEnabled])
 
     const handleToggleTrackerTab = useCallback(async (show: boolean) => {
+        const prev = showTrackerTab
+        setShowTrackerTab(show)
         const next = await setAgentSettings(userId, { showTrackerTab: show })
         if (next === null) {
+            setShowTrackerTab(prev)
             notifications.show({ title: 'Update failed', message: 'Could not update agent settings.', color: 'red', icon: <WarningCircle size={18} /> })
             return
         }
@@ -253,7 +259,7 @@ const [agentError, setAgentError] = useState<string | null>(null)
         if (next.showTrackerTab) {
             notifications.show({ title: 'Agent hub enabled', message: 'The Agent hub tab now appears at the top of the Application Tracker.', color: 'teal', icon: <Robot size={18} weight="bold" /> })
         }
-    }, [userId])
+    }, [userId, showTrackerTab])
 
     const handleCreateKey = useCallback(async () => {
         if (creating) return
