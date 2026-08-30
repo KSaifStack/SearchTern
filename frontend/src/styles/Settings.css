@@ -1,0 +1,239 @@
+.settings-header {
+    margin-bottom: 24px;
+}
+.settings-title {
+    font-size: 2rem;
+}
+.settings-subtitle {
+    color: var(--text-muted);
+    margin-bottom: 0;
+}
+
+.settings-section {
+    margin-bottom: 24px;
+    padding: 24px 28px !important;
+}
+
+.settings-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-slate);
+}
+
+.settings-section-title {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.settings-section-icon {
+    color: var(--accent-color);
+}
+
+/* ── Account ─────────────────────────────────────────────── */
+.settings-account {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.settings-account-guest {
+    color: var(--text-muted);
+}
+
+.settings-account-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.settings-account-name {
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.settings-account-email {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.settings-account-sync {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent-color);
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.settings-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.settings-btn-primary {
+    background-color: var(--button-color);
+    color: #fff;
+}
+.settings-btn-primary:hover {
+    background-color: var(--button-hover-color);
+}
+
+.settings-btn-secondary {
+    background-color: var(--menu-hover-bg);
+    color: var(--text-dark);
+    border: 1px solid var(--border-medium);
+}
+.settings-btn-secondary:hover {
+    background-color: var(--hover-bg);
+}
+
+.settings-btn-ghost {
+    background-color: transparent;
+    color: var(--text-dark);
+    border: 1px solid var(--border-medium);
+}
+.settings-btn-ghost:hover {
+    background-color: var(--menu-hover-bg);
+}
+
+.settings-btn-danger {
+    background-color: transparent;
+    color: #c0392b;
+    border: 1px solid #e8b4ad;
+}
+.settings-btn-danger:hover {
+    background-color: #fbeae8;
+}
+
+/* ── Uploaded file row ───────────────────────────────────── */
+.settings-file {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border: 1px dashed var(--border-medium);
+    border-radius: 12px;
+    background-color: var(--page-bg);
+    flex-wrap: wrap;
+}
+
+.settings-file-icon {
+    color: var(--accent-color);
+    flex-shrink: 0;
+}
+
+.settings-file-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.settings-file-name {
+    font-weight: 700;
+    color: var(--text-dark);
+    word-break: break-all;
+}
+
+.settings-file-meta {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.settings-file-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+.settings-replace-hint {
+    margin: 14px 0 8px !important;
+    font-size: 13px;
+}
+
+/* ── Dropzone ────────────────────────────────────────────── */
+.settings-dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 42px 24px;
+    border: 2px dashed var(--border-medium);
+    border-radius: 12px;
+    background-color: var(--feature-color);
+    color: var(--text-muted);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.settings-dropzone.compact {
+    flex-direction: row;
+    gap: 10px;
+    padding: 16px 20px;
+}
+
+.settings-dropzone:hover {
+    border-color: var(--button-color);
+}
+
+.settings-dropzone.active {
+    border-color: var(--button-color);
+    background-color: var(--primary-green-light);
+}
+
+.settings-dropzone-icon {
+    color: var(--button-color);
+    margin-bottom: 4px;
+}
+
+.settings-dropzone-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.settings-dropzone-sub {
+    font-size: 14px;
+}
+
+.settings-dropzone-hint {
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.settings-dropzone em {
+    color: var(--accent-color);
+    font-style: normal;
+    font-weight: 600;
+}
+
+/* ── Misc ────────────────────────────────────────────────── */
+.settings-muted {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.settings-preview-frame {
+    width: 100%;
+    height: 72vh;
+    border: none;
+}
