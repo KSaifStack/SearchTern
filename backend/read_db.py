@@ -16,6 +16,10 @@ _cache: list | None = None
 _cache_time: float = 0
 _CACHE_TTL = 3300  # 55 minutes (refresh before the hourly scrape)
 
+_agent_tables_ready = False
+_agent_tables_checked_at = 0.0
+_AGENT_TABLES_RECHECK_S = 600
+
 def now():
     return datetime.now(timezone.utc)
 
@@ -83,6 +87,9 @@ AGENT_TOOLS = ("add_to_tracker", "update_status", "apply")
 AGENT_CONNECTED_SECONDS = 90
 
 def ensure_agent_tables():
+    global _agent_tables_ready, _agent_tables_checked_at
+    if _agent_tables_ready and time() - _agent_tables_checked_at < _AGENT_TABLES_RECHECK_S:
+        return
     conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("""
@@ -190,6 +197,8 @@ def ensure_agent_tables():
         """)
     conn.commit()
     conn.close()
+    _agent_tables_ready = True
+    _agent_tables_checked_at = time()
 
 
 def create_agent_proposal(user_id, tool, payload, note=None, status="pending"):
