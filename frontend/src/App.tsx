@@ -10,6 +10,7 @@ import Privacy from "./pages/Privacy"
 import Settings from "./pages/Settings"
 import { TrackerProvider } from "./components/TrackerContext"
 import { AuthProvider } from "./components/AuthContext"
+import { AgentOverlay } from "./components/AgentOverlay"
 
 function App() {
     return (
@@ -28,6 +29,7 @@ function App() {
                                 <Route path="/settings" element={<main className="standard-layout"><Settings /></main>} />
                             </Routes>
                         </div>
+                        <AgentOverlay />
                         <SpeedInsights />
                         <Analytics />
                     </div>

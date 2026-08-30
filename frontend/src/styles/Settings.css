@@ -237,3 +237,227 @@
     height: 72vh;
     border: none;
 }
+
+/* ── AI Agents ───────────────────────────────────────────── */
+.settings-agent-unavailable {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.settings-agent-unavailable p {
+    margin: 0;
+    flex: 1;
+    min-width: 240px;
+}
+
+.settings-agent-unavailable-icon {
+    color: var(--text-light);
+    flex-shrink: 0;
+}
+
+.settings-agent-unavailable code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 5px;
+    border-radius: 4px;
+}
+.settings-agent-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-slate);
+}
+
+.settings-agent-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.settings-agent-row-title {
+    font-weight: 700;
+    color: var(--text-dark);
+    font-size: 14px;
+}
+
+.settings-agent-row-desc {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+    max-width: 480px;
+}
+
+.settings-agent-create {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+}
+
+.settings-key-input {
+    flex: 1;
+    min-width: 220px;
+    padding: 9px 12px;
+    border: 1px solid var(--border-medium);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--white);
+    color: var(--text-dark);
+}
+.settings-key-input:focus {
+    outline: none;
+    border-color: var(--button-color);
+}
+
+/* New key callout */
+.settings-key-callout {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 14px;
+    padding: 14px;
+    background: #fff8e6;
+    border: 1px solid #f0d98c;
+    border-radius: 10px;
+}
+
+.settings-key-callout-icon {
+    color: #b8860b;
+    flex-shrink: 0;
+}
+
+.settings-key-callout-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+}
+
+.settings-key-callout-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-dark);
+}
+
+.settings-key-callout-warn {
+    font-size: 12px;
+    color: #8a6d1a;
+}
+
+.settings-key-raw {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 12px;
+    word-break: break-all;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 6px 8px;
+    border-radius: 6px;
+    color: var(--text-dark);
+}
+
+.settings-key-callout-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Key list */
+.settings-keys {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.settings-key-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-slate);
+    border-radius: 10px;
+    background: var(--page-bg);
+    flex-wrap: wrap;
+}
+
+.settings-key-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-dark);
+}
+
+.settings-key-prefix {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.05);
+    padding: 3px 7px;
+    border-radius: 5px;
+}
+
+.settings-key-meta {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-left: auto;
+}
+
+.settings-key-revoke {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+/* Activity */
+.settings-agent-activity {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-slate);
+}
+
+.settings-agent-activity-title {
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text-light);
+}
+
+.settings-agent-event {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    flex-wrap: wrap;
+}
+
+.settings-agent-status {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: capitalize;
+    padding: 2px 8px;
+    border-radius: 20px;
+    flex-shrink: 0;
+}
+
+.settings-agent-status-pending { background: #fdf0d8; color: #a05e03; }
+.settings-agent-status-approved { background: #e7f5ec; color: var(--accent-color); }
+.settings-agent-status-rejected { background: #fbeae8; color: #c0392b; }
+.settings-agent-status-cancelled { background: var(--badge-bg); color: var(--text-muted); }
+
+.settings-agent-event-desc {
+    color: var(--text-slate);
+    flex: 1;
+    min-width: 160px;
+}
+
+.settings-agent-event-date {
+    color: var(--text-light);
+    font-size: 12px;
+}
