@@ -21,10 +21,10 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 ## How it works
 
 1. **Scraper** — APScheduler pulls from the [Simplify](https://github.com/SimplifyJobs/Summer2026-Internships) repo and additional sources hourly, using bulk upserts to keep the database fresh without downtime
-2. **Backend** — FastAPI serves the data with rate limiting and input validation, hosted on Railway
+2. **Backend** — FastAPI serves the data with rate limiting and input validation, hosted on Render
 3. **Frontend** — React/TypeScript dashboard with live search, sorting, and a drag-and-drop Kanban tracker
 4. **AI Agents** — Claude Code, opencode, or Hermes authenticate with a per-user key generated under Settings → AI Agents. Agents can search internships, read your synced resume and tracker, and propose tracker changes you approve in the overlay
-5. **Infrastructure** — Backend hosted on Railway, frontend on Vercel, database on Supabase PostgreSQL, with Supabase Auth + Storage for user accounts and resume cloud sync
+5. **Infrastructure** — Backend hosted on Render, frontend on Vercel, database on Supabase PostgreSQL, with Supabase Auth + Storage for user accounts and resume cloud sync
 
 ---
 
@@ -102,7 +102,7 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 </tr>
 <tr>
 <td><strong>Infrastructure</strong></td>
-<td>Railway (backend), Vercel (frontend), Supabase (database), Cloudflare (DNS)</td>
+<td>Render (backend), Vercel (frontend), Supabase (database), Cloudflare (DNS)</td>
 </tr>
 </table>
 
