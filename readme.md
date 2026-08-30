@@ -23,7 +23,8 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 1. **Scraper** — APScheduler pulls from the [Simplify](https://github.com/SimplifyJobs/Summer2026-Internships) repo and additional sources hourly, using bulk upserts to keep the database fresh without downtime
 2. **Backend** — FastAPI serves the data with rate limiting and input validation, hosted on Railway
 3. **Frontend** — React/TypeScript dashboard with live search, sorting, and a drag-and-drop Kanban tracker
-4. **Infrastructure** — Backend hosted on Railway, frontend on Vercel, database on Supabase PostgreSQL
+4. **AI Agents** — Claude Code, opencode, or Hermes authenticate with a per-user key generated under Settings → AI Agents. Agents can search internships, read your synced resume and tracker, and propose tracker changes you approve in the overlay
+5. **Infrastructure** — Backend hosted on Railway, frontend on Vercel, database on Supabase PostgreSQL, with Supabase Auth + Storage for user accounts and resume cloud sync
 
 ---
 
@@ -54,9 +55,21 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 <td><strong>CSV Export</strong></td>
 <td>Export your full pipeline, Excel-compatible</td>
 </tr>
+<tr>
+<td><strong>User Accounts</strong></td>
+<td>Sign in with Supabase; agent keys and cloud-synced resumes are tied to your account</td>
+</tr>
+<tr>
+<td><strong>AI Agents</strong></td>
+<td>Per-user keys for CLI agents — search, read your tracker + resume, propose tracker edits you approve</td>
+</tr>
+<tr>
+<td><strong>Resume Cloud Sync</strong></td>
+<td>Keep your resume in your account so your agents can reference it</td>
+</tr>
 </table>
 
-> **Coming soon:** AI resume grader, resource hub, user accounts
+> **Coming soon:** AI resume grader, resource hub
 
 ---
 
@@ -78,6 +91,14 @@ Most CS students end up sending 500+ applications across a dozen job boards with
 <tr>
 <td><strong>Frontend</strong></td>
 <td>React, TypeScript, Vite, Mantine UI, @dnd-kit</td>
+</tr>
+<tr>
+<td><strong>Auth & Storage</strong></td>
+<td>Supabase Auth (accounts), Supabase Storage (resume sync), RLS-protected tracker</td>
+</tr>
+<tr>
+<td><strong>Agent Bridge</strong></td>
+<td>FastAPI `/agent/*` endpoints, per-user agent keys, proposal review</td>
 </tr>
 <tr>
 <td><strong>Infrastructure</strong></td>
