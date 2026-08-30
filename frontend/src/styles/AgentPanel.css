@@ -1,29 +1,13 @@
-/* ── Agent hub drawer (right slide-over) ─────────────────────────────────
+/* ── Agent hub side panel (right, alongside the tracker) ─────────────────
    Root classes are unique (.agent-hub*) so nothing can collide with the
    floating FAB overlay styles in AgentOverlay.css (.agent-panel, .agent-item,
-   .agent-approve, .agent-list, .agent-panel-header…). The drawer is always
-   mounted; a transform toggles it on/off so entry/exit are animated.
-   No body scroll overflow; body scroll is locked via JS while open.
+   .agent-approve, .agent-list, .agent-panel-header…). The panel is always
+   mounted; a transform toggles it on/off so entry/exit are animated. When
+   open, the tracker compresses (see .tracker-hub-open) instead of being
+   dimmed or covered. Body scroll stays enabled so the tracker stays usable.
 ─────────────────────────────────────────────────────────────────────────── */
 
-/* ── Backdrop ── */
-.agent-hub-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 490;
-    background: rgba(26, 27, 30, 0.5);
-    backdrop-filter: blur(2px);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease-in-out;
-}
-
-.agent-hub-backdrop-open {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-/* ── Drawer shell (anchored right, slides in/out) ── */
+/* ── Panel shell (anchored right, slides in/out) ── */
 .agent-hub {
     position: fixed;
     top: 0;
@@ -35,7 +19,7 @@
     flex-direction: column;
     background: #fff;
     border-left: 1px solid var(--border, #dee2e6);
-    box-shadow: -18px 0 50px rgba(0, 0, 0, 0.18);
+    box-shadow: -6px 0 24px rgba(0, 0, 0, 0.08);
     transform: translateX(105%);
     transition: transform 0.3s ease-in-out;
 }
