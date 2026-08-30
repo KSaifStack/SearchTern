@@ -153,17 +153,33 @@ def ensure_agent_tables():
         # connection (the table owner, which bypasses RLS unless FORCE is set).
         # The browser never reads/writes these tables directly, so we enable RLS
         # with no policies: anon/authenticated (PostgREST) are denied entirely.
+        # IMPORTANT: this runs on every agent request, so the checks below must
+        # stay lock-free (plain SELECTs). ALTER TABLE takes ACCESS EXCLUSIVE
+        # locks and would deadlock under the frontend's parallel agent calls,
+        # so it only runs while RLS is actually off.
         for t in ("agent_proposals", "agent_keys", "agent_settings", "agent_policies", "agent_health"):
-            cur.execute(f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY")
+            cur.execute(
+                "SELECT c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+                "WHERE n.nspname = 'public' AND c.relname = %s",
+                (t,),
+            )
+            if not cur.fetchone()[0]:
+                cur.execute(f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY")
         # Defense in depth: drop any direct grants to Supabase roles so PostgREST
         # does not even expose these tables. No-op on non-Supabase databases.
+        # Guarded by a privilege check so it also stops locking once done.
         cur.execute("""
             DO $$
             DECLARE r text;
             BEGIN
                 FOREACH r IN ARRAY ARRAY['anon', 'authenticated']
                 LOOP
-                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r)
+                       AND EXISTS (
+                           SELECT 1 FROM information_schema.role_table_grants
+                           WHERE grantee = r
+                             AND table_name IN ('agent_proposals','agent_keys','agent_settings','agent_policies','agent_health')
+                       ) THEN
                         EXECUTE format(
                             'REVOKE ALL PRIVILEGES ON agent_proposals, agent_keys, agent_settings, agent_policies, agent_health FROM %I',
                             r
