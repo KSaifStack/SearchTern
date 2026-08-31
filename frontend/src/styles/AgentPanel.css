@@ -590,7 +590,7 @@
 }
 [data-theme="dark"] .agent-hub .agent-metric { background: #23262c; }
 .agent-hub .agent-metric-value { font-size: 1.35rem; font-weight: 800; line-height: 1; }
-.agent-hub .agent-metric-label { font-size: 0.72rem; font-weight: 700; color: var(--text-muted, #868e96); text-transform: uppercase; letter-spacing: 0.03em; }
+.agent-hub .agent-metric-label { font-size: 0.76rem; font-weight: 700; color: var(--text-muted, #868e96); text-transform: capitalize; }
 
 .agent-hub .agent-metrics-breakdown {
     flex-basis: 100%;
