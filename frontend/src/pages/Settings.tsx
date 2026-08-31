@@ -20,8 +20,11 @@ import {
     Plus,
     Copy,
     X,
+    SunDim,
+    Moon,
 } from "@phosphor-icons/react"
 import { useAuth } from "../components/AuthContext"
+import { useTheme } from "../components/ThemeContext"
 import "../styles/Settings.css"
 import {
     type ResumeRecord,
@@ -75,6 +78,7 @@ function describeActivity(p: AgentProposal): string {
 
 function Settings() {
     const { user, signOut } = useAuth()
+    const { theme, toggleTheme } = useTheme()
     const [resume, setResume] = useState<ResumeRecord | null>(null)
     const [loading, setLoading] = useState(true)
     const [dragActive, setDragActive] = useState(false)
@@ -338,6 +342,28 @@ const [agentError, setAgentError] = useState<string | null>(null)
                         </Link>
                     </div>
                 )}
+            </section>
+
+            {/* Appearance */}
+            <section className="feature settings-section">
+                <div className="settings-section-header">
+                    {theme === 'dark' ? <Moon size={24} weight="bold" className="settings-section-icon" /> : <SunDim size={24} weight="bold" className="settings-section-icon" />}
+                    <h3 className="settings-section-title">Appearance</h3>
+                </div>
+                <div className="settings-agent-row">
+                    <div className="settings-agent-info">
+                        <span className="settings-agent-row-title">Dark mode</span>
+                        <span className="settings-agent-row-desc">
+                            Use the dark theme.
+                        </span>
+                    </div>
+                    <Switch
+                        checked={theme === 'dark'}
+                        onChange={(e) => { if (theme === 'dark' !== e.currentTarget.checked) toggleTheme() }}
+                        size="lg"
+                        color="brand"
+                    />
+                </div>
             </section>
 
             {/* Resume */}

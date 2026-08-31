@@ -15,7 +15,7 @@
     width: 100%;
     max-width: 1300px; /* Increased from 1200px to make it slightly wider */
     min-height: calc(100vh - 140px);
-    background: #fff;
+    background: var(--white);
     border-radius: 20px;
     box-shadow: 0 16px 56px rgba(0, 0, 0, 0.1);
     overflow: hidden;
@@ -90,7 +90,7 @@
 /* ── Right form panel ────────────────────────────────────── */
 .auth-panel-right {
     flex: 0 0 520px;
-    background: #ffffff;
+    background: var(--white);
     display: flex;
     flex-direction: column;
     justify-content: center; /* True vertical center */
@@ -150,7 +150,7 @@
     font-size: 14px;
     font-family: inherit;
     color: var(--text-dark);
-    background: #fff;
+    background: var(--white);
     outline: none;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -176,8 +176,8 @@
     border: 1px solid #ffc9c9;
 }
 .auth-msg--info {
-    color: #2f9e44;
-    background: #ebfbee;
+    color: var(--accent-color);
+    background: var(--primary-green-light);
     border: 1px solid #b2f2bb;
 }
 

@@ -17,6 +17,33 @@ function sessionHeaders(): Record<string, string> {
 export type AgentTool = "add_to_tracker" | "update_status" | "apply";
 export type AgentDecision = "approved" | "rejected" | "cancelled";
 
+/** Real-world outcome of an apply attempt, reported by the agent. */
+export type ApplyOutcome =
+    | "submitted"
+    | "needs_input"
+    | "blocked"
+    | "already_applied"
+    | "pending"
+    | "error";
+
+/** Extra detail an apply proposal can carry about what actually happened. */
+export interface ApplyResult {
+    outcome?: ApplyOutcome;
+    /** Human-readable one-liner describing the result. */
+    summary?: string;
+    /** Fields / screening questions that still need a human to fill in. */
+    fields_needed?: string[];
+    /** Application portal the agent attempted (greenhouse, lever, workday, …). */
+    portal?: string;
+    /** Portal confirmation / submission id, when the portal returned one. */
+    submission_id?: string;
+    /** Whether the portal asked for materials the user may not have uploaded. */
+    require_resume?: boolean;
+    require_cover_letter?: boolean;
+    require_transcript?: boolean;
+    require_references?: boolean;
+}
+
 export interface AgentProposal {
     id: number;
     user_id: string;
@@ -27,6 +54,8 @@ export interface AgentProposal {
         location?: string;
         link?: string;
         status?: JobStatus;
+        /** Only present on `apply` proposals: how the application turned out. */
+        result?: ApplyResult;
     };
     status: "pending" | "approved" | "rejected" | "cancelled";
     note?: string | null;
