@@ -13,6 +13,8 @@ import {
     GearSix,
     Pause,
     Play,
+    Hand,
+    WarningCircle,
 } from "@phosphor-icons/react";
 import { useAuth } from "./AuthContext";
 import { useTracker } from "./TrackerContext";
@@ -33,6 +35,7 @@ import {
     type AgentPolicyAction,
     type AgentHealth,
     type AgentKey,
+    type ApplyOutcome,
 } from "../api/agent";
 import "../styles/AgentPanel.css";
 
@@ -44,6 +47,36 @@ const TOOL_META: Record<AgentTool, { title: string; icon: React.ReactNode }> = {
     apply: { title: "Apply for internship", icon: <PaperPlaneTilt size={16} weight="bold" /> },
 };
 
+const OUTCOME_META: Record<ApplyOutcome, { label: string; hint: string }> = {
+    submitted: { label: "Submitted", hint: "Application was successfully submitted." },
+    needs_input: { label: "Needs input", hint: "The agent hit a field or question it couldn't answer." },
+    blocked: { label: "Blocked", hint: "The application could not be completed (e.g. captcha or login wall)." },
+    already_applied: { label: "Already applied", hint: "This job was already applied to before." },
+    pending: { label: "In progress", hint: "The agent is still working on this application." },
+    error: { label: "Error", hint: "Something went wrong while applying." },
+};
+
+function outcomeOf(p: AgentProposal): ApplyOutcome {
+    return p.payload.result?.outcome ?? "pending";
+}
+
+/** Human-readable list of materials the portal asked for that may be missing. */
+function missingMaterials(p: AgentProposal): string[] {
+    const r = p.payload.result;
+    if (!r) return [];
+    const require: Record<string, boolean | undefined> = {
+        resume: r.require_resume,
+        "cover letter": r.require_cover_letter,
+        transcript: r.require_transcript,
+        references: r.require_references,
+    };
+    return Object.entries(require).filter(([, v]) => v).map(([k]) => k);
+}
+
+function needsInput(p: AgentProposal): boolean {
+    return p.tool === "apply" && outcomeOf(p) === "needs_input";
+}
+
 function describe(p: AgentProposal): string {
     const { company, role, location, status } = p.payload;
     switch (p.tool) {
@@ -52,7 +85,8 @@ function describe(p: AgentProposal): string {
         case "update_status":
             return `Move ${role} at ${company}${location ? ` (${location})` : ""} to "${status}".`;
         case "apply":
-            return `Apply for ${role} at ${company}${location ? ` (${location})` : ""} — will be recorded as Applied in your tracker.`;
+            if (p.payload.result?.summary) return p.payload.result.summary;
+            return `Apply for ${role} at ${company}${location ? ` (${location})` : ""}${p.payload.result?.outcome ? ` — ${OUTCOME_META[outcomeOf(p)].label.toLowerCase()}.` : " — will be recorded as Applied in your tracker."}`;
     }
 }
 
@@ -313,6 +347,23 @@ export function AgentPanel({ open, onClose }: { open: boolean; onClose: () => vo
         : activity.filter(p => p.status === statusFilter);
     const countBy = (s: StatusFilter) => s === "all" ? activity.length : activity.filter(p => p.status === s).length;
 
+    // ── Apply processing helpers ───────────────────────────────────────────
+    const applyHistory = activity.filter(p => p.tool === "apply");
+    const needsInputQueue = pending.filter(p => needsInput(p));
+    const applyMetrics = (() => {
+        const byOutcome: Partial<Record<ApplyOutcome, number>> = {};
+        const byPortal = new Map<string, number>();
+        let submitted = 0;
+        for (const p of applyHistory) {
+            const oc = outcomeOf(p);
+            byOutcome[oc] = (byOutcome[oc] ?? 0) + 1;
+            if (oc === "submitted") submitted += 1;
+            const portal = p.payload.result?.portal;
+            if (portal) byPortal.set(portal, (byPortal.get(portal) ?? 0) + 1);
+        }
+        return { total: applyHistory.length, pending: pending.filter(p => p.tool === "apply").length, submitted, byOutcome, byPortal };
+    })();
+
     return (
         <>
             <aside
@@ -359,6 +410,23 @@ export function AgentPanel({ open, onClose }: { open: boolean; onClose: () => vo
                                                     <div className="agent-item-body">
                                                         <span className="agent-item-title">{meta.title}</span>
                                                         <span className="agent-item-desc">{describe(p)}</span>
+                                                        {p.tool === "apply" && (
+                                                            <span className={`agent-outcome agent-outcome-${outcomeOf(p)}`}>
+                                                                {OUTCOME_META[outcomeOf(p)].label}
+                                                            </span>
+                                                        )}
+                                                        {p.tool === "apply" && missingMaterials(p).length > 0 && (
+                                                            <span className="agent-materials-warning">
+                                                                <WarningCircle size={14} weight="bold" />
+                                                                Needs: {missingMaterials(p).join(", ")} — upload in Settings → Resume
+                                                            </span>
+                                                        )}
+                                                        {p.tool === "apply" && needsInput(p) && (
+                                                            <span className="agent-needs-input">
+                                                                <Hand size={14} weight="bold" />
+                                                                Awaiting your input — {p.payload.result?.fields_needed?.join(", ") ?? "a field or question the agent couldn't answer"}
+                                                            </span>
+                                                        )}
                                                         {p.payload.link && (
                                                             <a href={p.payload.link} target="_blank" rel="noreferrer" className="agent-item-link">
                                                                 {p.payload.company} listing ↗
@@ -406,6 +474,50 @@ export function AgentPanel({ open, onClose }: { open: boolean; onClose: () => vo
                                     </div>
                                 )}
                             </div>
+
+                            {needsInputQueue.length > 0 && (
+                                <div className="agent-hub-section">
+                                    <span className="agent-hub-section-title">Needs your input</span>
+                                    <div className="agent-list">
+                                        {needsInputQueue.map((p) => (
+                                            <div className="agent-item agent-item-needs-input" key={p.id}>
+                                                <div className="agent-item-icon"><Hand size={16} weight="bold" /></div>
+                                                <div className="agent-item-body">
+                                                    <span className="agent-item-title">{TOOL_META[p.tool]?.title ?? p.tool} · {OUTCOME_META.needs_input.label}</span>
+                                                    <span className="agent-item-desc">{describe(p)}</span>
+                                                    {p.payload.link && (
+                                                        <a href={p.payload.link} target="_blank" rel="noreferrer" className="agent-item-link">
+                                                            Open listing ↗
+                                                        </a>
+                                                    )}
+                                                    <span className="agent-needs-input">
+                                                        <Hand size={14} weight="bold" />
+                                                        Fields: {p.payload.result?.fields_needed?.join(", ") ?? "a question the agent couldn't answer"}
+                                                    </span>
+                                                </div>
+                                                <div className="agent-item-actions agent-item-actions-wide">
+                                                    <button
+                                                        className="agent-approve"
+                                                        disabled={saving}
+                                                        onClick={() => settle(p, "approved")}
+                                                        title="Mark done — resume the application in the tracker"
+                                                    >
+                                                        <Check size={18} weight="bold" />
+                                                    </button>
+                                                    <button
+                                                        className="agent-reject"
+                                                        disabled={saving}
+                                                        onClick={() => settle(p, "rejected")}
+                                                        title="Reject — skip this one"
+                                                    >
+                                                        <X size={18} weight="bold" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="agent-hub-section">
                                 <span className="agent-hub-section-title">Rules</span>
@@ -476,6 +588,36 @@ export function AgentPanel({ open, onClose }: { open: boolean; onClose: () => vo
                                         ))}
                                     </div>
                                 )}
+                            </div>
+
+                            <div className="agent-hub-section">
+                                <span className="agent-hub-section-title">Applications</span>
+                                <div className="agent-metrics">
+                                    <div className="agent-metric">
+                                        <span className="agent-metric-value">{applyMetrics.submitted}</span>
+                                        <span className="agent-metric-label">Submitted</span>
+                                    </div>
+                                    <div className="agent-metric">
+                                        <span className="agent-metric-value">{needsInputQueue.length}</span>
+                                        <span className="agent-metric-label">Awaiting input</span>
+                                    </div>
+                                    <div className="agent-metric">
+                                        <span className="agent-metric-value">{applyMetrics.pending}</span>
+                                        <span className="agent-metric-label">In queue</span>
+                                    </div>
+                                    {(Object.keys(applyMetrics.byOutcome).length > 0 || applyMetrics.byPortal.size > 0) && (
+                                        <div className="agent-metrics-breakdown">
+                                            {Object.entries(applyMetrics.byOutcome).map(([oc, n]) => (
+                                                <span key={oc} className={`agent-outcome agent-outcome-${oc}`}>
+                                                    {n} {OUTCOME_META[oc as ApplyOutcome].label}
+                                                </span>
+                                            ))}
+                                            {Array.from(applyMetrics.byPortal.entries()).map(([portal, n]) => (
+                                                <span key={portal} className="agent-portal-chip">{n}× {portal}</span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="agent-hub-section">

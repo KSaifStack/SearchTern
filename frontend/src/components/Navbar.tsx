@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import "../styles/navbar.css"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import logo from "../assets/Logo.png"
 import { useAuth } from "./AuthContext"
 import { User, CaretDown, SignOut, SignIn, UserPlus, Info, GearSix } from "@phosphor-icons/react"
 import { notifications } from "@mantine/notifications"
@@ -35,7 +34,6 @@ function Navbar() {
         <nav>
             <ul className="Logo">
             <h1><Link to ="/" onClick={() => setMenuOpen(false)}>Search<span className="accent">Tern</span></Link></h1>
-            <img src={logo} alt="Logo" height="55"></img>
             </ul>
 
             <button

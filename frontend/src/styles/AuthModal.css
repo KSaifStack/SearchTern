@@ -19,7 +19,7 @@
 /* ── Card ────────────────────────────────────────────────── */
 .auth-card {
   position: relative;
-  background: #fff;
+  background: var(--white);
   border-radius: 16px;
   padding: 40px 44px 36px;
   width: 100%;
@@ -104,7 +104,7 @@
   box-shadow: none;
 }
 .auth-tab.active {
-  background: #fff;
+  background: var(--white);
   color: var(--accent-color);
   box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }
@@ -139,7 +139,7 @@
   font-size: 14px;
   font-family: inherit;
   color: var(--text-dark);
-  background: #fff;
+  background: var(--white);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -161,8 +161,8 @@
 }
 .auth-info {
   font-size: 13px;
-  color: #2f9e44;
-  background: #ebfbee;
+  color: var(--accent-color);
+  background: var(--primary-green-light);
   border: 1px solid #b2f2bb;
   border-radius: 6px;
   padding: 8px 12px;

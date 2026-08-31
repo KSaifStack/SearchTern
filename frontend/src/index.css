@@ -1,4 +1,5 @@
 :root {
+    color-scheme: light;
     --accent-color: #2d7a4f;
     --button-color: #3aa76d;
     --button-hover-color: #2d7a4f;
@@ -29,6 +30,94 @@
     --shadow-md: rgba(9, 30, 66, 0.25);
 }
 
+/* ── Dark theme ─────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+    color-scheme: dark;
+    --accent-color: #2d7a4f;
+    --button-color: #3aa76d;
+    --button-hover-color: #2d7a4f;
+    --font-color: #e8eaed;
+    --feature-color: #1e2126;
+    --header-bg: #17191d;
+    --page-bg: #121417;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    --white: #1e2126;
+    --text-dark: #e8eaed;
+    --text-muted: #9aa5b1;
+    --text-light: #6b7280;
+    --text-gray: #9aa5b1;
+    --text-slate: #cbd5e1;
+    --table-th-color: #8a94a6;
+    --table-td-color: #c7ced9;
+    --badge-bg: #2a2e35;
+    --hover-bg: rgba(255, 255, 255, 0.08);
+    --menu-hover-bg: #2a2e35;
+    --border-light: #33373f;
+    --border-medium: #3a3f48;
+    --border-slate: #2f343b;
+    --primary-green: #3a9e6e;
+    --primary-green-light: rgba(58, 158, 110, 0.18);
+    --link-visited: #7a9e8e;
+    --shadow-light: rgba(0, 0, 0, 0.4);
+    --shadow-sm: rgba(0, 0, 0, 0.4);
+    --shadow-md: rgba(0, 0, 0, 0.55);
+}
+
+/* ── Dark theme: semantic green status colors ───────────────────────────── */
+[data-theme="dark"] .agent-hub-chip-connected,
+[data-theme="dark"] .agent-hub-status-connected,
+[data-theme="dark"] .agent-hub .agent-approve,
+[data-theme="dark"] .agent-hub .agent-remember-allow:hover,
+[data-theme="dark"] .agent-hub .agent-seg-allow,
+[data-theme="dark"] .agent-approve {
+    background: rgba(58, 158, 110, 0.16);
+    color: #86efac;
+}
+[data-theme="dark"] .agent-hub-chip-connected .agent-hub-chip-dot,
+[data-theme="dark"] .agent-hub-status-connected .agent-hub-dot,
+[data-theme="dark"] .agent-hub .agent-approve:hover,
+[data-theme="dark"] .agent-approve:hover {
+    background: #3a9e6e;
+}
+[data-theme="dark"] .settings-agent-status-approved {
+    background: rgba(58, 158, 110, 0.16);
+    color: #86efac;
+}
+[data-theme="dark"] .settings-agent-status-pending {
+    background: rgba(245, 201, 80, 0.14);
+    color: #f6c26b;
+}
+[data-theme="dark"] .settings-agent-status-rejected,
+[data-theme="dark"] .agent-hub-chip-disconnected,
+[data-theme="dark"] .agent-hub-status-disconnected,
+[data-theme="dark"] .agent-hub .agent-reject,
+[data-theme="dark"] .agent-hub .agent-remember-block:hover,
+[data-theme="dark"] .agent-hub .agent-seg-block,
+[data-theme="dark"] .agent-reject {
+    background: rgba(224, 49, 49, 0.14);
+    color: #ff8a80;
+}
+[data-theme="dark"] .agent-hub-chip-connected .agent-hub-chip-dot,
+[data-theme="dark"] .agent-hub-status-connected .agent-hub-dot,
+[data-theme="dark"] .agent-hub .agent-approve:hover,
+[data-theme="dark"] .agent-approve:hover {
+    background: #3a9e6e;
+}
+[data-theme="dark"] .agent-hub .agent-reject:hover,
+[data-theme="dark"] .agent-reject:hover {
+    background: rgba(224, 49, 49, 0.24);
+}
+[data-theme="dark"] .agent-hub-chip-configured,
+[data-theme="dark"] .agent-hub-status-configured,
+[data-theme="dark"] .agent-hub-chip-checking,
+[data-theme="dark"] .agent-hub-status-checking,
+[data-theme="dark"] .agent-hub-chip-paused,
+[data-theme="dark"] .agent-hub-status-paused,
+[data-theme="dark"] .agent-hub-status-pending,
+[data-theme="dark"] .agent-hub .agent-seg-ask {
+    background: #2a2e35;
+}
+
 * {
     font-family: 'Lexend', sans-serif;
 }
@@ -50,7 +139,7 @@ p {
 
 /* Body */
 body {
-    background-color: #f8f7f4;
+    background-color: var(--page-bg);
     color: var(--font-color);
     margin: 0;
     padding: 0;

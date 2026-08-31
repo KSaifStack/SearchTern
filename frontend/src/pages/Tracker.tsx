@@ -15,6 +15,7 @@ import { Robot } from '@phosphor-icons/react';
 import { useTracker } from '../components/TrackerContext';
 import type { JobStatus, TrackedJob } from '../components/TrackerContext';
 import { useAuth } from '../components/AuthContext';
+import { useTheme } from '../components/ThemeContext';
 import { AgentPanel } from '../components/AgentPanel';
 import { fetchAgentSettings, fetchPendingAgentProposals } from '../api/agent';
 import { Column, JobCard } from '../components/JobCard';
@@ -23,6 +24,8 @@ import "../styles/Tracker.css";
 
 function Tracker() {
     const { user } = useAuth();
+    const { theme } = useTheme();
+    const ringTrackColor = theme === 'dark' ? '#2f343b' : '#cdd2da';
 
     // Local dev: no sign-in needed to preview the Agent hub. Outside of `npm
     // run dev` (import.meta.env.DEV) this stays null and the hub stays gated.
@@ -307,6 +310,7 @@ function Tracker() {
                         size={120}
                         thickness={12}
                         roundCaps
+                        rootColor={ringTrackColor}
                         sections={ringData}
                         label={
                             <div style={{ textAlign: 'center', marginTop: '-4px' }}>

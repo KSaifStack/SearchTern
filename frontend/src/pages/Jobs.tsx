@@ -93,6 +93,10 @@ function Jobs() {
 
   const filtered = useMemo(() => {
     let jobs = allJobs.filter(j => j && j.company)
+    jobs = jobs.filter(j => {
+      const link = (j.link ?? '').trim()
+      return link.length > 0 && !/^n\/?a$/i.test(link)
+    })
     if (searchText) {
       const q = searchText.toLowerCase()
       jobs = jobs.filter(j =>
