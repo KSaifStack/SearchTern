@@ -20,6 +20,9 @@ Both the drawer and the dedicated tab need the same underlying data/actions (pro
 
 **1. Trim the drawer — [AgentPanel.tsx](frontend/src/components/AgentPanel.tsx)**
 Keep this file, its `open`/`onClose` props, its close button/ESC handling, and its existing fixed-position slide-over CSS — it's still a real drawer, unchanged in [Tracker.tsx](frontend/src/pages/Tracker.tsx) (no changes needed there: keep `showAgentTab`, `agentTabOpen`, `pendingCount` state, the toggle button + badge, `tracker-hub-open` class, and the `<AgentPanel open={agentTabOpen} onClose={...} />` render line exactly as they are today).
+Current-state carry-over that must survive the trim (recent work, do not drop):
+- **Side-panel behavior**: the drawer compresses the Tracker instead of covering it — `.tracker-hub-open { padding-right: min(480px, 40vw) }` (agents don't walk away during big data pulls; compact alternative since full backdrop/overlay broke them), plus the ≥900px single-column-at-a-time board view (`AgentPanel` `.tracker-hub-open` CSS switches Saved/Applied/Interview/Offer/Rejected to pill tabs instead of squeezing all five column widths). Keep both rules intact.
+- **Dev-guest preview**: `Tracker.tsx` uses `const actorUser = user ?? (import.meta.env.DEV ? { id: "local" } : null)` — in local dev the hub renders for a guest actor (no sign-in, `enforce_signin` is a no-op without Supabase env); in prod it stays behind the real Supabase session. The refactor must not gate the drawer on a real user in dev.
 Switch its internals to call `useAgentHub()` and trim its rendered JSX down to only:
 - Connection status banner (compact, existing status-pill logic)
 - **Proposals** ("Proposes") section — full functionality retained (Approve/Reject/Always/Never), since these are time-sensitive actionable items
@@ -48,7 +51,7 @@ Page renders a header ("Agent Hub" + `Robot` icon) then three `.settings-section
 [AgentPanel.css](frontend/src/styles/AgentPanel.css) keeps its drawer-shell rules (fixed positioning, slide transform, close button, z-index) since `AgentPanel.tsx` remains a real drawer. Content classes it already defines (`.agent-item`, `.agent-status-pill`, rule/activity row styles, etc.) are reused as-is by the new Configuration section in `AgentHub.tsx` — that section just wraps them in a static `.settings-section` container instead of the fixed-position drawer shell, so no positioning rules leak into the page. New rules for the Docs/skill.md sections follow the `.settings-section` conventions already defined in `frontend/src/styles/Settings.css`.
 
 **5. Untouched (confirm, don't edit)**
-`frontend/src/components/AgentOverlay.tsx`, `frontend/src/styles/AgentOverlay.css`, `frontend/src/App.tsx`'s global FAB mount, `backend/api.py`, `backend/read_db.py`, `frontend/src/api/agent.ts` — no changes needed anywhere here.
+`frontend/src/components/AgentOverlay.tsx`, `frontend/src/styles/AgentOverlay.css`, `frontend/src/App.tsx`'s global FAB mount, `backend/api.py`, `backend/read_db.py`, `frontend/src/api/agent.ts` — no changes needed anywhere here. The new `/agent-hub` page should also render for the dev-guest actor (see carry-over notes in section 1) so it's testable locally without sign-in.
 
 ## Verification
 
@@ -60,4 +63,6 @@ Page renders a header ("Agent Hub" + `Robot` icon) then three `.settings-section
 6. Confirm the Docs section renders its "coming soon" placeholders with normal `.settings-section` styling.
 7. Click "Download skill.md"; open the downloaded file and confirm valid `---`-delimited YAML frontmatter (`name:`, `description:`) followed by the TODO body.
 8. Confirm the floating Agent FAB (`AgentOverlay.tsx`, bottom corner) still works unchanged on any page.
-9. Run the frontend TypeScript build/lint to catch unused imports or dead code from the `AgentPanel.tsx` trim.
+9. Right-click "inspect" the Tracker with the drawer open — confirm the Tracker still compresses (`padding-right`) and switches to the single-column tab view ≥900px, not an underlay/backdrop. Repeat with the drawer closed.
+10. Without signing in (local `npm run dev`), confirm both the drawer and `/agent-hub` still render via the dev-guest fallback.
+11. Run the frontend TypeScript build/lint to catch unused imports or dead code from the `AgentPanel.tsx` trim.

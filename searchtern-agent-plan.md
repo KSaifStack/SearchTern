@@ -4,8 +4,8 @@
 
 SearchTern already exposes a per-user "AI Agent" bridge (`/agent/search`, `/agent/tracker`, `/agent/resume`, `/agent/propose`, `/agent/health` in [backend/api.py](backend/api.py), auth via a Bearer `st_...` key generated under Settings → AI Agents). Today the only documentation of how to actually *use* that bridge is a couple of inline code comments and README bullets — there's no runnable client, no local profile format, and no guidance for turning "read a job posting" into "have my agent draft and help me submit an application." The user wants a **separate, new repo** that packages everything a person needs to point Claude Code / opencode at their own SearchTern account and start using it to find + apply to internships: setup docs for the existing 7-step key flow, a local-only file for personal/application info, and the scripts an agent shells out to.
 
-Two design constraints came out of research (confirmed directly against [backend/api.py:226-350](backend/api.py) and [backend/.env.template](backend/.env.template)):
-- **SearchTern stores no structured PII or resume text at all** (confirmed: resume is an opaque blob in `resumeStorage.ts`, `tracked_jobs` only has company/role/location/link/status/notes). Per the user's correction, this new repo does **not** pull resume/personal data from SearchTern's `/agent/resume` at all — that data is entered manually by the user directly into local files in this new repo. This repo is a separate tool that *extends* SearchTern (uses its job-search/tracker API) but owns all personal/resume data itself, entirely locally.
+Two design constraints (confirmed against [backend/api.py](backend/api.py), [backend/read_db.py](backend/read_db.py), and the env templates):
+- **Resume comes from SearchTern; structured PII stays local.** The signed-in user's resume IS stored per-account (Supabase Storage `resumes` bucket under `{user_id}/`, synced from Settings → AI Agents) and `/agent/resume` reads it back, scoped to the key's owner via `get_agent_identity`. It returns the file's bytes (base64) plus metadata (name, id, updated_at); the backend does **not** extract PDF text, so this repo uses `pypdf` to decode text locally from the API bytes. What SearchTern does NOT store is structured PII — `tracked_jobs` only has company/role/location/link/status/notes, and there's no personal-info store at all. So: `profile.yaml` holds the user's PII (entered manually, kept entirely local), while the resume itself is pulled through `/agent/resume`.
 - **Proposal decisions are applied client-side in SearchTern's own frontend** (`AgentPanel.tsx` `settle()`), not by the backend. `/agent/propose` only ever creates a proposal row; nothing in this new repo can write to the tracker directly, by design — that's the human-in-the-loop safety net staying intact.
 
 Decisions from the user (via clarifying questions):
@@ -24,20 +24,20 @@ searchtern-agent/
   TODO.md                     # deferred work: /agent/propose write-back, skill.md integration
   requirements.txt            # requests, python-dotenv, pyyaml, pypdf
   .env.template                # SEARCHTERN_AGENT_KEY, SEARCHTERN_API_URL
-  .gitignore                   # .env, profile.yaml, resume.*, cache/, applications/, __pycache__/
-  profile.template.yaml        # local personal-info schema, blank/example values, heavily commented
-  resume.template.txt          # placeholder the user replaces with their own resume text (or points profile.yaml at a local PDF)
+  .gitignore                   # .env, profile.yaml, cache/, applications/, __pycache__/
+  profile.template.yaml        # local personal-info (PII) schema — NO resume here, blank/example values, heavily commented
   searchtern_agent/
     __init__.py
-    client.py                  # SearchTernClient: search(), tracker(), health() — GET-only wrapper against SearchTern's job/tracker API
+    client.py                  # SearchTernClient: search(), tracker(), health(), resume() — GET-only wrapper against SearchTern's agent API
   cli/
     search.py                  # python cli/search.py --q "..." --location "..." --limit 25
     tracker.py                 # python cli/tracker.py  -> prints current tracker rows as JSON
-    profile.py                 # python cli/profile.py check  -> validates profile.yaml + local resume file are filled in
+    profile.py                 # python cli/profile.py check  -> validates profile.yaml (PII) is filled in
     gather_context.py          # python cli/gather_context.py --company X --role Y [--link Z]
-                                #   -> combines local profile.yaml + local resume text + job info (fetched from SearchTern)
+                                #   -> combines local profile.yaml (PII) + resume text (fetched from SearchTern
+                                #      via /agent/resume; PDF decoded locally with pypdf into cache/) + job info
                                 #      into one JSON blob on stdout for the calling agent to read; writes nothing itself
-  cache/                       # gitignored: any extracted-text cache if the user points profile.yaml at a local PDF resume
+  cache/                       # gitignored: extracted resume text cache (from the /agent/resume PDF bytes)
   applications/                # gitignored: where the agent (Claude Code/opencode) saves drafted materials it writes,
                                 #   one subfolder per application, e.g. applications/Acme-SWE-Intern/
 ```
@@ -49,13 +49,14 @@ Key point on `gather_context.py` / drafting: the Python scripts only **fetch and
 Thin `requests`-based wrapper, `Authorization: Bearer {SEARCHTERN_AGENT_KEY}` on every call, base URL from `SEARCHTERN_API_URL` (default `https://api.searchtern.ksaif.dev`):
 - `search(q="", location="", limit=25)` → `GET /agent/search`
 - `tracker()` → `GET /agent/tracker`
+- `resume(name="")` → `GET /agent/resume` — returns the list of the user's synced resumes when `name` is empty (pick the most recent `updated_at`), or the single resume's base64 bytes + metadata (`name`, `id`, `updated_at`, `content_type`) when `name` matches (get the name from the list response, or just call `resume()` without args then use its `id`/prefix). The backend returns raw file bytes for PDFs (no text extraction), so decode to PDF/text locally with `pypdf` and cache into `cache/`.
 - `health()` → `GET /agent/health`
 
-No `resume()` or `propose()` method in v1. Resume/personal data is manual-local per the user's correction (not fetched from `/agent/resume`), and `propose()` is intentionally deferred and called out in `TODO.md` so both boundaries are explicit in code, not just docs.
+No `propose()` method in v1. `POST /agent/propose` is intentionally deferred and called out in `TODO.md` so the write boundary is explicit in code, not just docs. The resume, by contrast, IS read from SearchTern (it lives in the user's account, scoped to the key owner); only structured PII (phone, address, EEO, work authorization ...) is manual-local in `profile.yaml` — SearchTern stores none of it, so there's nothing to fetch.
 
 ## `profile.template.yaml` + local resume file
 
-Both local-only, gitignored once the user copies/fills them in — entered manually, never fetched from SearchTern. `profile.template.yaml` has commented sections for: `personal` (name, email, phone, address, linkedin, github, portfolio), `education` (list), `experience` (list), `skills`, `work_authorization` (visa status, sponsorship needs, US work authorization), `eeo` (optional, blank by default — gender/race/veteran/disability), and `resume_path` (path to the user's own resume file placed locally in the repo, e.g. `./resume.txt` or `./resume.pdf`). File header explicitly states: this data never leaves the machine except to be read by the local agent — it is never sent to SearchTern or fetched from it.
+Both local-only, gitignored once the user copies/fills them in — entered manually, never fetched from SearchTern. `profile.template.yaml` has commented sections for: `personal` (name, email, phone, address, linkedin, github, portfolio), `education` (list), `experience` (list), `skills`, `work_authorization` (visa status, sponsorship needs, US work authorization), and `eeo` (optional, blank by default — gender/race/veteran/disability). No `resume_path` field and no local resume file: the resume itself is read from SearchTern via `/agent/resume` (see `client.resume()`), so the user just makes sure it's synced under Settings → AI Agents. File header explicitly states: this data never leaves the machine except to be read by the local agent — it is never sent to SearchTern, and SearchTern never stores structured PII like this to begin with.
 
 ## README.md content
 
@@ -64,7 +65,7 @@ Mirrors the user's existing 7-step flow, adapted:
 2. Settings → AI Agents → enable agents (and "Show tracker tab" if desired).
 3. Create an agent key (`st_...`), copy it — shown once.
 4. Clone this repo, `pip install -r requirements.txt`, `cp .env.template .env` and paste the key in.
-5. `cp profile.template.yaml profile.yaml` and fill in personal info manually; place your own resume as a local file (e.g. `resume.txt`, or a PDF referenced by `resume_path` — `pypdf` extracts text from it locally if so) and point `profile.yaml`'s `resume_path` at it. None of this is fetched from or sent to SearchTern.
+5. `cp profile.template.yaml profile.yaml` and fill in personal info manually (names, contact, experience, skills, work authorization, optional EEO). The resume is NOT stored here — it's read from your SearchTern account via `/agent/resume`, so make sure it's synced under Settings → AI Agents first. PII never leaves this machine except to the local agent.
 6. Point Claude Code / opencode at this repo folder; example prompt given for "search SearchTern for X, gather context for a role, draft application materials into `applications/...`."
 7. Review/submit manually; approve or reject anything that does show up as a proposal in SearchTern's own Agent hub as before. Note (linked to `TODO.md`) that v1 does not yet auto-report submitted applications back to SearchTern — the user still updates their own tracker in the SearchTern UI for now.
 8. Stop the agent anytime: revoke the key in Settings → AI Agents, or just delete the local `.env`.
@@ -80,7 +81,7 @@ Mirrors the user's existing 7-step flow, adapted:
 1. `cd searchtern-agent && pip install -r requirements.txt` succeeds.
 2. With a real `.env` (agent key from a signed-in SearchTern account) and `profile.yaml`/local resume filled in: `python cli/search.py --q "software engineer intern" --limit 5` returns real results as JSON.
 3. `python cli/tracker.py` returns the signed-in user's actual tracker rows.
-4. `python cli/profile.py check` correctly flags missing required fields (or a missing/empty local resume file) when incomplete, and passes when filled in — extracting readable text from a local PDF resume into `cache/` if `resume_path` points at one.
-5. `python cli/gather_context.py --company "Acme" --role "SWE Intern"` prints a single JSON blob containing local profile + local resume text + job info fetched from SearchTern.
+4. `python cli/profile.py check` correctly flags missing required fields when incomplete, and passes when filled in.
+5. `python cli/gather_context.py --company "Acme" --role "SWE Intern"` prints a single JSON blob containing local profile PII + resume text (decoded locally with `pypdf` from the `/agent/resume` PDF bytes into `cache/`) + job info fetched from SearchTern.
 6. Manually drive Claude Code against the repo with a prompt like "search for X, pick one, gather context, draft materials into applications/" and confirm it produces a sensible `applications/<company>-<role>/` folder without attempting any network submission.
-7. Confirm `.env`, `profile.yaml`, the local resume file, `cache/`, and `applications/` are all gitignored (`git status` shows them untracked/ignored) before any commit.
+7. Confirm `.env`, `profile.yaml`, `cache/`, and `applications/` are all gitignored (`git status` shows them untracked/ignored) before any commit.
