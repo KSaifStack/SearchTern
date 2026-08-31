@@ -175,7 +175,7 @@ function Tracker() {
 
     // Statistics
     const totalTracked = trackedJobs.length;
-    const totalApplied = trackedJobs.filter(j => j.status !== 'Saved').length;
+    const totalApplied = trackedJobs.filter(j => j.status === 'Applied').length;
     const offers = trackedJobs.filter(j => j.status === 'Offer').length;
     const responses = trackedJobs.filter(j => ['Interview', 'Offer', 'Rejected'].includes(j.status)).length;
     const responseRate = totalApplied > 0 ? Math.round((responses / totalApplied) * 100) : 0;

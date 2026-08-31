@@ -117,3 +117,13 @@ searchtern-agent/
 Dry-run by default; submissions only with `--submit`. Automating applications may violate
 some sites' terms; CAPTCHAs must be stopped, not fought; each `--submit` run should be
 reviewed. This is the operational spine of the whole feature.
+
+**Secret handling (implemented):** PII and the agent key never live in the agent repo.
+They are encrypted at rest under `~/.searchtern-agent/` with Fernet (AES): `profile.enc`,
+`.env` (key), `cache/`, `.screenshots/`, `applications/` — dirs 0700, files 0600. The
+decrypting `fernet.key` sits beside them (outside the repo), the same shape as the
+age/SOPS "0600 key file" pattern; on a box with a working Secret Service daemon the key
+moves into the OS keyring instead. Env note: this dev box's Secret Service daemon returns
+empty lookups, hence the key-file fallback. Profile is only decrypted in memory; the LLM
+mapper receives question labels, never profile values.
+

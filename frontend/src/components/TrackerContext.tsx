@@ -159,6 +159,16 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     }, [user?.id, fetchFromSupabase]);
 
+    // Poll for external changes (agent auto-apply, other devices) so the board
+    // stays in sync without a hard reload. Skip while a merge prompt is open.
+    useEffect(() => {
+        if (!user?.id || pendingMerge) return;
+        const id = window.setInterval(() => {
+            fetchFromSupabase(user.id);
+        }, 15000);
+        return () => window.clearInterval(id);
+    }, [user?.id, pendingMerge, fetchFromSupabase]);
+
     const handleMerge = () => {
         if (!pendingMerge || !supabase) return;
         const { local, cloud, userId } = pendingMerge;
