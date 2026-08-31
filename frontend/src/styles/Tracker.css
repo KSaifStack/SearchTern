@@ -4,6 +4,19 @@
     padding: 10px 0;
 }
 
+/* Agent hub opens as a side panel: compress the tracker (not cover it).
+   The drawer is 480px wide (min(480px, 100vw)); on small screens fall back
+   to the old overlay behaviour (no compression). */
+.tracker-hub-open {
+    padding-right: min(480px, 40vw);
+}
+
+@media (max-width: 900px) {
+    .tracker-hub-open {
+        padding-right: 0;
+    }
+}
+
 .tracker-board {
     display: flex;
     gap: 16px;
@@ -181,4 +194,54 @@
   .tracker-column-wrapper { display: none; }
   .tracker-column-wrapper.active { display: block; width: 100%; }
   .tracker-column { width: 100%; min-width: unset; }
+}
+
+/* Agent hub open compresses the tracker. Show one column at a time via the
+   tab strip instead of squeezing all five (they'd collapse into each other). */
+@media (min-width: 900px) {
+  .tracker-hub-open .tracker-tab-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    margin-bottom: 10px;
+    width: 100%;
+  }
+
+  .tracker-hub-open .tracker-tab {
+    background: var(--white);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tracker-hub-open .tracker-tab.active {
+    background: var(--primary-green-light);
+    color: var(--primary-green);
+    border-color: var(--primary-green);
+  }
+
+  .tracker-hub-open .tracker-tab .tab-count {
+    background: var(--badge-bg);
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+
+  .tracker-hub-open .tracker-tab.active .tab-count {
+    background: var(--primary-green);
+    color: var(--white);
+  }
+
+  .tracker-hub-open .tracker-board { display: block; }
+  .tracker-hub-open .tracker-column-wrapper { display: none; }
+  .tracker-hub-open .tracker-column-wrapper.active { display: block; width: 100%; }
+  .tracker-hub-open .tracker-column { width: 100%; min-width: unset; }
 }

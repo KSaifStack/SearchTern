@@ -23,6 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 database.db
+agent.db
+backend/agent.db
 .vscode
 .env
 frontend/.env

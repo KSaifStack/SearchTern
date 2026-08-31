@@ -23,6 +23,10 @@ import "../styles/Tracker.css";
 
 function Tracker() {
     const { user } = useAuth();
+
+    // Local dev: no sign-in needed to preview the Agent hub. Outside of `npm
+    // run dev` (import.meta.env.DEV) this stays null and the hub stays gated.
+    const actorUser = user ?? (import.meta.env.DEV ? { id: "local" } : null);
     const { trackedJobs, updateJobStatus, addJob, editJob, removeJob } = useTracker();
     const [activeId, setActiveId] = React.useState<string | null>(null);
     const [activeColumn, setActiveColumn] = useState<JobStatus>('Saved');
@@ -98,13 +102,19 @@ function Tracker() {
     );
 
     // The Agent hub tab only appears when enabled in Settings → AI Agents.
+    // Local dev preview (no sign-in) forces it on; production stays gated.
     React.useEffect(() => {
-        if (!user) {
+        if (!actorUser) {
             setShowAgentTab(false);
             setPendingCount(0);
             return;
         }
-        const userId = user.id;
+        if (import.meta.env.DEV && !user) {
+            setShowAgentTab(true);
+            setPendingCount(0);
+            return;
+        }
+        const userId = actorUser.id;
         let cancelled = false;
         const check = async () => {
             const settings = await fetchAgentSettings(userId);
@@ -114,12 +124,12 @@ function Tracker() {
         const onFocus = () => void check();
         window.addEventListener('focus', onFocus);
         return () => { cancelled = true; window.removeEventListener('focus', onFocus); };
-    }, [user]);
+    }, [actorUser, user]);
 
     // Red badge on the Agent hub button whenever actions await approval.
     React.useEffect(() => {
-        if (!user?.id || !showAgentTab) return;
-        const userId = user.id;
+        if (!actorUser?.id || !showAgentTab) return;
+        const userId = actorUser.id;
         let cancelled = false;
         const tick = async () => {
             const list = await fetchPendingAgentProposals(userId);
@@ -130,7 +140,7 @@ function Tracker() {
         const onFocus = () => void tick();
         window.addEventListener('focus', onFocus);
         return () => { cancelled = true; window.clearInterval(id); window.removeEventListener('focus', onFocus); };
-    }, [showAgentTab, user]);
+    }, [showAgentTab, actorUser]);
 
     const onDragStart = (event: DragStartEvent) => {
         setActiveId(event.active.id as string);
@@ -218,7 +228,10 @@ function Tracker() {
     };
 
     return (
-        <div style={{ width: '100%', maxWidth: '1580px', margin: '0 auto' }}>
+        <div
+            className={agentTabOpen ? 'tracker-hub-open' : undefined}
+            style={{ width: '100%', maxWidth: '1580px', margin: '0 auto', transition: 'padding-right 0.3s ease-in-out' }}
+        >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', marginTop: '10px' }}>
                 <Text size="xl" fw={800} c="var(--text-dark)" style={{ fontSize: '1.75rem' }}>Application Tracker</Text>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -363,7 +376,7 @@ function Tracker() {
                 </button>
             </div>
 
-            {user && <AgentPanel open={agentTabOpen} onClose={() => setAgentTabOpen(false)} />}
+            {actorUser && <AgentPanel open={agentTabOpen} onClose={() => setAgentTabOpen(false)} />}
 
             <JobModal 
                 opened={modalOpen} 

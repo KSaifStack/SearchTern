@@ -170,17 +170,12 @@ export function AgentPanel({ open, onClose }: { open: boolean; onClose: () => vo
         return () => window.clearInterval(id);
     }, [open, refreshPending, refreshHealth]);
 
-    // ESC to close + lock body scroll while the drawer is open.
+    // ESC to close while the drawer is open.
     useEffect(() => {
         if (!open) return;
         const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
         window.addEventListener("keydown", onKey);
-        const prev = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
-        return () => {
-            window.removeEventListener("keydown", onKey);
-            document.body.style.overflow = prev;
-        };
+        return () => window.removeEventListener("keydown", onKey);
     }, [open, onClose]);
 
     const togglePaused = useCallback(async () => {
@@ -320,15 +315,10 @@ export function AgentPanel({ open, onClose }: { open: boolean; onClose: () => vo
 
     return (
         <>
-            <div
-                className={`agent-hub-backdrop${open ? " agent-hub-backdrop-open" : ""}`}
-                onClick={onClose}
-                aria-hidden="true"
-            />
             <aside
                 className={`agent-hub${open ? " agent-hub-open" : ""}`}
                 role="dialog"
-                aria-modal={open}
+                aria-modal="false"
                 aria-label="Agent hub"
             >
                 <header className="agent-hub-header">
