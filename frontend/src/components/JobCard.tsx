@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { JobStatus, TrackedJob } from './TrackerContext';
+
+const PER_PAGE = 5;
 
 export const STATUS_COLORS: Record<JobStatus, string> = {
     'Saved': '#94a3b8',
@@ -68,10 +71,16 @@ export const Column = ({ status, jobs, onEdit, searchValue, onSearchChange, tota
         }
     });
 
+    const [page, setPage] = useState(0);
+    const totalPages = Math.max(1, Math.ceil(jobs.length / PER_PAGE));
+    const safePage = page >= totalPages ? totalPages - 1 : page;
+    const pageJobs = jobs.slice(safePage * PER_PAGE, (safePage + 1) * PER_PAGE);
+    const showPager = jobs.length > PER_PAGE;
+
     return (
         <div className="tracker-column">
-            <div className="column-header" style={{ color: STATUS_COLORS[status] }}>
-                <span>{status}</span>
+            <div className="column-header">
+                <span style={{ color: STATUS_COLORS[status] }}>{status}</span>
                 <span className="column-count" style={{ backgroundColor: `${STATUS_COLORS[status]}22`, color: STATUS_COLORS[status] }}>{jobs.length}</span>
             </div>
 
@@ -80,13 +89,13 @@ export const Column = ({ status, jobs, onEdit, searchValue, onSearchChange, tota
                     className="tracker-column-search"
                     placeholder="Search..."
                     value={searchValue || ''}
-                    onChange={e => onSearchChange?.(e.target.value)}
+                    onChange={e => { setPage(0); onSearchChange?.(e.target.value); }}
                 />
             )}
-            
-            <SortableContext items={jobs.map(j => j.id)} strategy={verticalListSortingStrategy}>
+
+            <SortableContext items={pageJobs.map(j => j.id)} strategy={verticalListSortingStrategy}>
                 <div ref={setNodeRef} style={{ flexGrow: 1, minHeight: '150px' }}>
-                    {jobs.map(job => (
+                    {pageJobs.map(job => (
                         <SortableJobCard key={job.id} job={job} onEdit={onEdit} />
                     ))}
                     {jobs.length === 0 && (
@@ -96,6 +105,30 @@ export const Column = ({ status, jobs, onEdit, searchValue, onSearchChange, tota
                     )}
                 </div>
             </SortableContext>
+
+            {showPager && (
+                <div className="column-pager">
+                    <button
+                        className="pager-btn"
+                        disabled={safePage === 0}
+                        onClick={() => setPage(safePage - 1)}
+                        title="Previous page"
+                    >
+                        ‹
+                    </button>
+                    <span className="pager-label">
+                        {safePage + 1} / {totalPages}
+                    </span>
+                    <button
+                        className="pager-btn"
+                        disabled={safePage >= totalPages - 1}
+                        onClick={() => setPage(safePage + 1)}
+                        title="Next page"
+                    >
+                        ›
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

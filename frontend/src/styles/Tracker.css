@@ -23,13 +23,13 @@
     min-height: 60vh;
     align-items: flex-start;
     width: 100%;
-    min-width: fit-content;
 }
 
 .tracker-column-wrapper {
     flex: 1;
     display: flex;
-    min-width: 220px;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .tracker-column {
@@ -86,6 +86,17 @@
     cursor: grab;
     transition: transform 0.1s ease, box-shadow 0.1s ease;
     border: 1px solid var(--border-light);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.tracker-card .card-company,
+.tracker-card .card-role {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .card-status-saved { border-left: 3px solid #94a3b8; }
@@ -120,6 +131,51 @@
     font-size: 12px;
     color: var(--text-light);
     min-width: 0;
+}
+
+.column-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 0;
+    margin-top: 5px;
+    border-top: 1px solid var(--border-light);
+}
+
+.pager-btn {
+    background: var(--white);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dark);
+    box-shadow: none;
+    transition: background 0.1s ease;
+}
+
+.pager-btn:hover:not(:disabled) {
+    background: var(--hover-bg);
+}
+
+.pager-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.pager-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 600;
+    min-width: 40px;
+    text-align: center;
 }
 
 .add-card-btn {

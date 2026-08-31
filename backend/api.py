@@ -310,6 +310,82 @@ def agent_tracker(
         return {"jobs": [], "note": f"Tracker read failed: {e}"}
 
 
+_TRACKER_STATUSES = ("Saved", "Applied", "Interview", "Offer", "Rejected")
+
+def _job_fingerprint(company, role, location):
+    """Content-based fingerprint matching the frontend makeJobFingerprint().
+
+    Stable across backend ID rotation so the tracker row keys line up between
+    the UI and the agent proposals."""
+    def norm(s):
+        s = (s or "").lower()
+        s = re.sub(r"[^a-z0-9\s]", "", s)
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
+    return f"{norm(company)}|{norm(role)}|{norm(location)}"
+
+
+def _execute_tracker_mutation(user_id, tool, body):
+    """Apply an auto-approved tracker mutation to Supabase `tracked_jobs`.
+
+    Mirrors the frontend addJob()/updateJobStatus() writes so an `allow`
+    policy actually keeps the tracker in sync (the review overlay only runs
+    `pending` proposals). No-op when Supabase isn't configured."""
+    if not _supabase_configured():
+        return "skipped: SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not set in backend/.env"
+    base = f"{SUPABASE_URL.rstrip('/')}/rest/v1/tracked_jobs"
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+    }
+    company = body.get("company", "")
+    role = body.get("role", "")
+    location = body.get("location") or ""
+    link = body.get("link") or None
+    fingerprint = _job_fingerprint(company, role, location)
+
+    try:
+        if tool == "update_status":
+            status = body.get("status")
+            if status not in _TRACKER_STATUSES:
+                return f"skipped: invalid status {status!r}"
+            url = f"{base}?user_id=eq.{quote_plus(user_id)}&fingerprint=eq.{quote_plus(fingerprint)}"
+            resp = requests.patch(
+                url,
+                headers=headers,
+                json={"status": status, "date_applied": read_db.now().isoformat() if status == "Applied" else None},
+                timeout=15,
+            )
+        elif tool == "add_to_tracker":
+            row = {
+                "user_id": user_id,
+                "fingerprint": fingerprint,
+                "company": company,
+                "role": role,
+                "location": location,
+                "link": link,
+                "status": body.get("status") if body.get("status") in _TRACKER_STATUSES else "Saved",
+                "date_added": body.get("date_added") or read_db.now().isoformat(),
+                "date_applied": body.get("date_applied") or None,
+                "notes": body.get("notes") or None,
+            }
+            resp = requests.post(
+                f"{base}?on_conflict=user_id,fingerprint",
+                headers={**headers, "Prefer": "resolution=merge-duplicates,return=minimal"},
+                json=[row],
+                timeout=15,
+            )
+        else:
+            return "skipped: apply is a browser action, no tracker write"
+        if resp.status_code not in (200, 201, 204):
+            return f"tracker write failed: HTTP {resp.status_code} {resp.text[:200]}"
+        return "ok"
+    except requests.RequestException as e:
+        return f"tracker write failed: {e}"
+
+
 @app.get("/agent/resume")
 @limiter.limit("30/minute")
 def agent_resume_get(request: Request, name: str = "", user_id: str = Depends(get_agent_identity)):
@@ -371,7 +447,13 @@ def agent_propose(
     if policy_action == "block":
         raise HTTPException(status_code=403, detail="This agent action is blocked by your policy.")
     status = "approved" if policy_action == "allow" else "pending"
-    proposal_id = read_db.create_agent_proposal(user_id, tool, body, note=payload.get("note"), status=status)
+    note = payload.get("note")
+    record_note = note
+    if status == "approved":
+        exec_result = _execute_tracker_mutation(user_id, tool, body)
+        if exec_result != "ok" and record_note is None:
+            record_note = f"[auto-execute] {exec_result}"
+    proposal_id = read_db.create_agent_proposal(user_id, tool, body, note=record_note, status=status)
     return {
         "proposal_id": proposal_id,
         "status": status,
