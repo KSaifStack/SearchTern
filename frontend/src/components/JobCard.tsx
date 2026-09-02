@@ -16,6 +16,20 @@ export const STATUS_COLORS: Record<JobStatus, string> = {
 
 export const JobCard = ({ job, onClick }: { job: TrackedJob, onClick?: () => void }) => {
     const companyDomain = `${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com`;
+    const addedLabel = (() => {
+        if (job.dateApplied) {
+            return new Date(job.dateApplied).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        }
+        if (!job.dateAdded) return 'Added today';
+        const start = new Date(job.dateAdded);
+        start.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((today.getTime() - start.getTime()) / 86400000);
+        if (diffDays <= 0) return 'Added today';
+        if (diffDays === 1) return 'Added yesterday';
+        return `Added ${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+    })();
     return (
         <div className={`tracker-card card-status-${job.status.toLowerCase()}`} onClick={onClick}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -31,7 +45,7 @@ export const JobCard = ({ job, onClick }: { job: TrackedJob, onClick?: () => voi
             <div className="card-footer">
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{job.location}</span>
                 <span style={{ color: 'var(--text-light)', fontSize: '11px', whiteSpace: 'nowrap', marginLeft: '8px', flexShrink: 0 }}>
-                    {job.dateApplied ? new Date(job.dateApplied).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Added today'}
+                    {addedLabel}
                 </span>
             </div>
         </div>

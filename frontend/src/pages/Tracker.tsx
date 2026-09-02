@@ -204,13 +204,14 @@ function Tracker() {
             return;
         }
 
-        const headers = ["Company", "Role", "Location", "Status", "Date Applied", "Link", "Notes"];
+        const headers = ["Company", "Role", "Location", "Status", "Date Added", "Date Applied", "Link", "Notes"];
         const rows = trackedJobs.map(job => [
             `"${(job.company || '').replace(/"/g, '""')}"`,
             `"${(job.role || '').replace(/"/g, '""')}"`,
             `"${(job.location || '').replace(/"/g, '""')}"`,
             `"${job.status || ''}"`,
-            `"${job.dateApplied || ''}"`,
+            `"${job.dateAdded ? new Date(job.dateAdded).toLocaleDateString('en-CA') : ''}"`,
+            `"${job.dateApplied ? new Date(job.dateApplied).toLocaleDateString('en-CA') : ''}"`,
             `"${(job.link || '').replace(/"/g, '""')}"`,
             `"${(job.notes || '').replace(/"/g, '""')}"`
         ]);

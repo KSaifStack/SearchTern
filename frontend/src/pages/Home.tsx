@@ -80,7 +80,7 @@ function Home() {
                 <div className="stat-item">
                     <Text className="stat-item-title" c="dimmed" size="xs" fw={600} mb={6}>Total Listings</Text>
                     <Text className="stat-item-value" fw={800} c="var(--text-dark)">
-                        {loading ? '—' : jobs.length}
+                        {loading ? '—' : jobs.length.toLocaleString()}
                     </Text>
 
                 </div>
