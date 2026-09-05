@@ -565,6 +565,25 @@ const [agentError, setAgentError] = useState<string | null>(null)
 </div>
                             )}
 
+                        <div className="settings-agent-row">
+                            <div className="settings-agent-info">
+                                <span className="settings-agent-row-title">Agent skill file</span>
+                                <span className="settings-agent-row-desc">
+                                    Download the skill that teaches Claude Code, opencode, or Hermes how to use your key — search jobs, read your tracker and resume, and propose actions you approve in the Agent hub.
+                                    <br />
+                                    Save it as <code>SKILL.md</code> at <code>.opencode/skills/searchtern/</code> (project), <code>~/.config/opencode/skills/searchtern/</code> (global), or <code>~/.claude/skills/searchtern/</code>, then restart your agent.
+                                </span>
+                            </div>
+                            <a
+                                href="/SKILL.md"
+                                download="SKILL.md"
+                                className="settings-btn settings-btn-primary"
+                            >
+                                <DownloadSimple size={16} weight="bold" />
+                                Download skill
+                            </a>
+                        </div>
+
                         {activity.length > 0 && (
                             <div className="settings-agent-activity">
                                 <span className="settings-agent-activity-title">Recent agent activity</span>
