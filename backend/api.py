@@ -9,6 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 import threading
+import time
 import sys
 import logging
 import hashlib
@@ -46,6 +47,14 @@ def _storage_headers():
         "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
     }
 
+# Short-TTL cache for session verification so each unique token is checked
+# against GoTrue at most once per window instead of on every agent call.
+_SIGNIN_CACHE: dict = {}
+_SIGNIN_CACHE_LOCK = threading.Lock()
+_SIGNIN_CACHE_OK_TTL = 60.0
+_SIGNIN_CACHE_BAD_TTL = 10.0
+_SIGNIN_CACHE_MAX = 512
+
 def enforce_signin(request: Request, user_id: str):
     """Signed-in gate for agent management.
 
@@ -59,19 +68,36 @@ def enforce_signin(request: Request, user_id: str):
     token = (request.headers.get("X-Supabase-Token") or "").strip()
     if not token:
         raise HTTPException(status_code=401, detail="Sign in required to manage agents.")
+    now = time.monotonic()
+    with _SIGNIN_CACHE_LOCK:
+        hit = _SIGNIN_CACHE.get(token)
+        sub = hit[1] if hit and hit[0] > now else None
+    if sub is not None:
+        if str(sub) != str(user_id):
+            raise HTTPException(status_code=403, detail="Session does not match this user.")
+        return
     url = f"{SUPABASE_URL.rstrip('/')}/auth/v1/user"
+    resp = None
     try:
         resp = requests.get(
             url,
             headers={"apikey": SUPABASE_SERVICE_ROLE_KEY, "Authorization": f"Bearer {token}"},
             timeout=10,
         )
+        sub = (resp.json() or {}).get("id") if resp.status_code == 200 else None
     except requests.RequestException:
-        raise HTTPException(status_code=401, detail="Could not verify your session.")
-    if resp.status_code != 200:
-        raise HTTPException(status_code=401, detail=f"Session invalid (HTTP {resp.status_code}).")
-    sub = (resp.json() or {}).get("id")
-    if not sub or str(sub) != str(user_id):
+        sub = None
+    with _SIGNIN_CACHE_LOCK:
+        if len(_SIGNIN_CACHE) >= _SIGNIN_CACHE_MAX:
+            _SIGNIN_CACHE.clear()
+        _SIGNIN_CACHE[token] = (now + (_SIGNIN_CACHE_OK_TTL if sub else _SIGNIN_CACHE_BAD_TTL), sub)
+    if sub is None:
+        logging.warning(
+            "Session verification failed for user_id=%s against %s (HTTP %s)",
+            user_id, SUPABASE_URL.rstrip("/"), getattr(resp, "status_code", None),
+        )
+        raise HTTPException(status_code=401, detail=f"Session invalid (HTTP {getattr(resp, 'status_code', 'error')}).")
+    if str(sub) != str(user_id):
         raise HTTPException(status_code=403, detail="Session does not match this user.")
 
 def agent_resume_list(user_id):

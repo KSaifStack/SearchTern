@@ -1,4 +1,5 @@
 import type { JobStatus } from "../components/TrackerContext";
+import { supabase } from "../lib/supabase";
 
 const api_key = import.meta.env.VITE_API_KEY;
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -10,8 +11,39 @@ export function setAgentSessionToken(token: string | null) {
     cachedSessionToken = token;
 }
 
-function sessionHeaders(): Record<string, string> {
-    return cachedSessionToken ? { "X-Supabase-Token": cachedSessionToken } : {};
+/**
+ * Single-flight read of the freshest access token. Supabase's background
+ * auto-refresh updates the stored session; `getSession()` returns whatever that
+ * storage currently holds, and we force a refresh when the stored token is near
+ * expiry so stale tokens never reach the backend's session check.
+ */
+let tokenRead: Promise<string | null> | null = null;
+function readSessionToken(): Promise<string | null> {
+    if (!supabase) return Promise.resolve(cachedSessionToken);
+    if (!tokenRead) {
+        tokenRead = (async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                let token = session?.access_token ?? cachedSessionToken ?? null;
+                if (token && session?.expires_at && Date.now() / 1000 >= session.expires_at - 60) {
+                    const refreshed = await supabase.auth.refreshSession();
+                    if (!refreshed.error) {
+                        token = refreshed.data.session?.access_token ?? token;
+                    }
+                }
+                if (token) cachedSessionToken = token;
+                return token;
+            } finally {
+                tokenRead = null;
+            }
+        })();
+    }
+    return tokenRead;
+}
+
+async function sessionHeaders(): Promise<Record<string, string>> {
+    const token = await readSessionToken();
+    return token ? { "X-Supabase-Token": token } : {};
 }
 
 export type AgentTool = "add_to_tracker" | "update_status" | "apply";
@@ -67,7 +99,7 @@ export async function fetchPendingAgentProposals(userId: string): Promise<AgentP
     try {
         const res = await fetch(
             `${BASE_URL}/agent/proposals?user_id=${encodeURIComponent(userId)}&status=pending`,
-            { headers: { ...sessionHeaders(), ...(api_key ? { "X-API-Key": api_key } : {}) } }
+            { headers: { ...(await sessionHeaders()), ...(api_key ? { "X-API-Key": api_key } : {}) } }
         );
         if (!res.ok) return [];
         const data = await res.json();
@@ -87,7 +119,7 @@ export async function decideAgentProposal(
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                ...sessionHeaders(),
+                ...(await sessionHeaders()),
                 ...(api_key ? { "X-API-Key": api_key } : {}),
             },
             body: JSON.stringify({ decision, user_id: userId }),
@@ -109,20 +141,20 @@ export interface AgentKey {
     last_used_at: string | null;
 }
 
-function appHeaders(extra?: Record<string, string>): Record<string, string> {
-    return {
+function appHeaders(extra?: Record<string, string>): Promise<Record<string, string>> {
+    return sessionHeaders().then((sh) => ({
         "Content-Type": "application/json",
-        ...sessionHeaders(),
+        ...sh,
         ...(api_key ? { "X-API-Key": api_key } : {}),
         ...extra,
-    };
+    }));
 }
 
 export async function fetchAgentKeys(userId: string): Promise<AgentKey[]> {
     try {
         const res = await fetch(
             `${BASE_URL}/agent/keys?user_id=${encodeURIComponent(userId)}`,
-            { headers: appHeaders() }
+            { headers: await appHeaders() }
         );
         if (!res.ok) return [];
         const data = await res.json();
@@ -143,7 +175,7 @@ export async function createAgentKey(userId: string, name: string): Promise<Crea
     try {
         const res = await fetch(`${BASE_URL}/agent/keys`, {
             method: "POST",
-            headers: appHeaders(),
+            headers: await appHeaders(),
             body: JSON.stringify({ user_id: userId, name }),
         });
         if (!res.ok) return null;
@@ -158,7 +190,7 @@ export async function revokeAgentKey(userId: string, keyId: number): Promise<boo
     try {
         const res = await fetch(`${BASE_URL}/agent/keys/${keyId}/revoke`, {
             method: "POST",
-            headers: appHeaders(),
+            headers: await appHeaders(),
             body: JSON.stringify({ user_id: userId }),
         });
         return res.ok;
@@ -176,7 +208,7 @@ export async function fetchAgentSettings(userId: string): Promise<AgentSettings 
     try {
         const res = await fetch(
             `${BASE_URL}/agent/settings?user_id=${encodeURIComponent(userId)}`,
-            { headers: appHeaders() }
+            { headers: await appHeaders() }
         );
         if (!res.ok) return null;
         const data = await res.json();
@@ -198,7 +230,7 @@ export async function fetchAgentSettingsProbe(userId: string): Promise<AgentSett
     try {
         const res = await fetch(
             `${BASE_URL}/agent/settings?user_id=${encodeURIComponent(userId)}`,
-            { headers: appHeaders() }
+            { headers: await appHeaders() }
         );
         if (!res.ok) return { settings: null, status: res.status };
         const data = await res.json();
@@ -221,7 +253,7 @@ export async function setAgentSettings(
     try {
         const res = await fetch(`${BASE_URL}/agent/settings`, {
             method: "POST",
-            headers: appHeaders(),
+            headers: await appHeaders(),
             body: JSON.stringify({ user_id: userId, ...patch }),
         });
         if (!res.ok) return null;
@@ -250,7 +282,7 @@ export async function fetchAgentPolicies(userId: string): Promise<AgentPolicy[]>
     try {
         const res = await fetch(
             `${BASE_URL}/agent/policies?user_id=${encodeURIComponent(userId)}`,
-            { headers: appHeaders() }
+            { headers: await appHeaders() }
         );
         if (!res.ok) return [];
         const data = await res.json();
@@ -269,7 +301,7 @@ export async function saveAgentPolicy(
     try {
         const res = await fetch(`${BASE_URL}/agent/policies`, {
             method: "POST",
-            headers: appHeaders(),
+            headers: await appHeaders(),
             body: JSON.stringify({ user_id: userId, tool, action, match }),
         });
         if (!res.ok) return null;
@@ -284,7 +316,7 @@ export async function deleteAgentPolicy(userId: string, policyId: number): Promi
     try {
         const res = await fetch(`${BASE_URL}/agent/policies/${policyId}`, {
             method: "DELETE",
-            headers: appHeaders(),
+            headers: await appHeaders(),
             body: JSON.stringify({ user_id: userId }),
         });
         return res.ok;
@@ -297,7 +329,7 @@ export async function fetchAgentActivity(userId: string): Promise<AgentProposal[
     try {
         const res = await fetch(
             `${BASE_URL}/agent/proposals?user_id=${encodeURIComponent(userId)}`,
-            { headers: appHeaders() }
+            { headers: await appHeaders() }
         );
         if (!res.ok) return [];
         const data = await res.json();
@@ -326,7 +358,7 @@ export async function fetchAgentHealth(userId: string): Promise<AgentHealth | nu
     try {
         const res = await fetch(
             `${BASE_URL}/agent/health?user_id=${encodeURIComponent(userId)}`,
-            { headers: appHeaders() }
+            { headers: await appHeaders() }
         );
         if (!res.ok) return null;
         return await res.json();

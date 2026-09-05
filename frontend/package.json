@@ -19,7 +19,7 @@
     "@mantine/hooks": "^9.2.0",
     "@mantine/notifications": "^9.2.1",
     "@phosphor-icons/react": "^2.1.10",
-    "@supabase/supabase-js": "^2.106.2",
+    "@supabase/supabase-js": "^2.115.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "dayjs": "^1.11.20",
