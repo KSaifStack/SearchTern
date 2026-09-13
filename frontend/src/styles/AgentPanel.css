@@ -610,3 +610,44 @@
     padding: 2px 8px;
     border-radius: 999px;
 }
+
+/* ── Form screenshot thumbnail ── */
+.agent-hub .agent-shot-link { display: inline-block; margin-top: 8px; }
+.agent-hub .agent-shot {
+    display: block;
+    max-width: 100%;
+    max-height: 150px;
+    border-radius: 8px;
+    border: 1px solid var(--border, #dee2e6);
+}
+
+/* ── Answer box for needs-input proposals ── */
+.agent-hub .agent-answer-box { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.agent-hub .agent-answer-field { display: flex; flex-direction: column; gap: 4px; }
+.agent-hub .agent-answer-label { font-size: 0.76rem; font-weight: 700; color: var(--text-light, #495057); }
+.agent-hub .agent-answer-input {
+    border: 1px solid var(--border, #dee2e6);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 0.82rem;
+    background: var(--white);
+    color: var(--text-dark, #1a1b1e);
+    resize: vertical;
+}
+.agent-hub .agent-answer-input::placeholder { color: #adb5bd; }
+.agent-hub .agent-answer-submit {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: none;
+    border-radius: 8px;
+    background: #fcc419;
+    color: #5d4a00;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 6px 12px;
+    cursor: pointer;
+}
+.agent-hub .agent-answer-submit:hover { background: #fab005; }
+.agent-hub .agent-answer-submit:disabled { opacity: 0.5; cursor: default; }

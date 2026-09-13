@@ -141,10 +141,14 @@ def ensure_agent_tables():
                 payload JSONB NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending',
                 note TEXT,
+                answers JSONB,
+                answered_at TIMESTAMPTZ,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 decided_at TIMESTAMPTZ
             )
         """)
+        cur.execute("ALTER TABLE agent_proposals ADD COLUMN IF NOT EXISTS answers JSONB")
+        cur.execute("ALTER TABLE agent_proposals ADD COLUMN IF NOT EXISTS answered_at TIMESTAMPTZ")
         cur.execute(
             "CREATE INDEX IF NOT EXISTS idx_agent_proposals_user ON agent_proposals (user_id, status)"
         )
@@ -284,6 +288,24 @@ def get_agent_proposal(proposal_id):
         row = cur.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def answer_agent_proposal(proposal_id, answers, user_id):
+    """Record a human's answers on a pending needs_input proposal. The proposal
+    STAYS pending — the agent reads the answers and retries; the human still
+    decides the eventual outcome."""
+    ensure_agent_tables()
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE agent_proposals SET answers = %s::jsonb, answered_at = now() "
+            "WHERE id = %s AND user_id = %s AND status = 'pending' RETURNING id",
+            (json.dumps(answers or {}), proposal_id, user_id),
+        )
+        updated = cur.fetchone()
+    conn.commit()
+    conn.close()
+    return updated is not None
 
 
 def decide_agent_proposal(proposal_id, status):
