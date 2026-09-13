@@ -74,6 +74,8 @@ export interface ApplyResult {
     require_cover_letter?: boolean;
     require_transcript?: boolean;
     require_references?: boolean;
+    /** PNG uploaded by the agent (via /agent/artifacts) showing the filled form. */
+    screenshot_url?: string;
 }
 
 export interface AgentProposal {
@@ -91,6 +93,9 @@ export interface AgentProposal {
     };
     status: "pending" | "approved" | "rejected" | "cancelled";
     note?: string | null;
+    /** Human answers to a needs_input proposal (field -> answer) — still pending.*/
+    answers?: Record<string, string>;
+    answered_at?: string | null;
     created_at: string;
     decided_at?: string | null;
 }
@@ -123,6 +128,27 @@ export async function decideAgentProposal(
                 ...(api_key ? { "X-API-Key": api_key } : {}),
             },
             body: JSON.stringify({ decision, user_id: userId }),
+        });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+export async function answerAgentProposal(
+    proposalId: number,
+    answers: Record<string, string>,
+    userId: string
+): Promise<boolean> {
+    try {
+        const res = await fetch(`${BASE_URL}/agent/proposals/${proposalId}/answer`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...(await sessionHeaders()),
+                ...(api_key ? { "X-API-Key": api_key } : {}),
+            },
+            body: JSON.stringify({ answers, user_id: userId }),
         });
         return res.ok;
     } catch {

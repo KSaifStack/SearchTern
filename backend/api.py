@@ -451,6 +451,45 @@ def agent_resume_get(request: Request, name: str = "", user_id: str = Depends(ge
     return {"resumes": rows, "resume": None, "note": note}
 
 
+@app.post("/agent/artifacts")
+@limiter.limit("60/minute")
+def agent_artifact_upload(
+    request: Request,
+    payload: dict = Body(...),
+    user_id: str = Depends(get_agent_identity),
+):
+    """Agent posts a small file (e.g. a dry-run screenshot PNG, base64) into
+    Supabase storage so the Agent hub can thumbnail it next to a proposal."""
+    name = str(payload.get("name") or "").strip()
+    data_b64 = str(payload.get("data_base64") or "").strip()
+    if not name or not data_b64:
+        raise HTTPException(status_code=400, detail="name and data_base64 are required.")
+    name = re.sub(r"[^A-Za-z0-9._\-]+", "-", name)[:120]
+    try:
+        data = base64.b64decode(data_b64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="data_base64 is not valid base64.")
+    if len(data) > 4_000_000:
+        raise HTTPException(status_code=400, detail="artifact too large (4MB max).")
+    if not _supabase_configured():
+        return {"url": None, "name": name, "note": "Uploads require SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in backend/.env."}
+    path = f"{user_id}/{int(time.time())}-{name}"
+    url = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/artifacts/{quote(path, safe='/')}"
+    try:
+        resp = requests.post(
+            url,
+            headers={**_storage_headers(), "Content-Type": "image/png", "x-upsert": "true"},
+            data=data,
+            timeout=30,
+        )
+    except requests.RequestException as e:
+        return {"url": None, "name": name, "note": f"Upload failed: {e}"}
+    if resp.status_code not in (200, 201):
+        return {"url": None, "name": name, "note": f"Upload failed: HTTP {resp.status_code} {resp.text[:200]}"}
+    public_url = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/artifacts/{quote(path, safe='/')}"
+    return {"url": public_url, "name": name, "note": ""}
+
+
 @app.post("/agent/propose")
 @limiter.limit("30/minute")
 def agent_propose(
@@ -528,6 +567,44 @@ def agent_proposal_decision(
     return {"proposal_id": proposal_id, "status": decision, "user_id": proposal["user_id"]}
 
 
+@app.post("/agent/proposals/{proposal_id}/answer")
+@limiter.limit("30/minute")
+def agent_proposal_answer(
+    request: Request,
+    proposal_id: int,
+    payload: dict = Body(...),
+    verified=Depends(verify_key),
+):
+    """Human answers the fields of a needs_input apply proposal from the Agent hub.
+
+    Answers land on the proposal (still `pending`) and the agent's daemon re-runs
+    that job with them on its next cycle. The proposal still needs a final
+    approve/reject once the retry reports back."""
+    user_id = str(payload.get("user_id") or "").strip()
+    enforce_signin(request, user_id)
+    answers = payload.get("answers")
+    if not isinstance(answers, dict) or not answers:
+        raise HTTPException(status_code=400, detail="answers must be an object of {field: value}.")
+    proposal = read_db.get_agent_proposal(proposal_id)
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found.")
+    if str(payload.get("user_id") or "") != proposal["user_id"]:
+        raise HTTPException(status_code=403, detail="Proposal does not belong to this user.")
+    if proposal["status"] != "pending":
+        raise HTTPException(status_code=409, detail=f"Proposal already {proposal['status']}.")
+    if proposal["tool"] != "apply":
+        raise HTTPException(status_code=400, detail="Only apply proposals can be answered.")
+    if not read_db.answer_agent_proposal(proposal_id, answers, user_id):
+        raise HTTPException(status_code=409, detail="Proposal no longer pending.")
+    return {
+        "proposal_id": proposal_id,
+        "status": "pending",
+        "answered": True,
+        "answers_count": len(answers),
+        "user_id": user_id,
+    }
+
+
 # ── Per-user agent keys & settings (managed from SearchTern) ─────────────────〃
 
 @app.get("/agent/keys")
@@ -570,9 +647,10 @@ def agent_keys_revoke(request: Request, key_id: int, payload: dict = Body(...), 
 
 @app.get("/agent/settings")
 @limiter.limit("30/minute")
-def agent_settings_get(request: Request, user_id: str, verified=Depends(verify_key)):
-    enforce_signin(request, user_id)
-    return {"user_id": user_id, **read_db.get_agent_settings(user_id)}
+def agent_settings_get(request: Request, user_id: str = ""):
+    """Read agent settings. App key + user_id (hub) OR a user's Bearer key (agent daemon)."""
+    actor = resolve_actor(request, user_id)
+    return {"user_id": actor, **read_db.get_agent_settings(actor)}
 
 
 @app.post("/agent/settings")
@@ -595,9 +673,10 @@ def agent_settings_set(request: Request, payload: dict = Body(...), verified=Dep
 
 @app.get("/agent/policies")
 @limiter.limit("30/minute")
-def agent_policies_list(request: Request, user_id: str, verified=Depends(verify_key)):
-    enforce_signin(request, user_id)
-    return {"result": read_db.list_agent_policies(user_id)}
+def agent_policies_list(request: Request, user_id: str = ""):
+    """Read agent policies. App key + user_id (hub) OR a user's Bearer key (agent daemon)."""
+    actor = resolve_actor(request, user_id)
+    return {"result": read_db.list_agent_policies(actor)}
 
 
 @app.post("/agent/policies")

@@ -546,24 +546,48 @@ const [agentError, setAgentError] = useState<string | null>(null)
                                     </button>
                                 </div>
 
-                                {agentKeys.length > 0 && (
-                                    <div className="settings-keys">
-                                        {agentKeys.map(k => (
-                                            <div className="settings-key-row" key={k.id}>
-                                                <span className="settings-key-name">{k.name}</span>
-                                                {!k.active && <span className="settings-agent-status settings-agent-status-cancelled">revoked</span>}
-                                                <code className="settings-key-prefix">{k.key_prefix}…</code>
-                                                <span className="settings-key-meta">
-                                                    created {formatDate(k.created_at)}
-                                                    {k.last_used_at ? ` · used ${formatDate(k.last_used_at)}` : ' · never used'}
-                                                </span>
-                                                <button className="settings-btn settings-btn-danger settings-key-revoke" onClick={() => void handleRevokeKey(k.id)}>
-                                                    <Trash size={15} weight="bold" /> Revoke
-                                                </button>
-                                            </div>
-                                        ))}
-</div>
-                            )}
+                                {(() => {
+                                    const activeKeys = agentKeys.filter(k => k.active)
+                                    const revokedKeys = agentKeys.filter(k => !k.active)
+                                    if (agentKeys.length === 0) return null
+                                    return (
+                                        <div className="settings-keys">
+                                            {activeKeys.length > 0 && (
+                                                <>
+                                                    <div className="settings-agent-activity-title">Active keys</div>
+                                                    {activeKeys.map(k => (
+                                                        <div className="settings-key-row" key={k.id}>
+                                                            <span className="settings-key-name">{k.name}</span>
+                                                            <code className="settings-key-prefix">{k.key_prefix}…</code>
+                                                            <span className="settings-key-meta">
+                                                                created {formatDate(k.created_at)}
+                                                                {k.last_used_at ? ` · used ${formatDate(k.last_used_at)}` : ' · never used'}
+                                                            </span>
+                                                            <button className="settings-btn settings-btn-danger settings-key-revoke" onClick={() => void handleRevokeKey(k.id)}>
+                                                                <Trash size={15} weight="bold" /> Revoke
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </>
+                                            )}
+                                            {revokedKeys.length > 0 && (
+                                                <>
+                                                    <div className="settings-agent-activity-title">Revoked keys</div>
+                                                    {revokedKeys.map(k => (
+                                                        <div className="settings-key-row" key={k.id}>
+                                                            <span className="settings-key-name">{k.name}</span>
+                                                            <span className="settings-agent-status settings-agent-status-cancelled">revoked</span>
+                                                            <code className="settings-key-prefix">{k.key_prefix}…</code>
+                                                            <span className="settings-key-meta">
+                                                                created {formatDate(k.created_at)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </>
+                                            )}
+                                        </div>
+                                    )
+                                })()}
 
                         <div className="settings-agent-row">
                             <div className="settings-agent-info">

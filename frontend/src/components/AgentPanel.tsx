@@ -22,6 +22,7 @@ import { makeJobFingerprint } from "../utils/jobFingerprint";
 import {
     fetchPendingAgentProposals,
     decideAgentProposal,
+    answerAgentProposal,
     fetchAgentPolicies,
     saveAgentPolicy,
     deleteAgentPolicy,
@@ -145,6 +146,16 @@ const CONN_WORD: Record<StatusState, string> = {
     checking: "Checking",
 };
 
+/** Click-through thumbnail of the agent's dry-run screenshot, when one was posted. */
+function Shot({ url }: { url?: string }) {
+    if (!url) return null;
+    return (
+        <a href={url} target="_blank" rel="noreferrer" className="agent-shot-link" title="Open screenshot">
+            <img src={url} className="agent-shot" alt="Agent form screenshot" />
+        </a>
+    );
+}
+
 export function AgentPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { user } = useAuth();
     const { addJob, updateJobStatus, isJobTracked } = useTracker();
@@ -159,6 +170,8 @@ export function AgentPanel({ open, onClose }: { open: boolean; onClose: () => vo
     const [keys, setKeys] = useState<AgentKey[]>([]);
     const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
     const [saving, setSaving] = useState<boolean>(false);
+    const [answerDrafts, setAnswerDrafts] = useState<Record<number, Record<string, string>>>({});
+    const [answeringIds, setAnsweringIds] = useState<Set<number>>(new Set());
 
     const [ruleTool, setRuleTool] = useState<AgentTool>("apply");
     const [ruleField, setRuleField] = useState<"location_contains" | "role_contains" | "company_eq">("location_contains");
@@ -263,6 +276,37 @@ export function AgentPanel({ open, onClose }: { open: boolean; onClose: () => vo
             await refreshAll();
         },
         [busyIds, userId, addJob, updateJobStatus, isJobTracked, refreshAll]
+    );
+
+    const submitAnswer = useCallback(
+        async (p: AgentProposal) => {
+            const fields = p.payload.result?.fields_needed ?? [];
+            const answers = answerDrafts[p.id] ?? {};
+            const filled = Object.fromEntries(
+                fields.map((f) => [f, (answers[f] ?? "").trim()]).filter(([, v]) => v !== "")
+            );
+            if (Object.keys(filled).length === 0 || answeringIds.has(p.id)) return;
+            setAnsweringIds((prev) => new Set(prev).add(p.id));
+            setSaving(true);
+            const ok = await answerAgentProposal(p.id, filled, userId);
+            if (ok) {
+                setAnswerDrafts((prev) => { const next = { ...prev }; delete next[p.id]; return next; });
+                notifications.show({
+                    title: "Answers sent to your agent",
+                    message: "It will retry the application using your answers. It comes back here if it still needs something.",
+                    color: "teal",
+                    autoClose: 3500,
+                });
+            }
+            setAnsweringIds((prev) => {
+                const next = new Set(prev);
+                next.delete(p.id);
+                return next;
+            });
+            setSaving(false);
+            await refreshAll();
+        },
+        [answerDrafts, answeringIds, userId, refreshAll]
     );
 
     const setBaseAction = useCallback(
@@ -485,6 +529,7 @@ export function AgentPanel({ open, onClose }: { open: boolean; onClose: () => vo
                                                 <div className="agent-item-body">
                                                     <span className="agent-item-title">{TOOL_META[p.tool]?.title ?? p.tool} · {OUTCOME_META.needs_input.label}</span>
                                                     <span className="agent-item-desc">{describe(p)}</span>
+                                                    {p.payload.result?.screenshot_url && <Shot url={p.payload.result.screenshot_url} />}
                                                     {p.payload.link && (
                                                         <a href={p.payload.link} target="_blank" rel="noreferrer" className="agent-item-link">
                                                             Open listing ↗
@@ -494,6 +539,32 @@ export function AgentPanel({ open, onClose }: { open: boolean; onClose: () => vo
                                                         <Hand size={14} weight="bold" />
                                                         Fields: {p.payload.result?.fields_needed?.join(", ") ?? "a question the agent couldn't answer"}
                                                     </span>
+                                                    {(p.payload.result?.fields_needed ?? []).map((field) => (
+                                                        <div className="agent-answer-field" key={field}>
+                                                            <span className="agent-answer-label">{field}</span>
+                                                            <input
+                                                                className="agent-answer-input"
+                                                                placeholder={`Your answer for "${field}"…`}
+                                                                value={answerDrafts[p.id]?.[field] ?? ""}
+                                                                disabled={answeringIds.has(p.id) || saving}
+                                                                onChange={(e) =>
+                                                                    setAnswerDrafts((prev) => ({
+                                                                        ...prev,
+                                                                        [p.id]: { ...(prev[p.id] ?? {}), [field]: e.target.value },
+                                                                    }))
+                                                                }
+                                                                onKeyDown={(e) => { if (e.key === "Enter") void submitAnswer(p) }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                    <button
+                                                        className="agent-answer-submit"
+                                                        disabled={answeringIds.has(p.id) || saving || !((answerDrafts[p.id] ?? {})[Object.keys(answerDrafts[p.id] ?? {})[0]]?.trim())}
+                                                        onClick={() => void submitAnswer(p)}
+                                                        title="Send your answers — the agent retries the application with them"
+                                                    >
+                                                        {answeringIds.has(p.id) ? "Sending…" : "Answer agent"}
+                                                    </button>
                                                 </div>
                                                 <div className="agent-item-actions agent-item-actions-wide">
                                                     <button

@@ -181,6 +181,31 @@ NON_US_COUNTRIES = [
 
 US_MARKERS = ["united states", "usa", "u.s.a.", "america", "states"]
 
+#: Cheap ATS guess from the apply URL, so agent feeds know the adapter without
+#: resolving the link again. Mirrors the agent's applier/detect.py URL patterns.
+ATS_URL_PATTERNS = (
+    ("greenhouse", r"greenhouse\.io|gh_jid="),
+    ("lever", r"jobs\.lever\.co"),
+    ("ashby", r"jobs\.ashbyhq\.com"),
+    ("workday", r"myworkdayjobs|workday\.com"),
+    ("workable", r"apply\.workable\.com"),
+    ("icims", r"icims\.com"),
+    ("smartrecruiters", r"smartrecruiters\.com"),
+    ("recruitee", r"recruitee\.com"),
+    ("teamtailor", r"teamtailor\.com"),
+    ("bamboohr", r"bamboohr\.com"),
+    ("successfactors", r"successfactors|sap\.cloud"),
+    ("avature", r"avature\.net"),
+    ("tal", r"tal\.net"),
+)
+
+
+def ats_of(url):
+    for ats_id, pat in ATS_URL_PATTERNS:
+        if re.search(pat, url, re.I):
+            return ats_id
+    return ""
+
 
 def is_us_only(location: str) -> bool:
     lower = (location or "").strip().lower()
@@ -234,6 +259,7 @@ def scrape_simplify_readme(url, job_type, season):
                 "link":     cells[-2].find("a")["href"] if cells[-2].find("a") else "N/A",
                 "type":     job_type,
                 "season":   season,
+                "ats":      ats_of(cells[-2].find("a")["href"]) if cells[-2].find("a") else "",
             })
 
     print(f"  {len(jobs)} rows from {job_type} ({season})")
@@ -316,6 +342,7 @@ def scrape_markdown_readme(url, job_type, season):
             "link":     link,
             "type":     job_type,
             "season":   season,
+            "ats":      ats_of(link),
         })
 
     print(f"  {len(jobs)} rows from {job_type} ({season}) [markdown]")
@@ -340,6 +367,7 @@ def scrape_searchtern_listings(url):
             "link":     job.get("link", "N/A"),
             "type":     jt if jt in ("internship", "newgrad") else "internship",
             "season":   "searchtern",
+            "ats":      ats_of(str(job.get("link", "N/A"))),
         })
 
     print(f"  {len(jobs)} rows from SearchTern-Listings")
@@ -407,6 +435,7 @@ def update_database():
             link TEXT,
             type TEXT,
             season TEXT,
+            ats TEXT,
             last_seen_at TIMESTAMPTZ DEFAULT NOW(),
             CONSTRAINT internships_unique_job UNIQUE (company, role, link)
         )
@@ -414,6 +443,7 @@ def update_database():
 
     cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS type TEXT")
     cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS season TEXT")
+    cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS ats TEXT")
     cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT NOW()")
 
     cursor.execute("SELECT 1 FROM pg_constraint WHERE conname = 'internships_unique_job'")
@@ -436,7 +466,7 @@ def update_database():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_location ON internships(location)")
 
     records = [
-        (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], current_run_time)
+        (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], job.get("ats", ""), current_run_time)
         for job in in_range
     ]
 
@@ -447,13 +477,14 @@ def update_database():
     )
 
     upsert_query = """
-        INSERT INTO internships (company, role, location, date, link, type, season, last_seen_at)
+        INSERT INTO internships (company, role, location, date, link, type, season, ats, last_seen_at)
         VALUES %s
         ON CONFLICT (company, role, location, link)
         DO UPDATE SET
             date = EXCLUDED.date,
             type = EXCLUDED.type,
             season = EXCLUDED.season,
+            ats = EXCLUDED.ats,
             last_seen_at = EXCLUDED.last_seen_at
     """
     execute_values(cursor, upsert_query, records, page_size=1000)
