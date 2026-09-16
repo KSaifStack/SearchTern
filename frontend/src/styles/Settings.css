@@ -461,3 +461,25 @@
     color: var(--text-light);
     font-size: 12px;
 }
+
+/* ── Dark theme: key UI & misc hardcoded light colors ──────────────────── */
+[data-theme="dark"] .settings-key-callout {
+    background: rgba(245, 201, 80, 0.08);
+    border-color: rgba(245, 201, 80, 0.28);
+}
+[data-theme="dark"] .settings-key-callout-icon,
+[data-theme="dark"] .settings-key-callout-warn {
+    color: #f6c26b;
+}
+[data-theme="dark"] .settings-key-raw,
+[data-theme="dark"] .settings-key-prefix,
+[data-theme="dark"] .settings-agent-unavailable code {
+    background: rgba(255, 255, 255, 0.07);
+}
+[data-theme="dark"] .settings-btn-danger {
+    border-color: rgba(224, 49, 49, 0.4);
+}
+[data-theme="dark"] .settings-btn-danger:hover {
+    background-color: rgba(224, 49, 49, 0.14);
+    color: #ff8a80;
+}

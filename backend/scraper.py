@@ -23,6 +23,12 @@ SIMPLIFY_SOURCES = [
         "type": "internship",
         "season": "offseason",
     },
+    {
+        "name": "SimplifyJobs — New Grad 2027",
+        "url": "https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/README.md",
+        "type": "newgrad",
+        "season": "2027",
+    },
 ]
 
 MARKDOWN_SOURCES = [
@@ -39,8 +45,14 @@ MARKDOWN_SOURCES = [
         "season": "offseason",
     },
     {
-        "name": "vanshb03 — New Grad 2027",
-        "url": "https://raw.githubusercontent.com/vanshb03/New-Grad-2027/dev/README.md",
+        "name": "speedyapply — 2027 SWE College Jobs (Internships)",
+        "url": "https://raw.githubusercontent.com/speedyapply/2027-SWE-College-Jobs/main/README.md",
+        "type": "internship",
+        "season": "2027",
+    },
+    {
+        "name": "speedyapply — 2027 SWE New Grad USA",
+        "url": "https://raw.githubusercontent.com/speedyapply/2027-SWE-College-Jobs/main/NEW_GRAD_USA.md",
         "type": "newgrad",
         "season": "2027",
     },
@@ -319,16 +331,20 @@ def scrape_markdown_readme(url, job_type, season):
         location = clean_text(raw_location)
         location = re.sub(r"\s*,\s*(,\s*)+", ", ", location).strip(" ,")
 
-        # Link — extract href from the anchor in cell 3
-        link_match = re.search(r'href="([^"]+)"', cells[3])
-        if link_match:
-            link = link_match.group(1)
-        else:
+        # Link — extract href from the last anchor cell (column order varies
+        # across sources: vanshb03 = ...|Apply|Date, speedyapply = ...|Salary|Posting|Age)
+        link = ""
+        for cell in reversed(cells):
+            link_match = re.search(r'href="([^"]+)"', cell)
+            if link_match:
+                link = link_match.group(1)
+                break
+        if not link:
             # Closed listing (🔒) or no link — skip
             continue
 
-        # Date — cell 4, strip HTML
-        raw_date = re.sub(r"<[^>]+>", "", cells[4]).strip()
+        # Date — last cell, strip HTML
+        raw_date = re.sub(r"<[^>]+>", "", cells[-1]).strip()
         date = clean_text(raw_date)
 
         if not company or not role:
@@ -359,6 +375,8 @@ def scrape_searchtern_listings(url):
     jobs = []
     for job in listings:
         jt = job.get("job_type", "internship")
+        if jt in ("new_grad", "new-grad"):
+            jt = "newgrad"
         jobs.append({
             "company":  clean_text(str(job.get("company", ""))),
             "role":     clean_text(str(job.get("role", ""))),
@@ -400,8 +418,14 @@ def update_database():
 
     print(f"Total after dedup: {len(deduped)}")
 
-    us_jobs = [job for job in deduped if is_us_only(job["location"])]
-    filtered = len(deduped) - len(us_jobs)
+    valid_link = [job for job in deduped if (l := str(job.get("link") or "").strip()) and not re.match(r"^n/?a$", l, re.I)]
+    dropped_links = len(deduped) - len(valid_link)
+    if dropped_links:
+        print(f"Removed {dropped_links} listings with empty/N/A links")
+    print(f"Listings with valid links: {len(valid_link)}")
+
+    us_jobs = [job for job in valid_link if is_us_only(job["location"])]
+    filtered = len(valid_link) - len(us_jobs)
     if filtered:
         print(f"Removed {filtered} non-US listings")
     print(f"US-only listings: {len(us_jobs)}")
