@@ -208,13 +208,18 @@ export function matchCompanyMeta(name: string): CompanyMatch | null {
   if (!name) return null
   const key = normalize(name)
   if (METAS[key]) return { ...METAS[key], canonical: findCanonical(key) }
-  // Noisy ATS names: fall back to substring match. Only one direction —
-  // the listing's name contains a canonical key. The reverse (k.includes(key))
-  // mislabels short names that are substrings of long composite keys
-  // (e.g. "ICE" is inside "amazonwebservices").
-  for (const [k, meta] of Object.entries(METAS)) {
-    if (k.length >= 4 && key.includes(k)) {
-      return { ...meta, canonical: k }
+  // Noisy ATS names (e.g. "Google LLC", "Amazon Web Services (AWS)"): match a
+  // canonical entry only as a contiguous run of whole words — never a substring
+  // of a longer word, or "Commercial Metals" becomes "meta" and "Physical
+  // Intelligence" becomes "intel".
+  const words = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+  for (const [raw, meta] of Object.entries(METAS)) {
+    const kw = raw.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+    if (!kw.length) continue
+    for (let i = 0; i + kw.length <= words.length; i++) {
+      if (kw.every((w, j) => words[i + j] === w)) {
+        return { ...meta, canonical: raw }
+      }
     }
   }
   return null
