@@ -2,13 +2,14 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { Table, Pagination, Popover, Text, Select } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth, fetchSources } from "../api/internships"
-import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple, GlobeSimple } from '@phosphor-icons/react';
+import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple, GlobeSimple, Buildings } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
 import { makeJobFingerprint } from "../utils/jobFingerprint"
 import { parseLocation, US_STATES } from "../utils/locationFilter"
 import type { ParsedLocation } from "../utils/locationFilter"
+import { matchCompanyMeta, EMPLOYEE_BUCKETS, inEmployeeBucket } from "../utils/companyMeta"
 
 interface Job {
   id: number
@@ -38,8 +39,11 @@ function Jobs() {
   const [sortOpen, setSortOpen] = useState(false)
   const [typeOpen, setTypeOpen] = useState(false)
   const [locOpen, setLocOpen] = useState(false)
+  const [companyOpen, setCompanyOpen] = useState(false)
   const [countryFilter, setCountryFilter] = useState('')
   const [stateFilter, setStateFilter] = useState('')
+  const [faangOnly, setFaangOnly] = useState(false)
+  const [employeeBucket, setEmployeeBucket] = useState<string>('')
 
   const perPage = 15;
 
@@ -109,6 +113,18 @@ function Jobs() {
     if (stateFilter) jobs = jobs.filter(j => parsedLocations.get(j.id)?.states.includes(stateFilter))
     if (!typeFilters.internship) jobs = jobs.filter(j => j.type === 'newgrad')
     if (!typeFilters.newgrad) jobs = jobs.filter(j => j.type !== 'newgrad')
+    if (faangOnly || employeeBucket) {
+      jobs = jobs.filter(j => {
+        const meta = matchCompanyMeta(j.company)
+        if (!meta) return false
+        if (faangOnly && !meta.faang) return false
+        if (employeeBucket) {
+          const bucket = EMPLOYEE_BUCKETS.find(b => b.label === employeeBucket)
+          if (bucket && !inEmployeeBucket(meta.employees, bucket)) return false
+        }
+        return true
+      })
+    }
     return [...jobs].sort((a, b) => {
       if (sortOrder === 'company-az') return a.company.localeCompare(b.company)
       if (sortOrder === 'company-za') return b.company.localeCompare(a.company)
@@ -118,7 +134,7 @@ function Jobs() {
       const bNum = isNaN(bParsed) ? 999 : bParsed
       return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
-  }, [allJobs, searchText, sortOrder, typeFilters, countryFilter, stateFilter, parsedLocations])
+  }, [allJobs, searchText, sortOrder, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, employeeBucket])
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
@@ -215,7 +231,7 @@ function Jobs() {
         />
 
         <div className="results-header">
-          <p className="result-count">{loading ? 'Loading...' : `${filtered.length} internships found`}</p>
+          <p className="result-count">{loading ? 'Loading...' : `${filtered.length.toLocaleString()} listings found`}</p>
           <div style={{ display: 'flex', gap: 6 }}>
             <Popover opened={sortOpen} onChange={setSortOpen} width={180} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
@@ -305,6 +321,46 @@ function Jobs() {
                       onClick={() => { setCountryFilter(''); setStateFilter(''); setPage(1) }}
                     >
                       Clear location filter
+                    </button>
+                  )}
+                </div>
+              </Popover.Dropdown>
+            </Popover>
+            <Popover opened={companyOpen} onChange={setCompanyOpen} width={230} position="bottom-end" withArrow shadow="md">
+              <Popover.Target>
+                <button className="sort_btn" onClick={() => setCompanyOpen(o => !o)} title="FAANG / company size filter">
+                  <Buildings size={17} weight="bold" />
+                </button>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <div style={{ padding: '4px 0', fontSize: '13px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={faangOnly}
+                      onChange={() => { setFaangOnly(!faangOnly); setPage(1) }}
+                      style={{ accentColor: 'var(--primary-green)' }}
+                    />
+                    FAANG only
+                  </label>
+                  <Select
+                    label="Company size"
+                    placeholder="Any size"
+                    size="xs"
+                    clearable
+                    data={EMPLOYEE_BUCKETS.map(b => ({ value: b.label, label: b.label }))}
+                    value={employeeBucket || null}
+                    onChange={val => { setEmployeeBucket(val || ''); setPage(1) }}
+                    maxDropdownHeight={220}
+                    mt={8}
+                    mb={10}
+                  />
+                  {(faangOnly || employeeBucket) && (
+                    <button
+                      className="btn-clear"
+                      onClick={() => { setFaangOnly(false); setEmployeeBucket(''); setPage(1) }}
+                    >
+                      Clear company filter
                     </button>
                   )}
                 </div>
