@@ -418,8 +418,14 @@ def update_database():
 
     print(f"Total after dedup: {len(deduped)}")
 
-    us_jobs = [job for job in deduped if is_us_only(job["location"])]
-    filtered = len(deduped) - len(us_jobs)
+    valid_link = [job for job in deduped if (l := str(job.get("link") or "").strip()) and not re.match(r"^n/?a$", l, re.I)]
+    dropped_links = len(deduped) - len(valid_link)
+    if dropped_links:
+        print(f"Removed {dropped_links} listings with empty/N/A links")
+    print(f"Listings with valid links: {len(valid_link)}")
+
+    us_jobs = [job for job in valid_link if is_us_only(job["location"])]
+    filtered = len(valid_link) - len(us_jobs)
     if filtered:
         print(f"Removed {filtered} non-US listings")
     print(f"US-only listings: {len(us_jobs)}")
