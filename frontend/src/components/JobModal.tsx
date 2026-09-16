@@ -71,7 +71,13 @@ export const JobModal: React.FC<JobModalProps> = ({ opened, onClose, editingJob,
             role: formData.role,
             location: formData.location,
             status: formData.status,
-            dateApplied: formData.dateApplied ? formData.dateApplied.toISOString().split('T')[0] : '',
+            dateApplied: formData.dateApplied
+                ? [
+                    formData.dateApplied.getFullYear(),
+                    String(formData.dateApplied.getMonth() + 1).padStart(2, '0'),
+                    String(formData.dateApplied.getDate()).padStart(2, '0'),
+                  ].join('-')
+                : '',
             notes: formData.notes,
             link: formData.link
         }, !editingJob);
