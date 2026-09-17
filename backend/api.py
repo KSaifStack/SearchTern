@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import Depends, FastAPI, HTTPException, Request, Header, Response, Body
+from fastapi import Depends, FastAPI, HTTPException, Request, Header, Response, Body, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -23,6 +23,7 @@ from urllib.parse import quote_plus, quote
 sys.path.insert(0, str(Path(__file__).parent))
 import scraper
 import read_db
+import resume_edit
 import os
 
 # Checks for api key
@@ -127,6 +128,16 @@ def agent_resume_fetch(user_id, name):
     if resp.status_code != 200:
         return None, f"Resume fetch failed: HTTP {resp.status_code}"
     return resp.content, resp.headers.get("content-type", "application/octet-stream")
+
+def _active_resume_name(user_id):
+    """Name in the {user_id}/_active marker file, or None."""
+    data, note = agent_resume_fetch(user_id, "_active")
+    if data is None:
+        return None
+    name = data.decode("utf-8", errors="replace").strip()
+    if not _SAFE_PATH_RE.fullmatch(name) or name in (".", ".."):
+        return None
+    return name
 
 def verify_key(x_api_key: str = Header(...)):
     if x_api_key != API_KEY:
@@ -415,9 +426,10 @@ def _execute_tracker_mutation(user_id, tool, body):
 @app.get("/agent/resume")
 @limiter.limit("30/minute")
 def agent_resume_get(request: Request, name: str = "", user_id: str = Depends(get_agent_identity)):
-    """Agents can read the user's current resume (mirrors what the UI uploads).
+    """Agents can read the user's resumes (mirrors what the UI uploads).
 
-    Without ?name it lists the user's synced resumes. With ?name=file.pdf it
+    Without ?name it lists the user's synced resumes and the "active" one
+    (the resume the user selected agents should use). With ?name=file.pdf it
     returns the file's bytes (base64) plus decoded text when it is textual.
     Only reads resumes stored in the `resumes` bucket under {user_id}/."""
     if not _supabase_configured():
@@ -448,7 +460,33 @@ def agent_resume_get(request: Request, name: str = "", user_id: str = Depends(ge
             "note": "",
         }
     rows, note = agent_resume_list(user_id)
-    return {"resumes": rows, "resume": None, "note": note}
+    active = _active_resume_name(user_id)
+    rows = [r for r in rows if not (r.get("name") or "").startswith("_")]
+    return {"resumes": rows, "active": active, "resume": None, "note": note}
+
+
+@app.post("/resume/edit-pdf")
+@limiter.limit("30/minute")
+def resume_edit_pdf(request: Request, file: UploadFile = File(...), original: str = Form(...), edited: str = Form(...)):
+    """Layout-preserving PDF text editor.
+
+    Rewrites the user's PDF in place: only the text lines that changed are
+    covered and redrawn at their original coordinates using the PDF's own
+    font. Stateless — the document is transformed in memory and returned; the
+    server never stores it.
+    """
+    if original.strip() == edited.strip():
+        return Response(content=file.file.read(), media_type="application/pdf")
+    raw = file.file.read()
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="PDF is over 5 MB.")
+    try:
+        out = resume_edit.edit_pdf(raw, original, edited)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:  # noqa: BLE001 - surface a readable message to the UI
+        raise HTTPException(status_code=400, detail=f"Could not edit this PDF: {e}")
+    return Response(content=out, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=\"edited.pdf\""})
 
 
 @app.post("/agent/artifacts")

@@ -6,3 +6,5 @@ slowapi
 apscheduler
 python-dotenv
 psycopg2-binary
+pikepdf
+pdfminer.six

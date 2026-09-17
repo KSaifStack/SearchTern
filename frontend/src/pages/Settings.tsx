@@ -1,20 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { Modal, Switch } from "@mantine/core"
+import { Switch } from "@mantine/core"
 import { notifications } from "@mantine/notifications"
 import {
-    CloudArrowUp,
-    FileText,
-    Eye,
-    DownloadSimple,
     Trash,
     CheckCircle,
     WarningCircle,
     ArrowClockwise,
+    DownloadSimple,
     SignIn,
     UserCircle,
     ShieldCheck,
-    Info,
     Robot,
     Key,
     Plus,
@@ -27,18 +23,6 @@ import { useAuth } from "../components/AuthContext"
 import { useTheme } from "../components/ThemeContext"
 import "../styles/Settings.css"
 import {
-    type ResumeRecord,
-    fileToRecord,
-    getLocalResume,
-    saveLocalResume,
-    clearLocalResume,
-    pushResumeToCloud,
-    removeResumeFromCloud,
-    syncResumeWithCloud,
-    cloudAvailable,
-    isValidResumeFile,
-} from "../services/resumeStorage"
-import {
     fetchAgentKeys,
     createAgentKey,
     revokeAgentKey,
@@ -49,12 +33,6 @@ import {
     type AgentProposal,
     type CreatedAgentKey,
 } from "../api/agent"
-
-function formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
-}
 
 function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString(undefined, {
@@ -79,11 +57,6 @@ function describeActivity(p: AgentProposal): string {
 function Settings() {
     const { user, signOut } = useAuth()
     const { theme, toggleTheme } = useTheme()
-    const [resume, setResume] = useState<ResumeRecord | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [dragActive, setDragActive] = useState(false)
-    const [preview, setPreview] = useState<string | null>(null)
-    const fileInputRef = useRef<HTMLInputElement>(null)
 
     const userId = user?.id ?? ""
     const [agentsAvailable, setAgentsAvailable] = useState<boolean | null>(null)
@@ -95,6 +68,9 @@ const [agentError, setAgentError] = useState<string | null>(null)
     const [creating, setCreating] = useState(false)
     const [createdKey, setCreatedKey] = useState<CreatedAgentKey | null>(null)
     const [activity, setActivity] = useState<AgentProposal[]>([])
+    const [tab, setTab] = useState<"keys" | "activity" | "config">("keys")
+    const [showRevoked, setShowRevoked] = useState(false)
+    const [activityFilter, setActivityFilter] = useState<"all" | "approved" | "rejected">("all")
 
     const displayName: string = user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? ''
     const displayEmail = user?.email ?? user?.user_metadata?.email ?? ''
@@ -130,106 +106,6 @@ const [agentError, setAgentError] = useState<string | null>(null)
         window.addEventListener("focus", onFocus)
         return () => { window.removeEventListener("focus", onFocus) }
     }, [loadAgentData])
-
-    useEffect(() => {
-        let cancelled = false
-        ;(async () => {
-            if (user?.id) {
-                await syncResumeWithCloud(user.id)
-            }
-            const local = await getLocalResume()
-            if (!cancelled) {
-                setResume(local)
-                setLoading(false)
-            }
-        })()
-        return () => { cancelled = true }
-    }, [user?.id])
-
-    useEffect(() => {
-        return () => {
-            if (preview) URL.revokeObjectURL(preview)
-        }
-    }, [preview])
-
-    const handleFile = useCallback(async (file: File | null) => {
-        if (!file) return
-        const error = isValidResumeFile(file)
-        if (error) {
-            notifications.show({ title: 'Invalid File', message: error, color: 'red', icon: <WarningCircle size={18} /> })
-            return
-        }
-        const record = fileToRecord(file)
-        setResume(record)
-        await saveLocalResume(record)
-        if (user?.id && cloudAvailable()) {
-            if (resume && resume.name !== record.name) {
-                await removeResumeFromCloud(user.id, resume)
-            }
-            const pushed = await pushResumeToCloud(user.id, record)
-            if (!pushed.ok) {
-                notifications.show({
-                    title: 'Cloud Sync Failed',
-                    message: 'Saved locally, but could not sync to your account: ' + pushed.error,
-                    color: 'orange',
-                    icon: <WarningCircle size={18} />,
-                })
-                return
-            }
-        }
-        notifications.show({ title: 'Resume Saved', message: record.name, color: 'teal', icon: <CheckCircle size={18} /> })
-    }, [user?.id, resume])
-
-    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault()
-        setDragActive(false)
-        const file = e.dataTransfer.files?.[0]
-        if (file) void handleFile(file)
-    }, [handleFile])
-
-    const handleRemove = useCallback(async () => {
-        if (!resume) return
-        if (user?.id && cloudAvailable()) {
-            await removeResumeFromCloud(user.id, resume)
-        }
-        await clearLocalResume()
-        setResume(null)
-        notifications.show({ title: 'Resume Removed', message: 'Your resume has been deleted.', color: 'blue', icon: <CheckCircle size={18} /> })
-    }, [resume, user?.id])
-
-    const openPreview = useCallback(() => {
-        if (!resume) return
-        const isDoc = /\.docx?$/i.test(resume.name)
-        if (isDoc) {
-            notifications.show({
-                title: 'Preview Not Available',
-                message: 'DOC/DOCX cannot be previewed in the browser. Use Download instead.',
-                color: 'blue',
-                icon: <Info size={18} />,
-            })
-            return
-        }
-        const url = URL.createObjectURL(resume.blob)
-        setPreview(url)
-    }, [resume])
-
-    const downloadResume = useCallback(() => {
-        if (!resume) return
-        const url = URL.createObjectURL(resume.blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = resume.name
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-    }, [resume])
-
-    const dropzoneProps = {
-        onDragOver: (e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); setDragActive(true) },
-        onDragLeave: () => setDragActive(false),
-        onDrop: handleDrop,
-    }
 
     const handleToggleAgents = useCallback(async (enabled: boolean) => {
         const prev = agentEnabled
@@ -305,7 +181,7 @@ const [agentError, setAgentError] = useState<string | null>(null)
         <div className="standard-layout">
             <div className="settings-header">
                 <h2 className="settings-title">Settings</h2>
-                <p className="settings-subtitle">Manage your account and your resume.</p>
+                <p className="settings-subtitle">Manage your account and your AI agents.</p>
             </div>
 
             {/* Account */}
@@ -366,92 +242,6 @@ const [agentError, setAgentError] = useState<string | null>(null)
                 </div>
             </section>
 
-            {/* Resume */}
-            <section className="feature settings-section">
-                <div className="settings-section-header">
-                    <FileText size={24} weight="bold" className="settings-section-icon" />
-                    <h3 className="settings-section-title">Resume</h3>
-                </div>
-
-                {loading ? (
-                    <p className="settings-muted">Loading your resume…</p>
-                ) : resume ? (
-                    <>
-                        <div className="settings-file">
-                            <FileText size={28} weight="bold" className="settings-file-icon" />
-                            <div className="settings-file-info">
-                                <span className="settings-file-name">{resume.name}</span>
-                                <span className="settings-file-meta">
-                                    {formatBytes(resume.size)} · uploaded {formatDate(resume.uploadedAt)}
-                                </span>
-                            </div>
-                            <div className="settings-file-actions">
-                                <button className="settings-btn settings-btn-primary" onClick={openPreview}>
-                                    <Eye size={16} weight="bold" />
-                                    View
-                                </button>
-                                <button className="settings-btn settings-btn-secondary" onClick={downloadResume}>
-                                    <DownloadSimple size={16} weight="bold" />
-                                    Download
-                                </button>
-                                <button className="settings-btn settings-btn-danger" onClick={handleRemove}>
-                                    <Trash size={16} weight="bold" />
-                                    Remove
-                                </button>
-                            </div>
-                        </div>
-                        <p className="settings-muted settings-replace-hint">
-                            To use a different file, drop it below or click to browse.
-                        </p>
-                        <div
-                            className={`settings-dropzone${dragActive ? ' active' : ''}${resume ? ' compact' : ''}`}
-                            onClick={() => fileInputRef.current?.click()}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click() }}
-                            {...dropzoneProps}
-                        >
-                            <ArrowClockwise size={20} weight="bold" className="settings-dropzone-icon" />
-                            <span>Drop to replace, or <em>click to browse</em></span>
-                            <span className="settings-dropzone-hint">PDF, DOC, DOCX, TXT · max 5 MB</span>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <div
-                            className={`settings-dropzone${dragActive ? ' active' : ''}`}
-                            onClick={() => fileInputRef.current?.click()}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click() }}
-                            {...dropzoneProps}
-                        >
-                            <CloudArrowUp size={34} weight="bold" className="settings-dropzone-icon" />
-                            <span className="settings-dropzone-title">Drag &amp; drop your resume here</span>
-                            <span className="settings-dropzone-sub">or click to browse from your computer</span>
-                            <span className="settings-dropzone-hint">PDF, DOC, DOCX, TXT · max 5 MB</span>
-                        </div>
-                        <p className="settings-muted">
-                            {user && cloudAvailable()
-                                ? 'Your resume is synced to your account and available on all your devices.'
-                                : 'Your resume is stored locally on this device.'}
-                        </p>
-                    </>
-                )}
-
-                <input
-                    ref={fileInputRef}
-                    type="file"
-                    hidden
-                    accept=".pdf,.doc,.docx,.txt"
-                    onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        void handleFile(file ?? null)
-                        e.target.value = ''
-                    }}
-                />
-            </section>
-
             {/* AI Agents */}
             <section className="feature settings-section">
                 <div className="settings-section-header">
@@ -480,37 +270,38 @@ const [agentError, setAgentError] = useState<string | null>(null)
                     </div>
                 ) : (
                     <>
-                        <div className="settings-agent-row">
-                                <div className="settings-agent-info">
-                                    <span className="settings-agent-row-title">Allow agents to act on my account</span>
-                                    <span className="settings-agent-row-desc">
-                                        Agents (Hermes, Claude Code, opencode…) can search jobs and propose actions; you approve each one before it happens.
-                                    </span>
-                                </div>
-                                <Switch
-                                    checked={Boolean(agentEnabled)}
-                                    onChange={(e) => { void handleToggleAgents(e.currentTarget.checked) }}
-                                    size="lg"
-                                    color="teal"
-                                />
-                            </div>
-
-                        <div className="settings-agent-row">
-                            <div className="settings-agent-info">
-                                <span className="settings-agent-row-title">Show Agent hub in the tracker</span>
-                                <span className="settings-agent-row-desc">
-                                    Adds an "Agent hub" tab to the Application Tracker where you review actions, manage rules for what the agent may do, and see activity.
-                                </span>
-                            </div>
-                            <Switch
-                                checked={showTrackerTab}
-                                onChange={(e) => { void handleToggleTrackerTab(e.currentTarget.checked) }}
-                                size="lg"
-                                color="teal"
-                            />
+                        <div className="settings-agent-tabs" role="tablist">
+                            {(["keys", "activity", "config"] as const).map(t => (
+                                <button
+                                    key={t}
+                                    className={`settings-agent-tab${tab === t ? " active" : ""}`}
+                                    onClick={() => setTab(t)}
+                                    role="tab"
+                                    aria-selected={tab === t}
+                                >
+                                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                                </button>
+                            ))}
                         </div>
 
-                        {createdKey && (
+                        {tab === "keys" && (
+                            <>
+                                <div className="settings-agent-create">
+                                    <input
+                                        className="settings-key-input"
+                                        placeholder="Key name, e.g. Claude Code laptop"
+                                        value={keyName}
+                                        onChange={(e) => setKeyName(e.target.value)}
+                                        maxLength={60}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateKey() }}
+                                    />
+                                    <button className="settings-btn settings-btn-primary" onClick={() => void handleCreateKey()} disabled={creating}>
+                                        <Plus size={16} weight="bold" />
+                                        {creating ? 'Generating…' : 'Generate key'}
+                                    </button>
+                                </div>
+
+                                {createdKey && (
                                     <div className="settings-key-callout">
                                         <Key size={18} weight="bold" className="settings-key-callout-icon" />
                                         <div className="settings-key-callout-body">
@@ -531,117 +322,168 @@ const [agentError, setAgentError] = useState<string | null>(null)
                                     </div>
                                 )}
 
-                                <div className="settings-agent-create">
-                                    <input
-                                        className="settings-key-input"
-                                        placeholder="Key name, e.g. Claude Code laptop"
-                                        value={keyName}
-                                        onChange={(e) => setKeyName(e.target.value)}
-                                        maxLength={60}
-                                        onKeyDown={(e) => { if (e.key === 'Enter') void handleCreateKey() }}
-                                    />
-                                    <button className="settings-btn settings-btn-primary" onClick={() => void handleCreateKey()} disabled={creating}>
-                                        <Plus size={16} weight="bold" />
-                                        {creating ? 'Generating…' : 'Generate key'}
-                                    </button>
-                                </div>
+                                {agentKeys.length === 0 ? (
+                                    <p className="settings-muted">No keys yet — generate one above.</p>
+                                ) : (
+                                    <>
+                                        <div className="settings-keys-scroll">
+                                            <table className="settings-keys-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Name</th>
+                                                        <th>Created</th>
+                                                        <th>Last Used</th>
+                                                        <th>Status</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {agentKeys.filter(k => k.active).map(k => (
+                                                        <tr key={k.id}>
+                                                            <td>
+                                                                <span className="settings-key-name">{k.name}</span>
+                                                                <code className="settings-key-prefix">{k.key_prefix}…</code>
+                                                            </td>
+                                                            <td>{formatDate(k.created_at)}</td>
+                                                            <td>{k.last_used_at ? formatDate(k.last_used_at) : "Never"}</td>
+                                                            <td><span className="settings-agent-status settings-agent-status-approved">Active</span></td>
+                                                            <td>
+                                                                <button className="settings-btn settings-btn-danger settings-key-revoke" onClick={() => void handleRevokeKey(k.id)}>
+                                                                    <Trash size={15} weight="bold" /> Revoke
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <button className="settings-revoked-toggle" onClick={() => setShowRevoked(v => !v)} aria-expanded={showRevoked}>
+                                            {showRevoked ? 'Hide' : 'Show'} revoked ({agentKeys.filter(k => !k.active).length})
+                                        </button>
+                                        {showRevoked && (
+                                            <div className="settings-keys-scroll">
+                                                <table className="settings-keys-table settings-keys-table-revoked">
+                                                    <tbody>
+                                                        {agentKeys.filter(k => !k.active).map(k => (
+                                                            <tr key={k.id}>
+                                                                <td>
+                                                                    <span className="settings-key-name">{k.name}</span>
+                                                                    <code className="settings-key-prefix">{k.key_prefix}…</code>
+                                                                </td>
+                                                                <td>{formatDate(k.created_at)}</td>
+                                                                <td>{k.last_used_at ? formatDate(k.last_used_at) : "Never"}</td>
+                                                                <td><span className="settings-agent-status settings-agent-status-cancelled">Revoked</span></td>
+                                                                <td></td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </>
+                        )}
 
+                        {tab === "activity" && (
+                            <>
+                                <div className="settings-activity-pills">
+                                    {(["all", "approved", "rejected"] as const).map(f => (
+                                        <button
+                                            key={f}
+                                            className={`settings-activity-pill${activityFilter === f ? " active" : ""}`}
+                                            onClick={() => setActivityFilter(f)}
+                                        >
+                                            {f.charAt(0).toUpperCase() + f.slice(1)}
+                                        </button>
+                                    ))}
+                                </div>
                                 {(() => {
-                                    const activeKeys = agentKeys.filter(k => k.active)
-                                    const revokedKeys = agentKeys.filter(k => !k.active)
-                                    if (agentKeys.length === 0) return null
+                                    const rows = activity.filter(p => activityFilter === "all" || p.status === activityFilter)
+                                    if (rows.length === 0) {
+                                        return <p className="settings-muted">No activity yet.</p>
+                                    }
                                     return (
-                                        <div className="settings-keys">
-                                            {activeKeys.length > 0 && (
-                                                <>
-                                                    <div className="settings-agent-activity-title">Active keys</div>
-                                                    {activeKeys.map(k => (
-                                                        <div className="settings-key-row" key={k.id}>
-                                                            <span className="settings-key-name">{k.name}</span>
-                                                            <code className="settings-key-prefix">{k.key_prefix}…</code>
-                                                            <span className="settings-key-meta">
-                                                                created {formatDate(k.created_at)}
-                                                                {k.last_used_at ? ` · used ${formatDate(k.last_used_at)}` : ' · never used'}
-                                                            </span>
-                                                            <button className="settings-btn settings-btn-danger settings-key-revoke" onClick={() => void handleRevokeKey(k.id)}>
-                                                                <Trash size={15} weight="bold" /> Revoke
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </>
-                                            )}
-                                            {revokedKeys.length > 0 && (
-                                                <>
-                                                    <div className="settings-agent-activity-title">Revoked keys</div>
-                                                    {revokedKeys.map(k => (
-                                                        <div className="settings-key-row" key={k.id}>
-                                                            <span className="settings-key-name">{k.name}</span>
-                                                            <span className="settings-agent-status settings-agent-status-cancelled">revoked</span>
-                                                            <code className="settings-key-prefix">{k.key_prefix}…</code>
-                                                            <span className="settings-key-meta">
-                                                                created {formatDate(k.created_at)}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </>
-                                            )}
+                                        <div className="settings-agent-activity">
+                                            {rows.map(p => (
+                                                <div className="settings-agent-event" key={p.id}>
+                                                    <span className={`settings-agent-status settings-agent-status-${p.status}`}>{p.status}</span>
+                                                    <span className="settings-agent-event-desc">{describeActivity(p) ?? ""}</span>
+                                                    <span className="settings-agent-event-date">
+                                                        {new Date(p.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                            ))}
                                         </div>
                                     )
                                 })()}
+                            </>
+                        )}
 
-                        <div className="settings-agent-row">
-                            <div className="settings-agent-info">
-                                <span className="settings-agent-row-title">Agent skill file</span>
-                                <span className="settings-agent-row-desc">
-                                    Download the skill that teaches Claude Code, opencode, or Hermes how to use your key — search jobs, read your tracker and resume, and propose actions you approve in the Agent hub.
-                                    <br />
-                                    Save it as <code>SKILL.md</code> at <code>.opencode/skills/searchtern/</code> (project), <code>~/.config/opencode/skills/searchtern/</code> (global), or <code>~/.claude/skills/searchtern/</code>, then restart your agent.
-                                </span>
-                            </div>
-                            <a
-                                href="/SKILL.md"
-                                download="SKILL.md"
-                                className="settings-btn settings-btn-primary"
-                            >
-                                <DownloadSimple size={16} weight="bold" />
-                                Download skill
-                            </a>
-                        </div>
-
-                        {activity.length > 0 && (
-                            <div className="settings-agent-activity">
-                                <span className="settings-agent-activity-title">Recent agent activity</span>
-                                {activity.slice(0, 10).map(p => (
-                                    <div className="settings-agent-event" key={p.id}>
-                                        <span className={`settings-agent-status settings-agent-status-${p.status}`}>{p.status}</span>
-                                        <span className="settings-agent-event-desc">{describeActivity(p)}</span>
-                                        <span className="settings-agent-event-date">
-                                            {new Date(p.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        {tab === "config" && (
+                            <>
+                                <div className="settings-agent-row">
+                                    <div className="settings-agent-info">
+                                        <span className="settings-agent-row-title">Allow agents to act on my account</span>
+                                        <span className="settings-agent-row-desc">
+                                            Agents (Hermes, Claude Code, opencode…) can search jobs and propose actions; you approve each one before it happens.
                                         </span>
                                     </div>
-                                ))}
-                            </div>
+                                    <Switch
+                                        checked={Boolean(agentEnabled)}
+                                        onChange={(e) => { void handleToggleAgents(e.currentTarget.checked) }}
+                                        size="lg"
+                                        color="teal"
+                                    />
+                                </div>
+
+                                <div className="settings-agent-row">
+                                    <div className="settings-agent-info">
+                                        <span className="settings-agent-row-title">Show Agent hub in the tracker</span>
+                                        <span className="settings-agent-row-desc">
+                                            Adds an "Agent hub" tab to the Application Tracker where you review actions, manage rules for what the agent may do, and see activity.
+                                        </span>
+                                    </div>
+                                    <Switch
+                                        checked={showTrackerTab}
+                                        onChange={(e) => { void handleToggleTrackerTab(e.currentTarget.checked) }}
+                                        size="lg"
+                                        color="teal"
+                                    />
+                                </div>
+
+                                <div className="settings-skill-card">
+                                    <div className="settings-skill-card-head">
+                                        <Robot size={20} weight="bold" className="settings-section-icon" />
+                                        <div className="settings-skill-card-info">
+                                            <span className="settings-key-callout-title">Agent skill file</span>
+                                            <p className="settings-muted">
+                                                Teaches Claude Code, opencode, or Hermes how to use your key — search jobs, read your tracker and resume, and propose actions you approve in the Agent hub.
+                                            </p>
+                                        </div>
+                                        <a
+                                            href="/SKILL.md"
+                                            download="SKILL.md"
+                                            className="settings-btn settings-btn-primary"
+                                        >
+                                            <DownloadSimple size={16} weight="bold" />
+                                            Download skill
+                                        </a>
+                                    </div>
+                                    <p className="settings-muted settings-install-hint">
+                                        Save it as <code className="settings-key-raw">SKILL.md</code> in one of these paths, then restart your agent:
+                                    </p>
+                                    <div className="settings-install-block">
+                                        <code>.opencode/skills/searchtern/SKILL.md</code>
+                                        <code>~/.config/opencode/skills/searchtern/SKILL.md</code>
+                                        <code>~/.claude/skills/searchtern/SKILL.md</code>
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </>
                 )}
             </section>
-
-            <Modal
-                opened={Boolean(preview)}
-                onClose={() => setPreview(null)}
-                title={`Resume - ${resume?.name ?? ''}`}
-                size="lg"
-                centered
-                styles={{ body: { padding: 0 } }}
-            >
-                {preview && (
-                    <iframe
-                        src={preview}
-                        title="Resume preview"
-                        className="settings-preview-frame"
-                    />
-                )}
-            </Modal>
         </div>
     )
 }
