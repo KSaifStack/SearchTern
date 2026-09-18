@@ -381,9 +381,9 @@ function Resume() {
                         <div ref={pdfWrapRef} className="resume-pdf-wrap">
                             <Document
                                 file={previewUrl}
-                                onLoadSuccess={async ({ numPages: n, pdf }) => {
-                                    setNumPages(n)
-                                    const page = await pdf.getPage(1)
+                                onLoadSuccess={async (doc) => {
+                                    setNumPages(doc.numPages)
+                                    const page = await doc.getPage(1)
                                     const vp = page.getViewport({ scale: 1 })
                                     setPdfAspect(vp.height / vp.width)
                                 }}
