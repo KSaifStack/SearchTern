@@ -341,7 +341,7 @@ function Jobs() {
                       onChange={() => { setFaangOnly(!faangOnly); setPage(1) }}
                       style={{ accentColor: 'var(--primary-green)' }}
                     />
-                    FAANG only
+                    FAANG+ only
                   </label>
                   <Select
                     label="Company size"

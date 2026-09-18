@@ -238,13 +238,6 @@
     border: none;
 }
 
-.resume-agent-note {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 12px;
-}
-
 /* ── AI Agents ───────────────────────────────────────────── */
 .settings-agent-unavailable {
     display: flex;

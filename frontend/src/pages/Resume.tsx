@@ -9,16 +9,13 @@ import {
     CloudArrowUp,
     Files,
     FileText,
-    Eye,
     ArrowSquareOut,
     Plus,
     DownloadSimple,
     Trash,
     CheckCircle,
     WarningCircle,
-    Robot,
     Copy,
-    NotePencil,
     PencilSimpleLine,
     Image as ImageIcon,
     Circle,
@@ -39,7 +36,6 @@ import {
     uniqueResumeName,
 } from "../services/resumeStorage"
 import { useAuth } from "../components/AuthContext"
-import { editPdfInPlace } from "../api/resumeEditor"
 import "../styles/Settings.css"
 import "../styles/Resume.css"
 
@@ -70,18 +66,7 @@ function isPreviewable(name: string): boolean {
     return /\.(pdf|png|jpe?g|gif|svg|txt)$/i.test(name)
 }
 
-function isTextual(name: string): boolean {
-    return /\.txt$/i.test(name)
-}
-
-function baseFileName(name: string): string {
-    const dot = name.lastIndexOf('.')
-    return dot > 0 ? name.slice(0, dot) : name
-}
-
-/** Extract plain text so the resume can be pasted into applications.
- *  PDF text items are clustered by baseline so each returned line matches a
- *  visual line — the same alignment the backend editor keys on. */
+/** Extract plain text so the resume can be pasted into applications. */
 async function resumeToText(r: ResumeRecord): Promise<string | null> {
     const lower = r.name.toLowerCase()
     if (lower.endsWith('.txt')) {
@@ -93,26 +78,7 @@ async function resumeToText(r: ResumeRecord): Promise<string | null> {
         for (let p = 1; p <= doc.numPages; p++) {
             const page = await doc.getPage(p)
             const content = await page.getTextContent()
-            const items = content.items
-                .filter(it => 'str' in it)
-                .map(it => ({
-                    str: it.str as string,
-                    x: (it.transform as number[])[4],
-                    y: (it.transform as number[])[5],
-                    size: Math.max(((it.transform as number[])[3] as number) ?? 0, 1),
-                }))
-            items.sort((a, b) => b.y - a.y || a.x - b.x)
-            const lines: string[] = []
-            let lastY: number | null = null
-            for (const it of items) {
-                if (lastY !== null && Math.abs(lastY - it.y) < 0.5 * it.size) {
-                    lines[lines.length - 1] += ' ' + it.str
-                } else {
-                    lines.push(it.str)
-                }
-                lastY = it.y
-            }
-            pages.push(lines.join('\n'))
+            pages.push(content.items.map(it => ('str' in it ? it.str : '')).join(' '))
         }
         return pages.join('\n\n')
     }
@@ -126,17 +92,13 @@ function Resume() {
     const [loading, setLoading] = useState(true)
     const [dragActive, setDragActive] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const { ref: pdfWrapRef, width: pdfWrapWidth } = useElementSize<HTMLDivElement>()
+    const { ref: pdfWrapRef, width: pdfWrapWidth, height: pdfWrapHeight } = useElementSize<HTMLDivElement>()
     const [numPages, setNumPages] = useState(0)
+    const [pdfAspect, setPdfAspect] = useState<number | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
     const [renameTarget, setRenameTarget] = useState<ResumeRecord | null>(null)
     const [renameName, setRenameName] = useState("")
-    const [editTarget, setEditTarget] = useState<ResumeRecord | null>(null)
-    const [editText, setEditText] = useState("")
-    const [editOriginal, setEditOriginal] = useState("")
-    const [editLoading, setEditLoading] = useState(false)
-    const [saving, setSaving] = useState(false)
 
     const userId = user?.id ?? ""
     const activeResume = resumes.find(r => r.id === activeId) ?? resumes[0] ?? null
@@ -170,6 +132,7 @@ function Resume() {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setPreviewUrl(url)
         setNumPages(0)
+        setPdfAspect(null)
         return () => URL.revokeObjectURL(url)
     }, [activeResume])
 
@@ -297,90 +260,10 @@ function Resume() {
         notifications.show({ title: 'Resume renamed', message: fixed, color: 'teal', icon: <CheckCircle size={18} /> })
     }, [renameTarget, renameName, resumes, userId, activeId])
 
-    const openEdit = useCallback(async (record: ResumeRecord) => {
-        setEditTarget(record)
-        setEditText("")
-        setEditOriginal("")
-        setEditLoading(true)
-        const text = await resumeToText(record)
-        setEditLoading(false)
-        setEditText(text ?? "")
-        setEditOriginal(text ?? "")
-    }, [])
-
-    const saveEdit = useCallback(async () => {
-        if (!editTarget) return
-        setSaving(true)
-        try {
-            if (isTextual(editTarget.name)) {
-                const updated = {
-                    ...editTarget,
-                    blob: new Blob([editText], { type: 'text/plain' }),
-                    type: 'text/plain',
-                    size: new Blob([editText]).size,
-                    uploadedAt: new Date().toISOString(),
-                }
-                await upsertLocalResume(updated)
-                setResumes(prev => prev.map(r => (r.id === updated.id ? updated : r)))
-                if (userId && cloudAvailable()) {
-                    await pushResumeToCloud(userId, updated)
-                    if (activeId === updated.id) {
-                        await setActiveEverywhere(userId, updated)
-                    }
-                }
-                notifications.show({ title: 'Resume saved', message: updated.name, color: 'teal', icon: <CheckCircle size={18} /> })
-            } else if (isPdf(editTarget.name)) {
-                const blob = await editPdfInPlace(editTarget.blob, editTarget.name, editOriginal, editText)
-                const editedName = uniqueResumeName(
-                    resumes.map(r => r.name),
-                    `${baseFileName(editTarget.name)} - edited.pdf`,
-                )
-                const record = fileToRecord(new File([blob], editedName, { type: 'application/pdf' }))
-                await upsertLocalResume(record)
-                setResumes(prev => [record, ...prev])
-                setActiveId(record.id)
-                if (userId && cloudAvailable()) {
-                    await setActiveEverywhere(userId, record)
-                }
-                notifications.show({ title: 'Edited resume saved', message: editedName, color: 'teal', icon: <CheckCircle size={18} /> })
-            } else {
-                const textName = uniqueResumeName(
-                    resumes.map(r => r.name),
-                    `${baseFileName(editTarget.name)} - edited.txt`,
-                )
-                const record = fileToRecord(new File([editText], textName, { type: 'text/plain' }))
-                await upsertLocalResume(record)
-                setResumes(prev => [record, ...prev])
-                setActiveId(record.id)
-                if (userId && cloudAvailable()) {
-                    await setActiveEverywhere(userId, record)
-                }
-                notifications.show({ title: 'Editable copy created', message: textName, color: 'teal', icon: <CheckCircle size={18} /> })
-            }
-            setEditTarget(null)
-        } catch (err) {
-            notifications.show({
-                title: 'Edit failed',
-                message: err instanceof Error
-                    ? err.message
-                    : 'The backend editor could not rewrite this PDF. Is the server running?',
-                color: 'red',
-                icon: <WarningCircle size={18} />,
-            })
-        } finally {
-            setSaving(false)
-        }
-    }, [editTarget, editText, editOriginal, resumes, userId, activeId])
-
     const canPreview = activeResume && isPreviewable(activeResume.name)
 
     return (
         <div className="standard-layout">
-            <div className="settings-header">
-                <h2 className="settings-title">Resume</h2>
-                <p className="settings-subtitle">Keep several resumes. Mark the one you want agents to use, and see it previewed live.</p>
-            </div>
-
             <div className="resume-split">
                 <section className="feature settings-section">
                     <div className="settings-section-header">
@@ -428,7 +311,6 @@ function Resume() {
                                             <div className="resume-row-info">
                                                 <span className="resume-row-name">
                                                     {r.name}
-                                                    {isActive && <span className="resume-row-badge">Active</span>}
                                                 </span>
                                                 <span className="resume-row-meta">
                                                     {formatBytes(r.size)} · uploaded {formatDate(r.uploadedAt)}
@@ -437,10 +319,6 @@ function Resume() {
                                                     <button className="settings-btn settings-btn-secondary" onClick={() => void handleCopy(r)} title="Copy resume text to clipboard">
                                                         <Copy size={15} weight="bold" />
                                                         Copy
-                                                    </button>
-                                                    <button className="settings-btn settings-btn-secondary" onClick={() => void openEdit(r)} title="Edit resume text">
-                                                        <NotePencil size={15} weight="bold" />
-                                                        Edit
                                                     </button>
                                                     <button className="settings-btn settings-btn-secondary" onClick={() => openRename(r)} title="Rename">
                                                         <PencilSimpleLine size={15} weight="bold" />
@@ -470,11 +348,8 @@ function Resume() {
                                 {...dropzoneProps}
                             >
                                 <Plus size={20} weight="bold" className="settings-dropzone-icon" />
-                                <span>Add another resume — drop it here or <em>click to browse</em></span>
+                                <span>Add another resume. Drop it here or <em>click to browse</em></span>
                             </div>
-                            <p className="settings-muted resume-agent-note">
-                                <Robot size={15} weight="bold" /> The Active resume is what your agents are told to use.
-                            </p>
                         </>
                     )}
 
@@ -493,8 +368,7 @@ function Resume() {
 
                 <section className="feature settings-section resume-viewer">
                     <div className="settings-section-header">
-                        <Eye size={24} weight="bold" className="settings-section-icon" />
-                        <h3 className="settings-section-title">Preview {current && `· ${current}`}</h3>
+                        <h3 className="settings-section-title">{current || 'Preview'}</h3>
                         {previewUrl && (
                             <button className="settings-btn settings-btn-ghost resume-open-btn" onClick={() => window.open(previewUrl, "_blank")} title="Open in a new tab">
                                 <ArrowSquareOut size={14} weight="bold" />
@@ -507,7 +381,12 @@ function Resume() {
                         <div ref={pdfWrapRef} className="resume-pdf-wrap">
                             <Document
                                 file={previewUrl}
-                                onLoadSuccess={({ numPages: n }) => setNumPages(n)}
+                                onLoadSuccess={async ({ numPages: n, pdf }) => {
+                                    setNumPages(n)
+                                    const page = await pdf.getPage(1)
+                                    const vp = page.getViewport({ scale: 1 })
+                                    setPdfAspect(vp.height / vp.width)
+                                }}
                                 loading={<p className="settings-muted resume-pdf-status">Loading PDF…</p>}
                                 error={<p className="settings-muted resume-pdf-status">Couldn't load this PDF.</p>}
                             >
@@ -515,7 +394,9 @@ function Resume() {
                                     <Page
                                         key={`${activeResume.id}-${i + 1}`}
                                         pageNumber={i + 1}
-                                        width={Math.floor(pdfWrapWidth) || undefined}
+                                        width={Math.floor(pdfAspect && pdfWrapHeight
+                                            ? Math.min(pdfWrapWidth, (pdfWrapHeight - 32) / pdfAspect)
+                                            : pdfWrapWidth) || undefined}
                                         className="resume-pdf-page"
                                     />
                                 ))}
@@ -565,54 +446,8 @@ function Resume() {
                     />
                     <div className="resume-modal-actions">
                         <button className="settings-btn settings-btn-ghost" onClick={() => setRenameTarget(null)}>Cancel</button>
-                        <button className="settings-btn settings-btn-primary" onClick={() => void saveRename()} disabled={!renameName.trim() || saving}>
+                        <button className="settings-btn settings-btn-primary" onClick={() => void saveRename()} disabled={!renameName.trim()}>
                             Save
-                        </button>
-                    </div>
-                </div>
-            </Modal>
-
-            <Modal
-                opened={Boolean(editTarget)}
-                onClose={() => setEditTarget(null)}
-                title={`Edit ${editTarget?.name ?? ''}`}
-                size="xl"
-                centered
-            >
-                <div className="resume-modal-body">
-                    <textarea
-                        className="resume-edit-area"
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        placeholder="Select text to edit…"
-                        disabled={editLoading || !editText}
-                        spellCheck={false}
-                    />
-                    {isTextual(editTarget?.name ?? "") ? (
-                        <p className="settings-muted">Saving overwrites this resume.</p>
-                    ) : isPdf(editTarget?.name ?? "") ? (
-                        <p className="settings-muted resume-edit-note">
-                            <WarningCircle size={14} weight="bold" /> Saving rewrites this PDF's layout in place — changed lines are re-rendered on the
-                            original document. Large structural rewrites may overlap; the original file is never touched.
-                        </p>
-                    ) : (
-                        <p className="settings-muted">
-                            This file isn't plain text. Saving creates a new <code className="settings-key-raw">.txt</code> resume from the text above;
-                            the original is kept untouched.
-                        </p>
-                    )}
-                    <div className="resume-modal-actions">
-                        <button className="settings-btn settings-btn-ghost" onClick={() => setEditTarget(null)}>Cancel</button>
-                        <button
-                            className="settings-btn settings-btn-primary"
-                            onClick={() => void saveEdit()}
-                            disabled={saving || editLoading || editText.trim().length === 0}
-                        >
-                            {isTextual(editTarget?.name ?? "")
-                                ? 'Save changes'
-                                : isPdf(editTarget?.name ?? '')
-                                    ? 'Save edits to PDF'
-                                    : 'Save as new .txt resume'}
                         </button>
                     </div>
                 </div>
