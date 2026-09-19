@@ -117,6 +117,19 @@
     line-height: 1.4;
 }
 
+.card-title-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    min-width: 0;
+}
+
+.card-title-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 .card-role {
     font-size: 13px;
     color: var(--text-muted);

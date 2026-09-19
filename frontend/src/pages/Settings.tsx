@@ -18,9 +18,11 @@ import {
     X,
     SunDim,
     Moon,
+    FileText,
 } from "@phosphor-icons/react"
 import { useAuth } from "../components/AuthContext"
 import { useTheme } from "../components/ThemeContext"
+import Resume from "./Resume"
 import "../styles/Settings.css"
 import {
     fetchAgentKeys,
@@ -71,6 +73,7 @@ const [agentError, setAgentError] = useState<string | null>(null)
     const [tab, setTab] = useState<"keys" | "activity" | "config">("keys")
     const [showRevoked, setShowRevoked] = useState(false)
     const [activityFilter, setActivityFilter] = useState<"all" | "approved" | "rejected">("all")
+    const [resumeCount, setResumeCount] = useState(0)
 
     const displayName: string = user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? ''
     const displayEmail = user?.email ?? user?.user_metadata?.email ?? ''
@@ -240,6 +243,21 @@ const [agentError, setAgentError] = useState<string | null>(null)
                         color="brand"
                     />
                 </div>
+            </section>
+
+            {/* Resumes */}
+            <section className="feature settings-section">
+                <div className="settings-section-header">
+                    <FileText size={24} weight="bold" className="settings-section-icon" />
+                    <h3 className="settings-section-title">Resumes</h3>
+                </div>
+                <Resume onCountChange={setResumeCount} />
+                {resumeCount > 1 && (
+                    <p className="resume-agent-note">
+                        <Robot size={15} weight="bold" />
+                        Your AI agent uses whichever resume is marked active (filled circle). Set the checkmark on the resume you want sent with applications.
+                    </p>
+                )}
             </section>
 
             {/* AI Agents */}

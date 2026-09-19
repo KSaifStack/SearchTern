@@ -4,6 +4,11 @@
     gap: 15px;
 }
 
+.modal-card-preview .tracker-card {
+    cursor: default;
+    margin-bottom: 0;
+}
+
 .group.grow {
     display: flex;
     gap: 1rem; 

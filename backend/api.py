@@ -238,6 +238,34 @@ def pull_recent(request: Request, response: Response):
         return Response(status_code=304, headers=headers)
     return Response(content=body, media_type="application/json", headers=headers)
 
+#Live listing count — powers the counter shown on job detail pages
+@app.get("/count")
+@limiter.limit("30/minute")
+def listing_count(request: Request):
+    return {"result": len(read_db.recent_internships())}
+
+#Resolve a job's current numeric id from its content fingerprint. Tracked jobs
+#store fingerprints (stable across rescrapes) but detail links need the live id.
+@app.get("/jobs/lookup")
+@limiter.limit("60/minute")
+def job_lookup(request: Request, company: str = "", role: str = "", location: str = ""):
+    if not (company or role or location):
+        raise HTTPException(status_code=400, detail="company, role, or location required.")
+    want = _job_fingerprint(company, role, location)
+    for job in read_db.recent_internships():
+        if _job_fingerprint(job.get("company"), job.get("role"), job.get("location")) == want:
+            return {"result": {"id": job.get("id")}}
+    raise HTTPException(status_code=404, detail="Job not found.")
+
+#Single internship by id — powers the public /jobs/<id> detail pages
+@app.get("/jobs/{job_id}")
+@limiter.limit("60/minute")
+def job_detail(request: Request, job_id: int):
+    job = read_db.get_internship(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return {"result": job}
+
 #Search location
 @app.get("/location")
 @limiter.limit("10/minute")

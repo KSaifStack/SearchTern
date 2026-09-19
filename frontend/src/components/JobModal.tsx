@@ -3,6 +3,7 @@ import { Modal, TextInput, Select, Textarea } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import type { JobStatus, TrackedJob } from './TrackerContext';
+import { JobCard } from './JobCard';
 
 import '../styles/JobModal.css';
 
@@ -83,6 +84,18 @@ export const JobModal: React.FC<JobModalProps> = ({ opened, onClose, editingJob,
         }, !editingJob);
     };
 
+    const previewJob: TrackedJob = {
+        id: 'preview',
+        company: formData.company,
+        role: formData.role,
+        location: formData.location,
+        link: formData.link,
+        status: formData.status,
+        dateAdded: new Date().toISOString(),
+        dateApplied: formData.dateApplied ? formData.dateApplied.toISOString() : undefined,
+        notes: formData.notes,
+    };
+
     return (
         <Modal 
             opened={opened} 
@@ -91,6 +104,9 @@ export const JobModal: React.FC<JobModalProps> = ({ opened, onClose, editingJob,
             size="lg"
         >
             <div className="modal-form-container">
+                <div className="modal-card-preview">
+                    <JobCard job={previewJob} />
+                </div>
                 <TextInput 
                     label="Company Name" 
                     placeholder="e.g. Google" 

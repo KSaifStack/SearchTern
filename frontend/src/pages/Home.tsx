@@ -73,7 +73,7 @@ function Home() {
     const todayCount = jobs.filter(j => parseFloat(String(j.date)) === 0).length;
 
     return (
-        <div className="standard-layout home-layout">
+        <main className="standard-layout home-layout">
 
             {/* ── Stat Bar ── */}
             <section className="feature stat-bar">
@@ -210,7 +210,7 @@ function Home() {
                     </Link>
                 </div>
             </footer>
-        </div>
+        </main>
     );
 }
 

@@ -158,6 +158,12 @@
     letter-spacing: 0.05em;
 }
 
+.stat-item-title,
+.stat-ring-label .mantine-Text-root,
+.stat-ring-legend-item .mantine-Text-root {
+    color: var(--text-muted) !important;
+}
+
 .stat-item-value {
     font-size: 2rem;
 }
