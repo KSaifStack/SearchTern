@@ -22,6 +22,12 @@ function formatPosted(dateValue: string | number): string {
     return `${Math.floor(parsed)} days ago`
 }
 
+function postedDate(dateValue: string | number): string | undefined {
+    const days = parseFloat(String(dateValue))
+    if (isNaN(days)) return undefined
+    return new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10)
+}
+
 function JobDetail() {
     const { id } = useParams()
     const [job, setJob] = useState<Job | null>(null)
@@ -130,6 +136,7 @@ function JobDetail() {
             "@context": "https://schema.org",
             "@type": "JobPosting",
             title: job.role,
+            description: `${job.role} at ${job.company} in ${job.location || 'remote/US'}. ${job.type === 'newgrad' ? 'New-grad' : 'Internship'} opportunity. Apply directly through the employer.`,
             hiringOrganization: { "@type": "Organization", name: job.company },
             jobLocation: {
                 "@type": "Place",
@@ -137,7 +144,7 @@ function JobDetail() {
             },
             directApply: true,
             employmentType: job.type === 'newgrad' ? "FULL_TIME" : job.type === 'internship' ? "INTERN" : undefined,
-            datePosted: undefined,
+            datePosted: postedDate(job.date),
         } as Record<string, unknown>,
     } : {
         title: loading ? "Job Listing | SearchTern" : "Job Not Found | SearchTern",
