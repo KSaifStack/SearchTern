@@ -123,8 +123,8 @@ function JobDetail() {
     }
 
     usePageMeta(job ? {
-        title: `${job.role} at ${job.company} | SearchTern`,
-        description: `${job.role} internship or new-grad role at ${job.company} — ${job.location || 'remote/US'}. Tracked in SearchTern's internship tracker.`,
+        title: `${job.role} | ${job.company} | SearchTern`,
+        description: `${job.role} at ${job.company} in ${job.location || 'remote/US'}. ${job.type === 'newgrad' ? 'New-grad' : 'Internship'} opportunity. Apply directly through the employer.`,
         path: `/jobs/${job.id}`,
         jsonLd: {
             "@context": "https://schema.org",

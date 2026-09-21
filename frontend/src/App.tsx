@@ -43,7 +43,7 @@ function App() {
                                         <>
                                             <RouteMeta meta={{
                                                 title: "SearchTern",
-                                                description: "SearchTern finds and tracks thousands of active software engineering internships and new-grad roles. Search by company, role, or location, and manage every application in one tracker.",
+                                                description: "Find thousands of active software internships and new-grad jobs, then track your applications in one place.",
                                                 path: "/",
                                                 jsonLd: [SITE_ORG, {
                                                     "@context": "https://schema.org",
