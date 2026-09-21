@@ -1,11 +1,7 @@
-import { rewrite } from "@vercel/edge";
-
 export const config = { runtime: "edge" };
 
 const SITE = "https://searchtern.ksaif.dev";
 const API = process.env.VITE_API_URL || "http://127.0.0.1:8000";
-
-const BOT_RE = /discord|slack|twitter|facebook|telegram|whatsapp|linkedin|pinterest|googlebot|bingbot|yandex|baiduspider|duckduckbot|applebot|satori|oEmbed|embed|curl|wget|python-requests|headless/i;
 
 function esc(s: string) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -45,20 +41,17 @@ async function jobMeta(id: string) {
 
 export default async function handler(req: Request) {
     const url = new URL(req.url);
-    const ua = req.headers.get("user-agent") || "";
-
-    if (!BOT_RE.test(ua)) return rewrite(`${SITE}/index.html`);
-
     const id = url.searchParams.get("id") || "";
-    const meta = id ? await jobMeta(id) : null;
-    if (!meta) return rewrite(`${SITE}/index.html`);
 
-    const location = `${SITE}/jobs/${id}`;
-    const html = `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>${esc(meta.title)}</title>
+    const spa = await fetch(`${SITE}/index.html`);
+    const html = await spa.text();
+
+    const meta = id ? await jobMeta(id) : null;
+
+    let head = "";
+    if (meta) {
+        const location = `${SITE}/jobs/${id}`;
+        head = `<title>${esc(meta.title)}</title>
 <meta name="description" content="${esc(meta.description)}" />
 <link rel="canonical" href="${location}" />
 <meta property="og:type" content="website" />
@@ -67,10 +60,9 @@ export default async function handler(req: Request) {
 <meta property="og:url" content="${location}" />
 <meta property="og:image" content="${SITE}/favicon.png" />
 <meta name="twitter:card" content="summary" />
-<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>
-</head>
-<body></body>
-</html>`;
+<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>`;
+    }
 
-    return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+    const injected = html.replace("</head>", `${head}\n</head>`);
+    return new Response(injected, { headers: { "content-type": "text/html; charset=utf-8" } });
 }
