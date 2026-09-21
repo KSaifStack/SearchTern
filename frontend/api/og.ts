@@ -2,6 +2,8 @@ export const config = { runtime: "edge" };
 
 const SITE = "https://searchtern.ksaif.dev";
 const API = process.env.VITE_API_URL || "http://127.0.0.1:8000";
+const DEFAULT_TITLE = "SearchTern — Software Internship & New-Grad Job Tracker";
+const DEFAULT_DESC = "Find thousands of active software internships and new-grad jobs, then track your applications in one place.";
 
 function esc(s: string) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -44,25 +46,23 @@ export default async function handler(req: Request) {
     const id = url.searchParams.get("id") || "";
 
     const spa = await fetch(`${SITE}/index.html`);
-    const html = await spa.text();
+    let html = await spa.text();
 
     const meta = id ? await jobMeta(id) : null;
 
-    let head = "";
+    const title = meta ? meta.title : DEFAULT_TITLE;
+    const desc = meta ? meta.description : DEFAULT_DESC;
+    const pageUrl = meta ? `${SITE}/jobs/${id}` : SITE;
+
+    html = html
+        .replaceAll("__OG_TITLE__", esc(title))
+        .replaceAll("__OG_DESCRIPTION__", esc(desc))
+        .replaceAll("__OG_URL__", pageUrl);
+
     if (meta) {
-        const location = `${SITE}/jobs/${id}`;
-        head = `<title>${esc(meta.title)}</title>
-<meta name="description" content="${esc(meta.description)}" />
-<link rel="canonical" href="${location}" />
-<meta property="og:type" content="website" />
-<meta property="og:title" content="${esc(meta.title)}" />
-<meta property="og:description" content="${esc(meta.description)}" />
-<meta property="og:url" content="${location}" />
-<meta property="og:image" content="${SITE}/favicon.png" />
-<meta name="twitter:card" content="summary" />
-<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>`;
+        html = html.replace("</head>", `<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>\n</head>`);
     }
 
-    const injected = html.replace("</head>", `${head}\n</head>`);
-    return new Response(injected, { headers: { "content-type": "text/html; charset=utf-8" } });
+    return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+
 }
