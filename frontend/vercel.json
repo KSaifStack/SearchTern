@@ -1,7 +1,7 @@
 {
   "rewrites": [
     { "source": "/jobs", "destination": "/index.html" },
-    { "source": "/jobs/:id", "destination": "/index.html" },
+    { "source": "/jobs/:id", "destination": "/api/og?id=:id" },
     { "source": "/tracker", "destination": "/index.html" },
     { "source": "/resume", "destination": "/index.html" },
     { "source": "/auth", "destination": "/index.html" },
