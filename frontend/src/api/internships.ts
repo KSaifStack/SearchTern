@@ -1,7 +1,19 @@
-const api_key = import.meta.env.VITE_API_KEY;
-// 127.0.0.1 not localhost: dev backend binds IPv4-only and the browser may
+const api_key = import.meta.env.VITE_API_KEY;// 127.0.0.1 not localhost: dev backend binds IPv4-only and the browser may
 // resolve "localhost" to ::1 first, which gets connection-refused.
 const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
+// subset of a job row the backend returns for same-company lookups
+export interface Job {
+    id: number
+    company: string
+    role: string
+    location?: string
+    link: string
+    date: number | string
+    type?: string
+    season?: string
+    ats?: string | null
+}
 
 // pulls update Backend data via fastapi (ThinkPad)
 export async function pullUpdateBackend() {
@@ -88,6 +100,19 @@ export async function pullKeyword(searchterm:String){
     return data.result || [];
   } catch (e) {
     console.error("Error fetching keyword search from backend:", e);
+    return [];
+  }
+}
+
+// pulls all open roles at a company (job detail "more from this company" panel)
+// pulls all open roles at a company (job detail "more from this company" panel)
+export async function pullCompany(name: string): Promise<Job[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/company?name=${encodeURIComponent(name)}`);
+    const data = await res.json();
+    return data.result || [];
+  } catch (e) {
+    console.error("Error fetching company listings from backend:", e);
     return [];
   }
 }

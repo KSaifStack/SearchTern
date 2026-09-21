@@ -278,6 +278,12 @@ def location_base(request: Request, searchterm: str):
 def keyword_base(request: Request, searchterm: str):
     return {"result": read_db.find_keywords(searchterm)}
 
+#All open roles at a given company
+@app.get("/company")
+@limiter.limit("10/minute")
+def company_base(request: Request, name: str):
+    return {"result": read_db.search_company(name)}
+
 
 # ── Agent bridge (Hermes / Claude Code / opencode) ────────────────────────────
 # Agents authenticate with the user's PERSONAL key, generated in SearchTern

@@ -2,25 +2,17 @@ import { useEffect, useRef, useState } from "react"
 import { useParams, Link } from "react-router-dom"
 import { Text, Badge, Divider } from "@mantine/core"
 import { notifications } from "@mantine/notifications"
-import { ArrowUpRight, Buildings, MapPin, Copy, BookmarkSimple } from "@phosphor-icons/react"
-import { pullJob, pullCount } from "../api/internships"
+import { ArrowUpRight, Buildings, MapPin, Copy, BookmarkSimple, ShareNetwork } from "@phosphor-icons/react"
+import { pullJob, pullCount, pullCompany, type Job } from "../api/internships"
 import { usePageMeta } from "../utils/seo"
 import { useAuth } from "../components/AuthContext"
+import { useTracker } from "../components/TrackerContext"
+import { matchCompanyMeta, type CompanyMatch } from "../utils/companyMeta"
 import { activeResumeText, getLocalResumes } from "../services/resumeStorage"
 import "../styles/Home.css"
 
-interface Job {
-    id: number
-    company: string
-    role: string
-    location: string
-    date: string
-    link: string
-    type?: string
-    season?: string
-}
-
 const STALE_DAYS = 21
+
 
 function formatPosted(dateValue: string | number): string {
     const parsed = parseFloat(String(dateValue))
@@ -37,8 +29,11 @@ function JobDetail() {
     const [notFound, setNotFound] = useState(false)
     const fetchToken = useRef(0)
     const { user } = useAuth()
+    const { addJob, isJobTracked } = useTracker()
     const [hasResume, setHasResume] = useState(false)
     const [listingCount, setListingCount] = useState<number | null>(null)
+    const [siblings, setSiblings] = useState<Job[]>([])
+    const [meta, setMeta] = useState<CompanyMatch | null>(null)
 
     useEffect(() => {
         let mounted = true
@@ -92,12 +87,40 @@ function JobDetail() {
             if (token !== fetchToken.current) return
             if (res) {
                 setJob(res)
+                setMeta(matchCompanyMeta(res.company))
+                pullCompany(res.company).then(rows => {
+                    if (token !== fetchToken.current) return
+                    setSiblings(rows.filter(s => s.id !== res.id).slice(0, 5))
+                })
             } else {
                 setNotFound(true)
             }
             setLoading(false)
         })
     }, [id])
+
+    const saveToTracker = (job: Job) => {
+        const loc = job.location ?? ''
+        const fp = { company: job.company, role: job.role, location: job.location ?? '', link: job.link }
+        const already = isJobTracked(job.company, job.role, loc)
+        if (!already) {
+            addJob(fp, 'Saved')
+            notifications.show({
+                title: 'Saved',
+                message: `${job.company} added to your tracker`,
+                color: 'teal',
+                icon: <BookmarkSimple size={18} weight="fill" />,
+                autoClose: 3000,
+            })
+        } else {
+            notifications.show({
+                title: 'Already tracked',
+                message: `${job.company} is already in your tracker`,
+                color: 'blue',
+                autoClose: 2500,
+            })
+        }
+    }
 
     usePageMeta(job ? {
         title: `${job.role} at ${job.company} | SearchTern`,
@@ -151,7 +174,16 @@ function JobDetail() {
                 </div>
             </div>
 
-            <Text fw={800} size="lg" c="var(--text-dark)">{job.company}</Text>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '6px 0 14px' }}>
+                <img
+                    src={`https://www.google.com/s2/favicons?domain=${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com&sz=64`}
+                    style={{ width: '28px', height: '28px', borderRadius: '4px' }}
+                    onError={(e) => e.currentTarget.style.display = 'none'}
+                    alt=""
+                />
+                <Text fw={800} size="lg" c="var(--text-dark)">{job.company}</Text>
+                {meta?.faang && <Badge color="green" variant="light" size="sm">FAANG+</Badge>}
+            </div>
             <Text fw={700} size="2.2rem" c="var(--text-dark)" lh={1.2} style={{ marginBottom: 8 }}>{job.role}</Text>
 
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', margin: '8px 0 4px' }}>
@@ -176,6 +208,28 @@ function JobDetail() {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '12px 24px', background: 'var(--button-color)', color: '#fff', borderRadius: 6, fontWeight: 700 }}>
                     Apply on employer site <ArrowUpRight size={18} weight="bold" />
                 </a>
+                    <button
+                        onClick={() => void (async () => {
+                            try {
+                                await navigator.clipboard.writeText(window.location.href)
+                                notifications.show({ title: 'Share link copied', message: 'Paste it in a group chat, Slack, or your notes. Anyone can open it — no account needed.', color: 'teal', icon: <ShareNetwork size={18} weight="bold" />, autoClose: 2500 })
+                            } catch {
+                                notifications.show({ title: 'Copy failed', message: 'Clipboard was blocked by the browser. Copy the URL from the address bar instead.', color: 'red', icon: <ShareNetwork size={18} weight="bold" />, autoClose: 2500 })
+                            }
+                        })()}
+                        className="home-card-link"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '12px 24px', background: 'transparent', color: 'var(--button-color)', borderRadius: 6, fontWeight: 700, border: '1px solid var(--button-color)', cursor: 'pointer' }}>
+                        <ShareNetwork size={18} weight="bold" /> Share
+                    </button>
+
+                {user && (
+                    <button
+                        onClick={() => saveToTracker(job)}
+                        className="home-card-link"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '12px 24px', background: 'transparent', color: 'var(--button-color)', borderRadius: 6, fontWeight: 700, border: '1px solid var(--button-color)', cursor: 'pointer' }}>
+                        <BookmarkSimple size={18} weight={isJobTracked(job.company, job.role, job.location ?? '') ? 'fill' : 'regular'} /> {isJobTracked(job.company, job.role, job.location ?? '') ? 'In tracker' : 'Save to tracker'}
+                    </button>
+                )}
                 {(user || hasResume) && (
                     <button
                         onClick={() => void copyResume()}
@@ -202,6 +256,21 @@ function JobDetail() {
                     </Link>
                 </div>
             )}
+
+            <div className="job-detail-panels">
+                {siblings.length > 0 && (
+                    <div className="job-detail-panel job-detail-panel-wide">
+                        <div className="job-detail-panel-title"><Buildings size={18} weight="bold" /> More roles at {job.company}</div>
+                        <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0' }}>
+                            {siblings.map(s => (
+                                <li key={s.id}>
+                                    <Link to={`/jobs/${s.id}`} className="home-card-link">{s.role} · {s.location}</Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
         </section>
     )
 }

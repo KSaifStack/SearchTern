@@ -126,6 +126,19 @@ def find_keywords(x):
     return [dict(row) for row in rows]
 
 
+# All open roles at a company (for the job detail "more from this company" panel)
+def search_company(x):
+    conn = get_conn()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT * FROM internships WHERE company ILIKE %s ORDER BY date",
+            (f"%{x}%",)
+        )
+        rows = cur.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
 # ── Agent approval bridge ─────────────────────────────────────────────────────
 # Agents never mutate the tracker directly. They POST proposals that a human
 # reviews in the SearchTern UI and approves/rejects before anything executes.
