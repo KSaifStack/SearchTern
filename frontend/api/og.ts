@@ -43,6 +43,15 @@ async function jobMeta(id: string) {
     };
 }
 
+async function spaAssets() {
+    const res = await fetch(`${SITE}/index.html`);
+    if (!res.ok) return { js: [], css: [] };
+    const text = await res.text();
+    const js = [...text.matchAll(/src="(\/assets\/[^"]+\.js)"/g)].map(m => m[1]);
+    const css = [...text.matchAll(/href="(\/assets\/[^"]+\.css)"/g)].map(m => m[1]);
+    return { js, css };
+}
+
 export default async function handler(req: Request) {
     const url = new URL(req.url);
     const ua = req.headers.get("user-agent") || "";
@@ -54,10 +63,14 @@ export default async function handler(req: Request) {
     if (!meta) return rewrite(`${SITE}/index.html`);
 
     const location = `${SITE}/jobs/${id}`;
+    const assets = await spaAssets();
+    const scripts = assets.js.map(s => `<script type="module" crossorigin src="${s}"></script>`).join("");
+    const css = assets.css.map(s => `<link rel="stylesheet" crossorigin href="${s}">`).join("");
     const html = `<!doctype html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>${esc(meta.title)}</title>
 <meta name="description" content="${esc(meta.description)}" />
 <link rel="canonical" href="${location}" />
@@ -68,8 +81,12 @@ export default async function handler(req: Request) {
 <meta property="og:image" content="${SITE}/favicon.png" />
 <meta name="twitter:card" content="summary" />
 <script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>
+${css}
+${scripts}
 </head>
-<body></body>
+<body>
+<div id="root"></div>
+</body>
 </html>`;
 
     return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
