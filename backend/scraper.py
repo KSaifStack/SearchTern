@@ -377,15 +377,18 @@ def scrape_searchtern_listings(url):
         jt = job.get("job_type", "internship")
         if jt in ("new_grad", "new-grad"):
             jt = "newgrad"
+        link = job.get("link")
+        if not link or not str(link).startswith(("http://", "https://")):
+            continue
         jobs.append({
             "company":  clean_text(str(job.get("company", ""))),
             "role":     clean_text(str(job.get("role", ""))),
             "location": clean_text(str(job.get("location", ""))),
             "date":     str(job.get("date", "")).strip(),
-            "link":     job.get("link", "N/A"),
+            "link":     link,
             "type":     jt if jt in ("internship", "newgrad") else "internship",
             "season":   "searchtern",
-            "ats":      ats_of(str(job.get("link", "N/A"))),
+            "ats":      ats_of(link),
         })
 
     print(f"  {len(jobs)} rows from SearchTern-Listings")

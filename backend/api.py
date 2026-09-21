@@ -128,6 +128,16 @@ def agent_resume_fetch(user_id, name):
         return None, f"Resume fetch failed: HTTP {resp.status_code}"
     return resp.content, resp.headers.get("content-type", "application/octet-stream")
 
+def _active_resume_name(user_id):
+    """Name in the {user_id}/_active marker file, or None."""
+    data, note = agent_resume_fetch(user_id, "_active")
+    if data is None:
+        return None
+    name = data.decode("utf-8", errors="replace").strip()
+    if not _SAFE_PATH_RE.fullmatch(name) or name in (".", ".."):
+        return None
+    return name
+
 def verify_key(x_api_key: str = Header(...)):
     if x_api_key != API_KEY:
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -228,6 +238,34 @@ def pull_recent(request: Request, response: Response):
         return Response(status_code=304, headers=headers)
     return Response(content=body, media_type="application/json", headers=headers)
 
+#Live listing count — powers the counter shown on job detail pages
+@app.get("/count")
+@limiter.limit("30/minute")
+def listing_count(request: Request):
+    return {"result": len(read_db.recent_internships())}
+
+#Resolve a job's current numeric id from its content fingerprint. Tracked jobs
+#store fingerprints (stable across rescrapes) but detail links need the live id.
+@app.get("/jobs/lookup")
+@limiter.limit("60/minute")
+def job_lookup(request: Request, company: str = "", role: str = "", location: str = ""):
+    if not (company or role or location):
+        raise HTTPException(status_code=400, detail="company, role, or location required.")
+    want = _job_fingerprint(company, role, location)
+    for job in read_db.recent_internships():
+        if _job_fingerprint(job.get("company"), job.get("role"), job.get("location")) == want:
+            return {"result": {"id": job.get("id")}}
+    raise HTTPException(status_code=404, detail="Job not found.")
+
+#Single internship by id — powers the public /jobs/<id> detail pages
+@app.get("/jobs/{job_id}")
+@limiter.limit("60/minute")
+def job_detail(request: Request, job_id: int):
+    job = read_db.get_internship(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return {"result": job}
+
 #Search location
 @app.get("/location")
 @limiter.limit("10/minute")
@@ -239,6 +277,12 @@ def location_base(request: Request, searchterm: str):
 @limiter.limit("10/minute")
 def keyword_base(request: Request, searchterm: str):
     return {"result": read_db.find_keywords(searchterm)}
+
+#All open roles at a given company
+@app.get("/company")
+@limiter.limit("10/minute")
+def company_base(request: Request, name: str):
+    return {"result": read_db.search_company(name)}
 
 
 # ── Agent bridge (Hermes / Claude Code / opencode) ────────────────────────────
@@ -415,9 +459,10 @@ def _execute_tracker_mutation(user_id, tool, body):
 @app.get("/agent/resume")
 @limiter.limit("30/minute")
 def agent_resume_get(request: Request, name: str = "", user_id: str = Depends(get_agent_identity)):
-    """Agents can read the user's current resume (mirrors what the UI uploads).
+    """Agents can read the user's resumes (mirrors what the UI uploads).
 
-    Without ?name it lists the user's synced resumes. With ?name=file.pdf it
+    Without ?name it lists the user's synced resumes and the "active" one
+    (the resume the user selected agents should use). With ?name=file.pdf it
     returns the file's bytes (base64) plus decoded text when it is textual.
     Only reads resumes stored in the `resumes` bucket under {user_id}/."""
     if not _supabase_configured():
@@ -448,7 +493,9 @@ def agent_resume_get(request: Request, name: str = "", user_id: str = Depends(ge
             "note": "",
         }
     rows, note = agent_resume_list(user_id)
-    return {"resumes": rows, "resume": None, "note": note}
+    active = _active_resume_name(user_id)
+    rows = [r for r in rows if not (r.get("name") or "").startswith("_")]
+    return {"resumes": rows, "active": active, "resume": None, "note": note}
 
 
 @app.post("/agent/artifacts")

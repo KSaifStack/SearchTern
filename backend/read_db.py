@@ -90,6 +90,16 @@ def recent_internships():
     return _cache
 
 
+# Get a single internship by id (for the public job detail pages)
+def get_internship(job_id):
+    conn = get_conn()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SELECT * FROM internships WHERE id = %s", (job_id,))
+        row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 # Search by location
 def search_location(x):
     conn = get_conn()
@@ -109,6 +119,19 @@ def find_keywords(x):
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             "SELECT * FROM internships WHERE role ILIKE %s ORDER BY date",
+            (f"%{x}%",)
+        )
+        rows = cur.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+# All open roles at a company (for the job detail "more from this company" panel)
+def search_company(x):
+    conn = get_conn()
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT * FROM internships WHERE company ILIKE %s ORDER BY date",
             (f"%{x}%",)
         )
         rows = cur.fetchall()

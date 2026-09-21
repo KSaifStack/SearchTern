@@ -1,8 +1,11 @@
 {
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/jobs", "destination": "/index.html" },
+    { "source": "/jobs/:id", "destination": "/index.html" },
+    { "source": "/tracker", "destination": "/index.html" },
+    { "source": "/resume", "destination": "/index.html" },
+    { "source": "/auth", "destination": "/index.html" },
+    { "source": "/privacy", "destination": "/index.html" },
+    { "source": "/settings", "destination": "/index.html" }
   ]
 }

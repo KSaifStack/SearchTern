@@ -55,9 +55,11 @@ Returns the user's saved jobs with their current status (`Saved`, `Applied`, `In
 ### Read the synced resume
 
 ```
-GET /agent/resume            # list available resumes
+GET /agent/resume            # list resumes; use the one marked "active"
 GET /agent/resume?name=<n>   # raw file bytes of one resume
 ```
+
+The response to the bare `GET /agent/resume` includes `"active": "<name>"` — that is the resume the user selected for agents to use. Fetch it with `?name=<active>` whenever you need the resume.
 
 ### Propose an action (human-approved, never direct)
 

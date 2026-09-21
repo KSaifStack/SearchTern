@@ -462,6 +462,166 @@
     font-size: 12px;
 }
 
+/* ── Agent tabs ──────────────────────────────────────────── */
+.settings-agent-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border-slate);
+    margin-bottom: 16px;
+}
+
+.settings-agent-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-agent-tab:hover {
+    color: var(--text-dark);
+}
+
+.settings-agent-tab.active {
+    color: var(--accent-color);
+    border-bottom-color: var(--accent-color);
+}
+
+/* ── Keys table ──────────────────────────────────────────── */
+.settings-keys-scroll {
+    overflow-x: auto;
+    margin-top: 14px;
+}
+
+.settings-keys-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.settings-keys-table th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-light);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-slate);
+}
+
+.settings-keys-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-slate);
+    vertical-align: middle;
+    color: var(--text-dark);
+    white-space: nowrap;
+}
+
+.settings-keys-table .settings-key-prefix {
+    margin-left: 8px;
+}
+
+.settings-keys-table-revoked {
+    opacity: 0.55;
+}
+
+.settings-keys-table-revoked .settings-key-name {
+    color: var(--text-muted);
+}
+
+.settings-revoked-toggle {
+    margin-top: 12px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.settings-revoked-toggle:hover {
+    color: var(--text-dark);
+}
+
+/* ── Activity pills ──────────────────────────────────────── */
+.settings-activity-pills {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.settings-activity-pill {
+    background: var(--menu-hover-bg);
+    border: 1px solid var(--border-medium);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 20px;
+    padding: 4px 12px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-activity-pill.active {
+    background: var(--button-color);
+    border-color: var(--button-color);
+    color: #fff;
+}
+
+/* ── Configuration skill card ────────────────────────────── */
+.settings-skill-card {
+    border: 1px solid var(--border-medium);
+    border-radius: 12px;
+    padding: 18px;
+    background: var(--page-bg);
+    margin-top: 4px;
+}
+
+.settings-skill-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.settings-skill-card-info {
+    flex: 1;
+}
+
+.settings-skill-card-info .settings-muted {
+    margin: 4px 0 0;
+}
+
+.settings-skill-card-head .settings-btn {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.settings-install-hint {
+    margin: 14px 0 10px !important;
+    font-size: 13px;
+}
+
+.settings-install-block {
+    background: rgba(0, 0, 0, 0.045);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.settings-install-block code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 12px;
+    color: var(--text-dark);
+    word-break: break-all;
+}
+
 /* ── Dark theme: key UI & misc hardcoded light colors ──────────────────── */
 [data-theme="dark"] .settings-key-callout {
     background: rgba(245, 201, 80, 0.08);
@@ -482,4 +642,7 @@
 [data-theme="dark"] .settings-btn-danger:hover {
     background-color: rgba(224, 49, 49, 0.14);
     color: #ff8a80;
+}
+[data-theme="dark"] .settings-install-block {
+    background: rgba(255, 255, 255, 0.07);
 }

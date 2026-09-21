@@ -33,7 +33,7 @@ function Navbar() {
         <header>
         <nav>
             <ul className="Logo">
-            <h1><Link to ="/" onClick={() => setMenuOpen(false)}>Search<span className="accent">Tern</span></Link></h1>
+                <h1><Link to="/" onClick={() => setMenuOpen(false)}>Search<span className="accent">Tern</span></Link></h1>
             </ul>
 
             <button
@@ -100,6 +100,7 @@ function Navbar() {
             <div className="nav-auth" ref={dropdownRef}>
                 <button
                     className="nav-profile-trigger"
+                    aria-label="Account menu"
                     onClick={() => setProfileOpen(!profileOpen)}
                 >
                     {user ? (

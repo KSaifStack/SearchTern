@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react"
-import { Table, Pagination, Popover, Text, Select } from '@mantine/core'
+import { Table, Pagination, Popover, Text, Select, Badge } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth, fetchSources } from "../api/internships"
-import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple, GlobeSimple, Buildings } from '@phosphor-icons/react';
+import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple, GlobeSimple, Buildings, Clock } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
@@ -20,6 +20,25 @@ interface Job {
   link: string
   type?: string
   season?: string
+}
+
+const STALE_DAYS = 21
+const RECENCY_OPTIONS = [
+  { days: 0, label: 'Any time' },
+  { days: 7, label: 'Past 7 days' },
+  { days: 14, label: 'Past 14 days' },
+  { days: 30, label: 'Past 30 days' },
+]
+
+function daysAgo(date: string | number): number {
+  const parsed = parseFloat(String(date))
+  return isNaN(parsed) ? 999 : parsed
+}
+function isStale(j: Job): boolean {
+  return daysAgo(j.date) >= STALE_DAYS
+}
+function jobKey(c: string, r: string, l: string): string {
+  return [c, r, l].map(s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim()).join('|')
 }
 
 function Jobs() {
@@ -44,6 +63,9 @@ function Jobs() {
   const [stateFilter, setStateFilter] = useState('')
   const [faangOnly, setFaangOnly] = useState(false)
   const [employeeBucket, setEmployeeBucket] = useState<string>('')
+  const [recencyDays, setRecencyDays] = useState(0)
+  const [hideStale, setHideStale] = useState(() => localStorage.getItem('searchtern-hide-stale') === '1')
+  const [freshnessOpen, setFreshnessOpen] = useState(false)
 
   const perPage = 15;
 
@@ -72,6 +94,15 @@ function Jobs() {
     const map = new Map<number, ParsedLocation>()
     for (const j of allJobs) map.set(j.id, parseLocation(j.location))
     return map
+  }, [allJobs])
+
+  const freshness = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const j of allJobs) {
+      const k = jobKey(j.company, j.role, j.location)
+      counts.set(k, (counts.get(k) || 0) + 1)
+    }
+    return counts
   }, [allJobs])
 
   const countryOptions = useMemo(() => {
@@ -125,6 +156,8 @@ function Jobs() {
         return true
       })
     }
+    if (hideStale) jobs = jobs.filter(j => !isStale(j))
+    if (recencyDays > 0) jobs = jobs.filter(j => daysAgo(j.date) <= recencyDays)
     return [...jobs].sort((a, b) => {
       if (sortOrder === 'company-az') return a.company.localeCompare(b.company)
       if (sortOrder === 'company-za') return b.company.localeCompare(a.company)
@@ -134,7 +167,7 @@ function Jobs() {
       const bNum = isNaN(bParsed) ? 999 : bParsed
       return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
-  }, [allJobs, searchText, sortOrder, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, employeeBucket])
+  }, [allJobs, searchText, sortOrder, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, employeeBucket, hideStale, recencyDays])
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
@@ -256,6 +289,42 @@ function Jobs() {
                 </div>
               </Popover.Dropdown>
             </Popover>
+            <Popover opened={freshnessOpen} onChange={setFreshnessOpen} width={190} position="bottom-end" withArrow shadow="md">
+              <Popover.Target>
+                <button className="sort_btn" onClick={() => setFreshnessOpen(o => !o)} title="Recency filter">
+                  <Clock size={17} weight="bold" />
+                </button>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <div style={{ padding: '4px 0', fontSize: '13px' }}>
+                  {RECENCY_OPTIONS.map(opt => (
+                    <label key={opt.days} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="recency"
+                        checked={recencyDays === opt.days}
+                        onChange={() => { setRecencyDays(opt.days); setPage(1) }}
+                        style={{ accentColor: 'var(--primary-green)' }}
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0 0', cursor: 'pointer', borderTop: '1px solid var(--border-color, rgba(128,128,128,0.2))', marginTop: 4 }}>
+                    <input
+                      type="checkbox"
+                      checked={hideStale}
+                      onChange={() => {
+                        localStorage.setItem('searchtern-hide-stale', hideStale ? '0' : '1')
+                        setHideStale(!hideStale)
+                        setPage(1)
+                      }}
+                      style={{ accentColor: 'var(--primary-green)' }}
+                    />
+                    Hide likely-filled ({STALE_DAYS}+ days)
+                  </label>
+                </div>
+              </Popover.Dropdown>
+            </Popover>
             <Popover opened={typeOpen} onChange={setTypeOpen} width={160} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
                 <button className="sort_btn" onClick={() => setTypeOpen(o => !o)}>
@@ -341,7 +410,7 @@ function Jobs() {
                       onChange={() => { setFaangOnly(!faangOnly); setPage(1) }}
                       style={{ accentColor: 'var(--primary-green)' }}
                     />
-                    FAANG only
+                    FAANG+ only
                   </label>
                   <Select
                     label="Company size"
@@ -387,33 +456,47 @@ function Jobs() {
                 <Table.Td colSpan={4} className="empty-state">No listings found!</Table.Td>
               </Table.Tr>
             ) : (
-              paginated.map(job => (
-                <Table.Tr key={job.id}>
-                  <Table.Td className="company-cell" data-label="Company">
-                    <BookmarkSimpleIcon
-                      size={25}
-                      className="bookmark-icon"
-                      weight={isJobTracked(job.company, job.role, job.location) ? "fill" : "regular"}
-                      color={isJobTracked(job.company, job.role, job.location) ? "var(--accent-color)" : "currentColor"}
-                      onClick={() => toggleSave(job)}
-                    />
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com&sz=32`}
-                      style={{ width: '16px', height: '16px', borderRadius: '2px' }}
-                      onError={(e) => e.currentTarget.style.display = 'none'}
-                      alt=""
-                    />
-                    {job.company}
-                  </Table.Td>
-                  <Table.Td data-label="Role">
-                    <a href={job.link} target="_blank" rel="noreferrer" className="apply-link">
-                      {job.role}
-                    </a>
-                  </Table.Td>
-                  <Table.Td data-label="Location">{job.location}</Table.Td>
-                  <Table.Td data-label="Date">{formatRelativeDate(job.date)}</Table.Td>
-                </Table.Tr>
-              ))
+              paginated.map(job => {
+                const stale = isStale(job)
+                const repost = (freshness.get(jobKey(job.company, job.role, job.location)) || 0) > 1
+                return (
+                  <Table.Tr key={job.id} style={{ opacity: stale ? 0.55 : 1 }}>
+                    <Table.Td className="company-cell" data-label="Company">
+                      <BookmarkSimpleIcon
+                        size={25}
+                        className="bookmark-icon"
+                        weight={isJobTracked(job.company, job.role, job.location) ? "fill" : "regular"}
+                        color={isJobTracked(job.company, job.role, job.location) ? "var(--accent-color)" : "currentColor"}
+                        onClick={() => toggleSave(job)}
+                      />
+                      <div>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <img
+                            src={`https://www.google.com/s2/favicons?domain=${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com&sz=32`}
+                            style={{ width: '16px', height: '16px', borderRadius: '2px' }}
+                            onError={(e) => e.currentTarget.style.display = 'none'}
+                            alt=""
+                          />
+                          {job.company}
+                        </span>
+                        {(stale || repost) && (
+                          <span style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                            {stale && <Badge size="xs" variant="light" color="gray">Likely filled</Badge>}
+                            {repost && <Badge size="xs" variant="light" color="yellow">Reposted</Badge>}
+                          </span>
+                        )}
+                      </div>
+                    </Table.Td>
+                    <Table.Td data-label="Role">
+                      <a href={job.link} target="_blank" rel="noreferrer" className="apply-link">
+                        {job.role}
+                      </a>
+                    </Table.Td>
+                    <Table.Td data-label="Location">{job.location}</Table.Td>
+                    <Table.Td data-label="Date">{formatRelativeDate(job.date)}</Table.Td>
+                  </Table.Tr>
+                )
+              })
             )}
           </Table.Tbody>
         </Table>

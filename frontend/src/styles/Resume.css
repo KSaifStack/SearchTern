@@ -1,0 +1,234 @@
+.resume-layout {
+    max-width: 1500px;
+    width: 100%;
+}
+
+.resume-split {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 20px;
+}
+
+.resume-split > section {
+    display: flex;
+    flex-direction: column;
+}
+
+.resume-viewer .settings-section-header {
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.resume-open-btn {
+    margin-left: auto;
+    padding: 6px 12px;
+}
+
+.resume-viewer-frame {
+    width: 100%;
+    height: 70vh;
+    border: 1px solid var(--border-medium);
+    border-radius: 10px;
+    background: #fff;
+}
+
+.resume-pdf-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 16px;
+    background: var(--border-slate);
+    border: 1px solid var(--border-medium);
+    border-radius: 10px;
+    overflow: auto;
+    height: auto;
+    max-height: calc(100vh - 140px);
+}
+
+.resume-pdf-pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.resume-pdf-page {
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.resume-pdf-status {
+    padding: 24px 0;
+}
+
+/* ── Left panel: empty upload state ──────────────────────── */
+.resume-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 8px;
+}
+
+.resume-empty-note {
+    text-align: center;
+}
+
+/* ── Resume list ─────────────────────────────────────────── */
+.resume-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.resume-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    border: 1px solid var(--border-medium);
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: var(--white);
+}
+
+.resume-row.active {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 1px var(--accent-color);
+}
+
+.resume-select {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 0 0 0;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.resume-select:hover {
+    background: transparent;
+    transform: none;
+    box-shadow: none;
+}
+
+.resume-select.selected {
+    color: var(--accent-color);
+}
+
+.resume-row-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.resume-row-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    overflow-wrap: anywhere;
+}
+
+.resume-row-meta {
+    color: var(--text-muted);
+    font-size: 12.5px;
+}
+
+.resume-row-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.resume-row-actions .settings-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+/* ── "Add another" tile + agent note ─────────────────────── */
+.resume-add-dropzone {
+    margin-top: auto;
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+    padding: 22px 18px;
+}
+
+.resume-add-dropzone .settings-dropzone-icon {
+    margin-bottom: 0;
+}
+
+.resume-agent-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: var(--accent-soft, rgba(29, 158, 117, 0.14));
+    border: 1px solid var(--border-slate);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.resume-agent-note svg {
+    color: var(--accent-color);
+    flex-shrink: 0;
+}
+
+.resume-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.resume-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.resume-modal-actions .settings-btn {
+    padding: 8px 16px;
+}
+
+.resume-viewer-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 48px 24px;
+    text-align: center;
+    border: 1px dashed var(--border-slate);
+    border-radius: 10px;
+    flex: 1;
+    margin-top: 8px;
+}
+
+.resume-viewer-empty-icon {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+@media (max-width: 1000px) {
+    .resume-split {
+        grid-template-columns: 1fr;
+    }
+}
