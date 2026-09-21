@@ -5,10 +5,16 @@ export const config = { runtime: "edge" };
 const SITE = "https://searchtern.ksaif.dev";
 const API = process.env.VITE_API_URL || "http://127.0.0.1:8000";
 
-const BOT_RE = /discord|slack|twitter|facebookexternalhit|facebookbot|telegram|whatsapp|linkedin|pinterest|embeds|curl|python-requests/i;
+const BOT_RE = /discord|slack|twitter|facebook|telegram|whatsapp|linkedin|pinterest|googlebot|bingbot|yandex|baiduspider|duckduckbot|applebot|satori|oEmbed|embed|curl|wget|python-requests|headless/i;
 
 function esc(s: string) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function postedDate(daysValue: string | number): string | undefined {
+    const days = parseFloat(String(daysValue));
+    if (isNaN(days)) return undefined;
+    return new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
 }
 
 async function jobMeta(id: string) {
@@ -17,9 +23,23 @@ async function jobMeta(id: string) {
     const data = await res.json();
     const j = data?.result;
     if (!j) return null;
+    const desc = `${j.role} in ${j.location || "remote/US"}. Apply directly through ${j.company}.`;
     return {
         title: `${j.role} | ${j.company} | SearchTern`,
-        description: `${j.role} in ${j.location || "remote/US"}. Apply directly through ${j.company}.`,
+        description: desc,
+        jsonLd: {
+            "@context": "https://schema.org",
+            "@type": "JobPosting",
+            title: j.role,
+            description: desc,
+            datePosted: postedDate(j.date),
+            hiringOrganization: { "@type": "Organization", name: j.company },
+            jobLocation: {
+                "@type": "Place",
+                address: { "@type": "PostalAddress", addressLocality: j.location },
+            },
+            directApply: true,
+        },
     };
 }
 
@@ -47,7 +67,7 @@ export default async function handler(req: Request) {
 <meta property="og:url" content="${location}" />
 <meta property="og:image" content="${SITE}/favicon.png" />
 <meta name="twitter:card" content="summary" />
-<meta http-equiv="refresh" content="0;url=${location}" />
+<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>
 </head>
 <body></body>
 </html>`;
