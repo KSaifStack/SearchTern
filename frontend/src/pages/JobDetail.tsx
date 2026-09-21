@@ -130,13 +130,13 @@ function JobDetail() {
 
     usePageMeta(job ? {
         title: `${job.role} | ${job.company} | SearchTern`,
-        description: `${job.role} at ${job.company} in ${job.location || 'remote/US'}. ${job.type === 'newgrad' ? 'New-grad' : 'Internship'} opportunity. Apply directly through the employer.`,
+        description: `${job.role} in ${job.location || 'remote/US'}. Apply directly through ${job.company}.`,
         path: `/jobs/${job.id}`,
         jsonLd: {
             "@context": "https://schema.org",
             "@type": "JobPosting",
             title: job.role,
-            description: `${job.role} at ${job.company} in ${job.location || 'remote/US'}. ${job.type === 'newgrad' ? 'New-grad' : 'Internship'} opportunity. Apply directly through the employer.`,
+            description: `${job.role} in ${job.location || 'remote/US'}. Apply directly through ${job.company}.`,
             hiringOrganization: { "@type": "Organization", name: job.company },
             jobLocation: {
                 "@type": "Place",

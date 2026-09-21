@@ -19,7 +19,7 @@ async function jobMeta(id: string) {
     if (!j) return null;
     return {
         title: `${j.role} | ${j.company} | SearchTern`,
-        description: `${j.role} at ${j.company} in ${j.location || "remote/US"}. ${j.type === "newgrad" ? "New-grad" : "Internship"} opportunity. Apply directly through the employer.`,
+        description: `${j.role} in ${j.location || "remote/US"}. Apply directly through ${j.company}.`,
     };
 }
 
