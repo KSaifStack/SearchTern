@@ -18,9 +18,12 @@ import {
     X,
     SunDim,
     Moon,
+    FileText,
+    CaretDown,
 } from "@phosphor-icons/react"
 import { useAuth } from "../components/AuthContext"
 import { useTheme } from "../components/ThemeContext"
+import Resume from "./Resume"
 import "../styles/Settings.css"
 import {
     fetchAgentKeys,
@@ -71,6 +74,8 @@ const [agentError, setAgentError] = useState<string | null>(null)
     const [tab, setTab] = useState<"keys" | "activity" | "config">("keys")
     const [showRevoked, setShowRevoked] = useState(false)
     const [activityFilter, setActivityFilter] = useState<"all" | "approved" | "rejected">("all")
+    const [visibleActivity, setVisibleActivity] = useState(10)
+    const [resumeCount, setResumeCount] = useState(0)
 
     const displayName: string = user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? ''
     const displayEmail = user?.email ?? user?.user_metadata?.email ?? ''
@@ -242,6 +247,21 @@ const [agentError, setAgentError] = useState<string | null>(null)
                 </div>
             </section>
 
+            {/* Resumes */}
+            <section className="feature settings-section">
+                <div className="settings-section-header">
+                    <FileText size={24} weight="bold" className="settings-section-icon" />
+                    <h3 className="settings-section-title">Resumes</h3>
+                </div>
+                <Resume onCountChange={setResumeCount} />
+                {resumeCount > 1 && (
+                    <p className="resume-agent-note">
+                        <Robot size={15} weight="bold" />
+                        Your AI agent uses whichever resume is marked active (filled circle). Set the checkmark on the resume you want sent with applications.
+                    </p>
+                )}
+            </section>
+
             {/* AI Agents */}
             <section className="feature settings-section">
                 <div className="settings-section-header">
@@ -392,29 +412,40 @@ const [agentError, setAgentError] = useState<string | null>(null)
                                         <button
                                             key={f}
                                             className={`settings-activity-pill${activityFilter === f ? " active" : ""}`}
-                                            onClick={() => setActivityFilter(f)}
+                                            onClick={() => { setActivityFilter(f); setVisibleActivity(10) }}
                                         >
                                             {f.charAt(0).toUpperCase() + f.slice(1)}
                                         </button>
                                     ))}
                                 </div>
                                 {(() => {
-                                    const rows = activity.filter(p => activityFilter === "all" || p.status === activityFilter)
+                                    const rows = activity
+                                        .filter(p => activityFilter === "all" || p.status === activityFilter)
+                                        .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
                                     if (rows.length === 0) {
                                         return <p className="settings-muted">No activity yet.</p>
                                     }
+                                    const shown = rows.slice(0, visibleActivity)
                                     return (
-                                        <div className="settings-agent-activity">
-                                            {rows.map(p => (
-                                                <div className="settings-agent-event" key={p.id}>
-                                                    <span className={`settings-agent-status settings-agent-status-${p.status}`}>{p.status}</span>
-                                                    <span className="settings-agent-event-desc">{describeActivity(p) ?? ""}</span>
-                                                    <span className="settings-agent-event-date">
-                                                        {new Date(p.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
+                                        <>
+                                            <div className="settings-agent-activity">
+                                                {shown.map(p => (
+                                                    <div className="settings-agent-event" key={p.id}>
+                                                        <span className={`settings-agent-status settings-agent-status-${p.status}`}>{p.status}</span>
+                                                        <span className="settings-agent-event-desc">{describeActivity(p) ?? ""}</span>
+                                                        <span className="settings-agent-event-date">
+                                                            {new Date(p.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {rows.length > shown.length && (
+                                                <button className="settings-activity-more" onClick={() => setVisibleActivity(v => v + 10)}>
+                                                    <CaretDown size={16} weight="bold" />
+                                                    Older activity
+                                                </button>
+                                            )}
+                                        </>
                                     )
                                 })()}
                             </>

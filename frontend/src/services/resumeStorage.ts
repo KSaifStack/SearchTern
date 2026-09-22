@@ -6,7 +6,13 @@
 // preview and the one agents are told to use. Active is stored locally and
 // mirrored to a small `_active` marker file in the user's cloud bucket so the
 // backend can tell agents which resume is current.
+import { pdfjs } from 'react-pdf';
 import { supabase } from '../lib/supabase';
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url,
+).toString();
 
 export interface ResumeRecord {
     id: string;
@@ -151,6 +157,34 @@ export function isValidResumeFile(file: File): string | null {
         return 'Resume must be under 5 MB.';
     }
     return null;
+}
+
+/** Extract plain text so the resume can be pasted into applications. */
+export async function resumeToText(r: ResumeRecord): Promise<string | null> {
+    const lower = r.name.toLowerCase()
+    if (lower.endsWith('.txt')) {
+        return await r.blob.text()
+    }
+    if (lower.endsWith('.pdf')) {
+        const doc = await pdfjs.getDocument({ data: new Uint8Array(await r.blob.arrayBuffer()) }).promise
+        const pages: string[] = []
+        for (let p = 1; p <= doc.numPages; p++) {
+            const page = await doc.getPage(p)
+            const content = await page.getTextContent()
+            pages.push(content.items.map(it => ('str' in it ? it.str : '')).join(' '))
+        }
+        return pages.join('\n\n')
+    }
+    return null
+}
+
+/** Text of the active local resume (or the most recent one), or null if none. */
+export async function activeResumeText(): Promise<string | null> {
+    const resumes = await getLocalResumes()
+    if (resumes.length === 0) return null
+    const activeId = await getActiveResumeId()
+    const active = resumes.find(r => r.id === activeId) ?? resumes[0]
+    return await resumeToText(active)
 }
 
 // ── Cloud sync (Supabase Storage) ────────────────────────────────────────────

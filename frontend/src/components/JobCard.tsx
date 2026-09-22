@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { notifications } from '@mantine/notifications';
+import { ShareNetwork } from '@phosphor-icons/react';
 import type { JobStatus, TrackedJob } from './TrackerContext';
+import { pullLookup } from '../api/internships';
 
 const PER_PAGE = 5;
 
@@ -30,16 +33,56 @@ export const JobCard = ({ job, onClick }: { job: TrackedJob, onClick?: () => voi
         if (diffDays === 1) return 'Added yesterday';
         return `Added ${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
     })();
+    const titleContent = job.link ? (
+        <a
+            className="card-title-link"
+            href={job.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+        >
+            <h4 className="card-company" style={{ margin: 0 }}>{job.company}</h4>
+        </a>
+    ) : (
+        <h4 className="card-company" style={{ margin: 0 }}>{job.company}</h4>
+    );
+    const handleShare = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        const id = await pullLookup(job.company, job.role, job.location)
+        const url = id ? `${window.location.origin}/jobs/${id}` : (job.link ?? '')
+        if (!url) return
+        try {
+            await navigator.clipboard.writeText(url)
+            notifications.show({
+                title: id ? 'SearchTern link copied' : 'Original link copied',
+                message: id
+                    ? 'Job page link is on your clipboard — paste it anywhere to share.'
+                    : 'This job is no longer listed on SearchTern, so its original link was copied.',
+                color: 'teal',
+            })
+        } catch {
+            notifications.show({ title: 'Copy failed', message: 'Clipboard access was blocked by the browser.', color: 'red' })
+        }
+    };
+
     return (
         <div className={`tracker-card card-status-${job.status.toLowerCase()}`} onClick={onClick}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <img 
+                <img
                     src={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=32`}
                     style={{ width: '16px', height: '16px', borderRadius: '2px' }}
                     onError={(e) => e.currentTarget.style.display = 'none'}
                     alt=""
                 />
-                <h4 className="card-company" style={{ margin: 0 }}>{job.company}</h4>
+                {titleContent}
+                <button
+                    onClick={handleShare}
+                    title="Copy SearchTern job link to share"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)', display: 'inline-flex', padding: 3, flexShrink: 0, marginLeft: 'auto', borderRadius: 4 }}
+                    aria-label={`Share ${job.company}`}
+                >
+                    <ShareNetwork size={15} weight="bold" />
+                </button>
             </div>
             <p className="card-role">{job.role}</p>
             <div className="card-footer">

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { RingProgress, Text, Divider } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import {
     DndContext,
     DragOverlay,
@@ -11,7 +12,7 @@ import {
 } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Robot } from '@phosphor-icons/react';
+import { Robot, UserPlus } from '@phosphor-icons/react';
 import { useTracker } from '../components/TrackerContext';
 import type { JobStatus, TrackedJob } from '../components/TrackerContext';
 import { useAuth } from '../components/AuthContext';
@@ -23,7 +24,7 @@ import { JobModal, STATUSES } from '../components/JobModal';
 import "../styles/Tracker.css";
 
 function Tracker() {
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const { theme } = useTheme();
     const ringTrackColor = theme === 'dark' ? '#2f343b' : '#cdd2da';
 
@@ -128,6 +129,21 @@ function Tracker() {
         window.addEventListener('focus', onFocus);
         return () => { cancelled = true; window.removeEventListener('focus', onFocus); };
     }, [actorUser, user]);
+
+    // Guest notice: one per session, invite signed-out visitors to create an
+    // account so their applications actually persist across devices.
+    React.useEffect(() => {
+        if (authLoading || user) return;
+        if (sessionStorage.getItem('searchtern-guest-nudged')) return;
+        sessionStorage.setItem('searchtern-guest-nudged', '1');
+        notifications.show({
+            title: 'Save your applications',
+            message: 'Sign up for a free account so your tracker data is saved and synced across devices.',
+            color: 'green',
+            autoClose: 8000,
+            icon: <UserPlus size={18} weight="bold" />,
+        });
+    }, [authLoading, user]);
 
     // Red badge on the Agent hub button whenever actions await approval.
     React.useEffect(() => {

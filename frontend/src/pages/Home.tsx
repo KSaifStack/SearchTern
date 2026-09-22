@@ -74,7 +74,7 @@ function Home() {
     const todayCount = jobs.filter(j => parseFloat(String(j.date)) === 0).length;
 
     return (
-        <div className="standard-layout home-layout">
+        <main className="standard-layout home-layout">
 
             {/* ── Stat Bar ── */}
             <section className="feature stat-bar">
@@ -206,16 +206,16 @@ function Home() {
             <footer className="home-footer">
                 <p className="home-footer-text">© 2026 SearchTern</p>
                 <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', alignItems: 'center' }}>
-                    <a href="https://github.com/KSaifStack/SearchTern" target="_blank" rel="noopener noreferrer" className="home-footer-link"> 
-                        GitHub 
-                    </a> 
-                    <Link to="/privacy" className="home-footer-link"> 
-                        Privacy Policy 
-                    </Link> 
-                </div> 
-            </footer> 
-        </div> 
-    ); 
-} 
- 
+                    <a href="https://github.com/KSaifStack/SearchTern" target="_blank" rel="noopener noreferrer" className="home-footer-link">
+                        GitHub
+                    </a>
+                    <Link to="/privacy" className="home-footer-link">
+                        Privacy Policy
+                    </Link>
+                </div>
+            </footer>
+        </main>
+    );
+}
+
 export default Home;

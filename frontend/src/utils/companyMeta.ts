@@ -246,3 +246,11 @@ export const FAANG_COMPANIES = new Set(
     .filter(([, m]) => m.faang)
     .map(([k]) => k)
 )
+export function formatEmployees(n: number): string {
+    return n.toLocaleString('en-US')
+}
+
+export function bucketLabel(employees: number): string | null {
+    const b = EMPLOYEE_BUCKETS.find(x => employees >= x.min && employees <= x.max)
+    return b ? b.label : null
+}

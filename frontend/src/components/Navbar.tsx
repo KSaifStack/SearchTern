@@ -33,7 +33,7 @@ function Navbar() {
         <header>
         <nav>
             <ul className="Logo">
-            <h1><Link to ="/" onClick={() => setMenuOpen(false)}>Search<span className="accent">Tern</span></Link></h1>
+                <h1><Link to="/" onClick={() => setMenuOpen(false)}>Search<span className="accent">Tern</span></Link></h1>
             </ul>
 
             <button
@@ -48,7 +48,6 @@ function Navbar() {
             <ul className={`nav-left${menuOpen ? ' open' : ''}`}>
                 <li><Link to="/jobs" className={location.pathname === '/jobs' ? 'active' : ''} onClick={() => setMenuOpen(false)}>Internships</Link></li>
                 <li><Link to="/tracker" className={location.pathname === '/tracker' ? 'active' : ''} onClick={() => setMenuOpen(false)}>Applications</Link></li>
-                <li><Link to="/resume" className={location.pathname === '/resume' ? 'active' : ''} onClick={() => setMenuOpen(false)}>Resumes</Link></li>
                 
                 {/* Mobile Auth Items */}
                 <li className="mobile-auth-container">
@@ -101,6 +100,7 @@ function Navbar() {
             <div className="nav-auth" ref={dropdownRef}>
                 <button
                     className="nav-profile-trigger"
+                    aria-label="Account menu"
                     onClick={() => setProfileOpen(!profileOpen)}
                 >
                     {user ? (

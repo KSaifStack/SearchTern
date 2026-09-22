@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useElementSize } from "@mantine/hooks"
 import { Modal } from "@mantine/core"
 import { notifications } from "@mantine/notifications"
-import { Document, Page, pdfjs } from "react-pdf"
+import { Document, Page } from "react-pdf"
 import "react-pdf/dist/Page/TextLayer.css"
 import "react-pdf/dist/Page/AnnotationLayer.css"
 import {
@@ -34,15 +34,13 @@ import {
     cloudAvailable,
     isValidResumeFile,
     uniqueResumeName,
+    resumeToText,
 } from "../services/resumeStorage"
 import { useAuth } from "../components/AuthContext"
 import "../styles/Settings.css"
 import "../styles/Resume.css"
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.min.mjs",
-    import.meta.url,
-).toString()
+const MAX_RESUMES = 5
 
 function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
@@ -66,33 +64,14 @@ function isPreviewable(name: string): boolean {
     return /\.(pdf|png|jpe?g|gif|svg|txt)$/i.test(name)
 }
 
-/** Extract plain text so the resume can be pasted into applications. */
-async function resumeToText(r: ResumeRecord): Promise<string | null> {
-    const lower = r.name.toLowerCase()
-    if (lower.endsWith('.txt')) {
-        return await r.blob.text()
-    }
-    if (lower.endsWith('.pdf')) {
-        const doc = await pdfjs.getDocument({ data: new Uint8Array(await r.blob.arrayBuffer()) }).promise
-        const pages: string[] = []
-        for (let p = 1; p <= doc.numPages; p++) {
-            const page = await doc.getPage(p)
-            const content = await page.getTextContent()
-            pages.push(content.items.map(it => ('str' in it ? it.str : '')).join(' '))
-        }
-        return pages.join('\n\n')
-    }
-    return null
-}
-
-function Resume() {
+function Resume({ onCountChange }: { onCountChange?: (count: number) => void }) {
     const { user } = useAuth()
     const [resumes, setResumes] = useState<ResumeRecord[]>([])
     const [activeId, setActiveId] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [dragActive, setDragActive] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const { ref: pdfWrapRef, width: pdfWrapWidth, height: pdfWrapHeight } = useElementSize<HTMLDivElement>()
+    const { ref: pdfWrapRef, width: pdfWrapWidth } = useElementSize<HTMLDivElement>()
     const [numPages, setNumPages] = useState(0)
     const [pdfAspect, setPdfAspect] = useState<number | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -106,6 +85,8 @@ function Resume() {
 
     const resumesRef = useRef(resumes)
     useEffect(() => { resumesRef.current = resumes }, [resumes])
+
+    useEffect(() => { onCountChange?.(resumes.length) }, [resumes, onCountChange])
 
     const loadAll = useCallback(async () => {
         if (userId) {
@@ -141,6 +122,10 @@ function Resume() {
         const error = isValidResumeFile(file)
         if (error) {
             notifications.show({ title: 'Invalid File', message: error, color: 'red', icon: <WarningCircle size={18} /> })
+            return
+        }
+        if (resumes.length >= MAX_RESUMES) {
+            notifications.show({ title: 'Resume limit reached', message: `You can store up to ${MAX_RESUMES} resumes. Remove one first.`, color: 'orange', icon: <WarningCircle size={18} /> })
             return
         }
         const record = fileToRecord(file)
@@ -383,23 +368,29 @@ function Resume() {
                                 file={previewUrl}
                                 onLoadSuccess={async (doc) => {
                                     setNumPages(doc.numPages)
-                                    const page = await doc.getPage(1)
-                                    const vp = page.getViewport({ scale: 1 })
-                                    setPdfAspect(vp.height / vp.width)
+                                    try {
+                                        const page = await doc.getPage(1)
+                                        const vp = page.getViewport({ scale: 1 })
+                                        setPdfAspect(vp.height / vp.width)
+                                    } catch {
+                                        setPdfAspect(1.294)
+                                    }
                                 }}
                                 loading={<p className="settings-muted resume-pdf-status">Loading PDF…</p>}
                                 error={<p className="settings-muted resume-pdf-status">Couldn't load this PDF.</p>}
                             >
-                                {Array.from({ length: numPages }, (_, i) => (
-                                    <Page
-                                        key={`${activeResume.id}-${i + 1}`}
-                                        pageNumber={i + 1}
-                                        width={Math.floor(pdfAspect && pdfWrapHeight
-                                            ? Math.min(pdfWrapWidth, (pdfWrapHeight - 32) / pdfAspect)
-                                            : pdfWrapWidth) || undefined}
-                                        className="resume-pdf-page"
-                                    />
-                                ))}
+                                {pdfAspect ? (
+                                    Array.from({ length: numPages }, (_, i) => (
+                                        <Page
+                                            key={`${activeResume.id}-${i + 1}`}
+                                            pageNumber={i + 1}
+                                            width={Math.floor(Math.min(pdfWrapWidth, (window.innerHeight - 172) / pdfAspect)) || undefined}
+                                            className="resume-pdf-page"
+                                        />
+                                    ))
+                                ) : (
+                                    <p className="settings-muted resume-pdf-status">Preparing preview…</p>
+                                )}
                             </Document>
                         </div>
                     ) : activeResume && canPreview && previewUrl ? (

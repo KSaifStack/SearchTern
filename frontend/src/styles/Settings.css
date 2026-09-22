@@ -121,6 +121,14 @@
     background-color: #fbeae8;
 }
 
+/* Drop the global green glow/overlay that every <button> gets on hover. */
+.settings-section button {
+    box-shadow: none;
+}
+.settings-section button:hover {
+    box-shadow: none;
+}
+
 /* ── Uploaded file row ───────────────────────────────────── */
 .settings-file {
     display: flex;
@@ -424,7 +432,6 @@
 .settings-agent-activity-title {
     font-weight: 700;
     font-size: 13px;
-    text-transform: uppercase;
     letter-spacing: 0.02em;
     color: var(--text-light);
 }
@@ -506,7 +513,6 @@
 .settings-keys-table th {
     text-align: left;
     font-size: 11px;
-    text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--text-light);
     padding: 8px 12px;
@@ -571,6 +577,24 @@
     background: var(--button-color);
     border-color: var(--button-color);
     color: #fff;
+}
+
+.settings-activity-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 12px auto 0;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 12px;
+}
+.settings-activity-more:hover {
+    color: var(--text-dark);
 }
 
 /* ── Configuration skill card ────────────────────────────── */
