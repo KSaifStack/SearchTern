@@ -55,9 +55,9 @@ export default async function handler(req: Request) {
     const pageUrl = meta ? `${SITE}/jobs/${id}` : SITE;
 
     html = html
-        .replaceAll("__OG_TITLE__", esc(title))
-        .replaceAll("__OG_DESCRIPTION__", esc(desc))
-        .replaceAll("__OG_URL__", pageUrl);
+        .replaceAll(DEFAULT_TITLE, esc(title))
+        .replaceAll(DEFAULT_DESC, esc(desc))
+        .replace(`content="${SITE}"`, `content="${pageUrl}"`);
 
     if (meta) {
         html = html.replace("</head>", `<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>\n</head>`);
