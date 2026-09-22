@@ -4,6 +4,7 @@ import { Text, Divider, RingProgress } from '@mantine/core';
 import { getRecent } from '../services/internshipmanager';
 import { useTracker } from '../components/TrackerContext';
 import type { ActivityEvent } from '../components/TrackerContext';
+import ReviewSlide from '../components/ReviewSlide';
 import '../styles/Home.css';
 
 interface Job {
@@ -198,20 +199,23 @@ function Home() {
 
             </div>
 
+            {/* ── Review Slide ── */}
+            <ReviewSlide />
+
             {/* ── Footer ── */}
             <footer className="home-footer">
                 <p className="home-footer-text">© 2026 SearchTern</p>
                 <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', alignItems: 'center' }}>
-                    <a href="https://github.com/KSaifStack/SearchTern" target="_blank" rel="noopener noreferrer" className="home-footer-link">
-                        GitHub
-                    </a>
-                    <Link to="/privacy" className="home-footer-link">
-                        Privacy Policy
-                    </Link>
-                </div>
-            </footer>
-        </div>
-    );
-}
-
+                    <a href="https://github.com/KSaifStack/SearchTern" target="_blank" rel="noopener noreferrer" className="home-footer-link"> 
+                        GitHub 
+                    </a> 
+                    <Link to="/privacy" className="home-footer-link"> 
+                        Privacy Policy 
+                    </Link> 
+                </div> 
+            </footer> 
+        </div> 
+    ); 
+} 
+ 
 export default Home;
