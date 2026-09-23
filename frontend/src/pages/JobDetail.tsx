@@ -140,8 +140,14 @@ function JobDetail() {
             hiringOrganization: { "@type": "Organization", name: job.company },
             jobLocation: {
                 "@type": "Place",
-                address: { "@type": "PostalAddress", addressLocality: job.location },
+                address: {
+                    "@type": "PostalAddress",
+                    addressLocality: /remote|anywhere|telecommute/i.test(job.location ?? '') ? undefined : (job.location ?? '').split(',')[0],
+                    addressRegion: /remote|anywhere|telecommute/i.test(job.location ?? '') ? undefined : (job.location ?? '').split(',')[1]?.trim(),
+                    addressCountry: "US",
+                },
             },
+            jobLocationType: /remote|anywhere|telecommute/i.test(job.location ?? '') ? "TELECOMMUTE" : undefined,
             directApply: true,
             employmentType: job.type === 'newgrad' ? "FULL_TIME" : job.type === 'internship' ? "INTERN" : undefined,
             datePosted: postedDate(job.date),

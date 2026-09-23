@@ -15,6 +15,10 @@ function postedDate(daysValue: string | number): string | undefined {
     return new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
 }
 
+function isRemote(location: string): boolean {
+    return /remote|anywhere|telecommute/i.test(location);
+}
+
 async function jobMeta(id: string) {
     const res = await fetch(`${API}/jobs/${id}`);
     if (!res.ok) return null;
@@ -22,6 +26,10 @@ async function jobMeta(id: string) {
     const j = data?.result;
     if (!j) return null;
     const desc = `${j.role} in ${j.location || "remote/US"}. Apply directly through ${j.company}.`;
+    const loc = j.location || "";
+    const remote = isRemote(loc);
+    const parts = loc.split(",").map(p => p.trim());
+    const region = remote ? undefined : parts[1] ?? undefined;
     return {
         title: `${j.role} | ${j.company} | SearchTern`,
         description: desc,
@@ -34,8 +42,14 @@ async function jobMeta(id: string) {
             hiringOrganization: { "@type": "Organization", name: j.company },
             jobLocation: {
                 "@type": "Place",
-                address: { "@type": "PostalAddress", addressLocality: j.location },
+                address: {
+                    "@type": "PostalAddress",
+                    addressLocality: remote ? undefined : parts[0],
+                    addressRegion: region,
+                    addressCountry: "US",
+                },
             },
+            jobLocationType: remote ? "TELECOMMUTE" : undefined,
             directApply: true,
         },
     };
@@ -60,7 +74,8 @@ export default async function handler(req: Request) {
         .replace(`content="${SITE}"`, `content="${pageUrl}"`);
 
     if (meta) {
-        html = html.replace("</head>", `<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>\n</head>`);
+        const headTags = `<link rel="canonical" href="${SITE}/jobs/${id}" />\n<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>`;
+        html = html.replace("</head>", `${headTags}\n</head>`);
     }
 
     return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
