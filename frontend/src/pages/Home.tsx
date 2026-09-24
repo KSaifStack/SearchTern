@@ -4,6 +4,7 @@ import { Text, Divider, RingProgress } from '@mantine/core';
 import { getRecent } from '../services/internshipmanager';
 import { useTracker } from '../components/TrackerContext';
 import type { ActivityEvent } from '../components/TrackerContext';
+import ReviewSlide from '../components/ReviewSlide';
 import '../styles/Home.css';
 
 interface Job {
@@ -197,6 +198,9 @@ function Home() {
                 </section>
 
             </div>
+
+            {/* ── Review Slide ── */}
+            <ReviewSlide />
 
             {/* ── Footer ── */}
             <footer className="home-footer">
