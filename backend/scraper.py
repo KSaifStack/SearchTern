@@ -380,6 +380,7 @@ def scrape_searchtern_listings(url):
         link = job.get("link")
         if not link or not str(link).startswith(("http://", "https://")):
             continue
+        description = job.get("description")
         jobs.append({
             "company":  clean_text(str(job.get("company", ""))),
             "role":     clean_text(str(job.get("role", ""))),
@@ -389,6 +390,7 @@ def scrape_searchtern_listings(url):
             "type":     jt if jt in ("internship", "newgrad") else "internship",
             "season":   "searchtern",
             "ats":      ats_of(link),
+            "description": clean_text(str(description)) if description else None,
         })
 
     print(f"  {len(jobs)} rows from SearchTern-Listings")
@@ -463,6 +465,7 @@ def update_database():
             type TEXT,
             season TEXT,
             ats TEXT,
+            description TEXT,
             last_seen_at TIMESTAMPTZ DEFAULT NOW(),
             CONSTRAINT internships_unique_job UNIQUE (company, role, link)
         )
@@ -471,6 +474,7 @@ def update_database():
     cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS type TEXT")
     cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS season TEXT")
     cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS ats TEXT")
+    cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS description TEXT")
     cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT NOW()")
 
     cursor.execute("SELECT 1 FROM pg_constraint WHERE conname = 'internships_unique_job'")
@@ -493,7 +497,7 @@ def update_database():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_location ON internships(location)")
 
     records = [
-        (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], job.get("ats", ""), current_run_time)
+        (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], job.get("ats", ""), job.get("description"), current_run_time)
         for job in in_range
     ]
 
@@ -504,7 +508,7 @@ def update_database():
     )
 
     upsert_query = """
-        INSERT INTO internships (company, role, location, date, link, type, season, ats, last_seen_at)
+        INSERT INTO internships (company, role, location, date, link, type, season, ats, description, last_seen_at)
         VALUES %s
         ON CONFLICT (company, role, location, link)
         DO UPDATE SET
@@ -512,6 +516,7 @@ def update_database():
             type = EXCLUDED.type,
             season = EXCLUDED.season,
             ats = EXCLUDED.ats,
+            description = EXCLUDED.description,
             last_seen_at = EXCLUDED.last_seen_at
     """
     execute_values(cursor, upsert_query, records, page_size=1000)
