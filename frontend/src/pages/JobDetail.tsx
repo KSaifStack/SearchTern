@@ -23,9 +23,16 @@ function formatPosted(dateValue: string | number): string {
 }
 
 function postedDate(dateValue: string | number): string | undefined {
-    const days = parseFloat(String(dateValue))
-    if (isNaN(days)) return undefined
-    return new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10)
+    const parsed = parseFloat(String(dateValue))
+    if (!isNaN(parsed)) {
+        return new Date(Date.now() - parsed * 86400e3).toISOString().slice(0, 10)
+    }
+    const iso = new Date(String(dateValue).replace("Z", "+00:00"))
+    return isNaN(iso.getTime()) ? undefined : iso.toISOString().slice(0, 10)
+}
+
+function metaDescription(job: Job): string {
+    return (job.description ?? "").replace(/\s+/g, " ").trim().slice(0, 155) || `${job.role} in ${job.location || 'remote/US'}. Apply directly through ${job.company}.`
 }
 
 function JobDetail() {
@@ -130,18 +137,24 @@ function JobDetail() {
 
     usePageMeta(job ? {
         title: `${job.role} | ${job.company} | SearchTern`,
-        description: `${job.role} in ${job.location || 'remote/US'}. Apply directly through ${job.company}.`,
+        description: metaDescription(job),
         path: `/jobs/${job.id}`,
         jsonLd: {
             "@context": "https://schema.org",
             "@type": "JobPosting",
             title: job.role,
-            description: `${job.role} in ${job.location || 'remote/US'}. Apply directly through ${job.company}.`,
+            description: job.description ?? `${job.role} in ${job.location || 'remote/US'}. Apply directly through ${job.company}.`,
             hiringOrganization: { "@type": "Organization", name: job.company },
             jobLocation: {
                 "@type": "Place",
-                address: { "@type": "PostalAddress", addressLocality: job.location },
+                address: {
+                    "@type": "PostalAddress",
+                    addressLocality: /remote|anywhere|telecommute/i.test(job.location ?? '') ? undefined : (job.location ?? '').split(',')[0],
+                    addressRegion: /remote|anywhere|telecommute/i.test(job.location ?? '') ? undefined : (job.location ?? '').split(',')[1]?.trim(),
+                    addressCountry: "US",
+                },
             },
+            jobLocationType: /remote|anywhere|telecommute/i.test(job.location ?? '') ? "TELECOMMUTE" : undefined,
             directApply: true,
             employmentType: job.type === 'newgrad' ? "FULL_TIME" : job.type === 'internship' ? "INTERN" : undefined,
             datePosted: postedDate(job.date),
@@ -205,6 +218,13 @@ function JobDetail() {
             </div>
 
             <Divider my={24} />
+
+            {job.description && (
+                <div style={{ marginBottom: 24 }}>
+                    <Text fw={700} size="lg" c="var(--text-dark)" mb={8}>About this role</Text>
+                    <Text c="var(--text-muted)" size="md" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{job.description}</Text>
+                </div>
+            )}
 
             <Text c="var(--text-muted)" size="sm" mb={16}>
                 This role is aggregated from public postings by <Link to="/" className="home-card-link" style={{ color: 'var(--primary-green)', fontWeight: 600 }}>SearchTern</Link>. Apply directly on the employer's site.

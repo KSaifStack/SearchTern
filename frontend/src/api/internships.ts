@@ -13,6 +13,7 @@ export interface Job {
     type?: string
     season?: string
     ats?: string | null
+    description?: string | null
 }
 
 // pulls update Backend data via fastapi (ThinkPad)

@@ -198,22 +198,52 @@ def health():
         "next_scrape": str(next_run) if next_run else "unknown"
     }
 
-#Lists the data sources the scraper pulls from
+#Lists the data sources the Listing feed pulls from (fetched from the
+#SearchTern-Listings sources manifest; falls back to local source list).
+SOURCES_MANIFEST_URL = "https://raw.githubusercontent.com/KSaifStack/SearchTern-Listings/main/pages/sources.json"
+_sources_cache: dict = {}
+
+
 @app.get("/sources")
 @limiter.limit("60/minute")
 def sources(request: Request):
-    return {
-        "count": len(scraper.ALL_SOURCES),
-        "sources": [
+    now_ts = time.time()
+    if cached := _sources_cache.get("data"):
+        if now_ts - _sources_cache.get("fetched_at", 0) < 300:
+            return cached
+    try:
+        resp = requests.get(SOURCES_MANIFEST_URL, timeout=10)
+        resp.raise_for_status()
+        body = resp.json()
+        sources_out = [
             {
                 "name": s["name"],
-                "url": s["url"],
-                "type": s["type"],
-                "season": s["season"],
+                "url": s.get("url", ""),
+                "type": s.get("type", ""),
+                "season": s.get("season", ""),
+                "count": int(s.get("count", 0)),
             }
-            for s in scraper.ALL_SOURCES
-        ],
-    }
+            for s in sorted(body.get("sources", []), key=lambda s: s.get("count", 0), reverse=True)
+        ]
+        result = {"count": len(sources_out), "sources": sources_out}
+    except Exception as e:
+        print(f"  /sources manifest fetch failed: {e}")
+        result = {
+            "count": len(scraper.ALL_SOURCES),
+            "sources": [
+                {
+                    "name": s["name"],
+                    "url": s["url"],
+                    "type": s["type"],
+                    "season": s["season"],
+                    "count": 0,
+                }
+                for s in scraper.ALL_SOURCES
+            ],
+        }
+    _sources_cache["data"] = result
+    _sources_cache["fetched_at"] = now_ts
+    return result
 
 #Update DataBase
 @app.post("/update")

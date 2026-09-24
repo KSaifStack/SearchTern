@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { Table, Pagination, Popover, Text, Select, Badge } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth, fetchSources } from "../api/internships"
-import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple, GlobeSimple, Buildings, Clock } from '@phosphor-icons/react';
+import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple, GlobeSimple, Buildings, Clock, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
@@ -48,8 +48,9 @@ function Jobs() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [healthStatus, setHealthStatus] = useState<any>(null)
-  const [sources, setSources] = useState<{ name: string; type: string; season: string }[]>([])
+  const [sources, setSources] = useState<{ name: string; type: string; season: string; count?: number; url?: string }[]>([])
   const [popoverOpened, setPopoverOpened] = useState(false)
+  const [sourcePage, setSourcePage] = useState(1)
   const [refreshCountdown, setRefreshCountdown] = useState(() => getSecondsUntilNextHour())
   const debounceRef = useRef<number | undefined>(undefined)
   const [searchText, setSearchText] = useState('')
@@ -225,7 +226,7 @@ function Jobs() {
               <button className="health_btn" onClick={() => {
                 if (!popoverOpened) {
                   checkHealth().then(setHealthStatus)
-                  fetchSources().then(setSources)
+                  fetchSources().then(s => { setSources(s); setSourcePage(1) })
                 }
                 setPopoverOpened((o) => !o)
               }}>...</button>
@@ -238,12 +239,36 @@ function Jobs() {
                   <Text size="xs" mt={5} c="dimmed">Data Sources ({sources.length || '—'}):</Text>
                   {sources.length > 0 ? (
                     <div style={{ marginTop: 4 }}>
-                      {sources.map((s) => (
+                      {sources.slice((sourcePage - 1) * 5, sourcePage * 5).map((s) => (
                         <Text key={s.name} size="xs" c="dimmed" style={{ paddingLeft: 8, paddingTop: 2 }}>
                           • {s.name}
+                          {s.count ? <span style={{ color: 'var(--text-muted)' }}> ({s.count.toLocaleString()})</span> : null}
                           <span style={{ color: 'var(--text-muted)' }}> ({s.type}{s.season && s.season !== 'searchtern' ? ` · ${s.season}` : ''})</span>
                         </Text>
                       ))}
+                      {sources.length > 5 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, marginLeft: 6 }}>
+                          {sourcePage > 1 && (
+                            <button
+                              onClick={() => setSourcePage(p => p - 1)}
+                              style={{ display: 'flex', alignItems: 'center', padding: '2px 8px', background: 'transparent', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                            >
+                              <CaretLeft size={13} weight="bold" />
+                            </button>
+                          )}
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                            {sourcePage} / {Math.ceil(sources.length / 5)}
+                          </span>
+                          {sourcePage * 5 < sources.length && (
+                            <button
+                              onClick={() => setSourcePage(p => p + 1)}
+                              style={{ display: 'flex', alignItems: 'center', padding: '2px 8px', background: 'transparent', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                            >
+                              <CaretRight size={13} weight="bold" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <Text size="xs" c="dimmed" style={{ paddingLeft: 8 }}>Unavailable</Text>
