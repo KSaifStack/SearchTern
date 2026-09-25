@@ -153,10 +153,17 @@ def get_agent_identity(authorization: str = Header(None)):
 
 logger = logging.getLogger(__name__)
 
+def run_scrape():
+    return scraper.update_database()
+
 def scheduled_scrape():
     try:
-        result = scraper.update_database()
-        logger.info(f"Scheduler: {result}")
+        result = run_scrape()
+        if result is None:
+            logger.info("Scheduler: scrape already running")
+        else:
+            read_db.invalidate_cache()
+            logger.info(f"Scheduler: {result}")
     except Exception as e:
         logger.error(f"Scheduler: scrape failed — {e}")
 
@@ -166,7 +173,6 @@ scheduler = BackgroundScheduler()
 async def lifespan(app: FastAPI):
     scheduler.add_job(scheduled_scrape, CronTrigger(minute=0))
     scheduler.start()
-    threading.Thread(target=scheduled_scrape, daemon=True).start()
     yield
     scheduler.shutdown()
 
@@ -249,8 +255,10 @@ def sources(request: Request):
 @app.post("/update")
 @limiter.limit("5/minute")
 def update_base(request: Request, verified=Depends(verify_key)):
+    result = run_scrape()
+    if result is None:
+        raise HTTPException(status_code=409, detail="Scrape already running.")
     read_db.invalidate_cache()
-    scraper.update_database()
     return {"result": read_db.recent_internships()}
 
 #Search recent internships
