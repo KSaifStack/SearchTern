@@ -6,6 +6,7 @@ from psycopg2.extras import execute_values
 import os
 from dotenv import load_dotenv
 from datetime import datetime, timezone
+from threading import Lock
 
 load_dotenv()
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -78,6 +79,8 @@ ALL_SOURCES = [
 # Listings older than this many days are dropped on every scrape run.
 # Tune via SCRAPER_MAX_AGE_DAYS env var; defaults to 90 days.
 MAX_AGE_DAYS = int(os.environ.get("SCRAPER_MAX_AGE_DAYS", "90"))
+_update_lock = Lock()
+_SCRAPE_ADVISORY_LOCK_ID = 742031
 
 
 def clean_text(text):
@@ -243,10 +246,9 @@ def is_us_only(location: str) -> bool:
 
 
 def scrape_simplify_readme(url, job_type, season):
-    response = requests.get(url)
+    response = requests.get(url, timeout=30)
     if response.status_code != 200:
-        print(f"  Error {response.status_code} — {url}")
-        return []
+        raise RuntimeError(f"HTTP {response.status_code} while fetching {url}")
 
     soup = BeautifulSoup(response.text, "html.parser")
     jobs = []
@@ -274,6 +276,8 @@ def scrape_simplify_readme(url, job_type, season):
                 "ats":      ats_of(cells[-2].find("a")["href"]) if cells[-2].find("a") else "",
             })
 
+    if not jobs:
+        raise RuntimeError(f"No rows found in {url}")
     print(f"  {len(jobs)} rows from {job_type} ({season})")
     return jobs
 
@@ -282,8 +286,7 @@ def scrape_markdown_readme(url, job_type, season):
     """Parser for repos that use pure Markdown pipe tables (e.g. vanshb03)."""
     response = requests.get(url, timeout=30)
     if response.status_code != 200:
-        print(f"  Error {response.status_code} — {url}")
-        return []
+        raise RuntimeError(f"HTTP {response.status_code} while fetching {url}")
 
     jobs = []
     last_company = ""
@@ -361,6 +364,8 @@ def scrape_markdown_readme(url, job_type, season):
             "ats":      ats_of(link),
         })
 
+    if not jobs:
+        raise RuntimeError(f"No rows found in {url}")
     print(f"  {len(jobs)} rows from {job_type} ({season}) [markdown]")
     return jobs
 
@@ -368,8 +373,7 @@ def scrape_markdown_readme(url, job_type, season):
 def scrape_searchtern_listings(url):
     response = requests.get(url, timeout=30)
     if response.status_code != 200:
-        print(f"  Error {response.status_code} — {url}")
-        return []
+        raise RuntimeError(f"HTTP {response.status_code} while fetching {url}")
 
     listings = response.json()
     jobs = []
@@ -393,11 +397,33 @@ def scrape_searchtern_listings(url):
             "description": clean_text(str(description)) if description else None,
         })
 
+    if not jobs:
+        raise RuntimeError(f"No rows found in {url}")
     print(f"  {len(jobs)} rows from SearchTern-Listings")
     return jobs
 
 
 def update_database():
+    if not _update_lock.acquire(blocking=False):
+        return None
+    lock_conn = None
+    try:
+        lock_conn = psycopg2.connect(DATABASE_URL, connect_timeout=30)
+        lock_cursor = lock_conn.cursor()
+        lock_cursor.execute("SELECT pg_try_advisory_lock(%s)", (_SCRAPE_ADVISORY_LOCK_ID,))
+        if not lock_cursor.fetchone()[0]:
+            return None
+        lock_conn.commit()
+        return _update_database()
+    finally:
+        try:
+            if lock_conn is not None:
+                lock_conn.close()
+        finally:
+            _update_lock.release()
+
+
+def _update_database():
     all_jobs = []
 
     print("Scraping SimplifyJobs READMEs...")
@@ -410,6 +436,9 @@ def update_database():
 
     print("Scraping SearchTern-Listings...")
     all_jobs.extend(scrape_searchtern_listings(SEARCHTERN_LISTINGS_URL))
+
+    if not all_jobs:
+        raise RuntimeError("No listings scraped")
 
     seen = set()
     deduped = []
@@ -450,85 +479,102 @@ def update_database():
         print(f"Removed {too_old} listings older than {MAX_AGE_DAYS} days")
     print(f"Listings within {MAX_AGE_DAYS} days: {len(in_range)}")
 
-    conn = psycopg2.connect(DATABASE_URL)
-    cursor = conn.cursor()
-    current_run_time = datetime.now(timezone.utc)
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=30)
+    try:
+        cursor = conn.cursor()
+        current_run_time = datetime.now(timezone.utc)
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS internships (
-            id SERIAL PRIMARY KEY,
-            company TEXT,
-            role TEXT,
-            location TEXT,
-            date TEXT,
-            link TEXT,
-            type TEXT,
-            season TEXT,
-            ats TEXT,
-            description TEXT,
-            last_seen_at TIMESTAMPTZ DEFAULT NOW(),
-            CONSTRAINT internships_unique_job UNIQUE (company, role, link)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS internships (
+                id SERIAL PRIMARY KEY,
+                company TEXT,
+                role TEXT,
+                location TEXT,
+                date TEXT,
+                link TEXT,
+                type TEXT,
+                season TEXT,
+                ats TEXT,
+                description TEXT,
+                last_seen_at TIMESTAMPTZ DEFAULT NOW(),
+                CONSTRAINT internships_unique_job UNIQUE (company, role, location, link)
+            )
+        """)
+
+        cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS type TEXT")
+        cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS season TEXT")
+        cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS ats TEXT")
+        cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS description TEXT")
+        cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT NOW()")
+
+        cursor.execute("""
+            SELECT pg_get_constraintdef(oid)
+            FROM pg_constraint
+            WHERE conname = %s AND conrelid = 'internships'::regclass
+        """, ("internships_unique_job",))
+        constraint = cursor.fetchone()
+        constraint_sql = re.sub(r"\s+", "", (constraint[0] if constraint else "")).lower()
+        if constraint_sql != "unique(company,role,location,link)":
+            if constraint:
+                cursor.execute("ALTER TABLE internships DROP CONSTRAINT internships_unique_job")
+            cursor.execute("""
+                DELETE FROM internships a
+                USING internships b
+                WHERE a.id > b.id
+                  AND a.company = b.company AND a.role = b.role
+                  AND a.location = b.location AND a.link = b.link
+            """)
+            cursor.execute("""
+                ALTER TABLE internships
+                ADD CONSTRAINT internships_unique_job UNIQUE (company, role, location, link)
+            """)
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_last_seen ON internships(last_seen_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_date ON internships(date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_role ON internships(role)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_location ON internships(location)")
+
+        listing_count = len(in_range)
+        del all_jobs, seen, deduped, valid_link, us_jobs
+
+        # Purge existing rows older than the age cap (numeric dates only)
+        cursor.execute(
+            r"DELETE FROM internships WHERE date ~ '^[0-9]+(\.[0-9]+)?$' AND date::numeric > %s",
+            (MAX_AGE_DAYS,),
         )
-    """)
 
-    cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS type TEXT")
-    cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS season TEXT")
-    cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS ats TEXT")
-    cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS description TEXT")
-    cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT NOW()")
+        upsert_query = """
+            INSERT INTO internships (company, role, location, date, link, type, season, ats, description, last_seen_at)
+            VALUES %s
+            ON CONFLICT (company, role, location, link)
+            DO UPDATE SET
+                date = EXCLUDED.date,
+                type = EXCLUDED.type,
+                season = EXCLUDED.season,
+                ats = EXCLUDED.ats,
+                description = EXCLUDED.description,
+                last_seen_at = EXCLUDED.last_seen_at
+        """
+        execute_values(
+            cursor,
+            upsert_query,
+            (
+                (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], job.get("ats", ""), job.get("description"), current_run_time)
+                for job in in_range
+            ),
+            page_size=1000,
+        )
+        del in_range
 
-    cursor.execute("SELECT 1 FROM pg_constraint WHERE conname = 'internships_unique_job'")
-    if cursor.fetchone() is None:
         cursor.execute("""
-            DELETE FROM internships a
-            USING internships b
-            WHERE a.id > b.id
-              AND a.company = b.company AND a.role = b.role
-              AND a.location = b.location AND a.link = b.link
-        """)
-        cursor.execute("""
-            ALTER TABLE internships
-            ADD CONSTRAINT internships_unique_job UNIQUE (company, role, location, link)
-        """)
+            DELETE FROM internships
+            WHERE last_seen_at < %s
+        """, (current_run_time,))
 
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_last_seen ON internships(last_seen_at)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_date ON internships(date)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_role ON internships(role)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_location ON internships(location)")
-
-    records = [
-        (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], job.get("ats", ""), job.get("description"), current_run_time)
-        for job in in_range
-    ]
-
-    # Purge existing rows older than the age cap (numeric dates only)
-    cursor.execute(
-        r"DELETE FROM internships WHERE date ~ '^[0-9]+(\.[0-9]+)?$' AND date::numeric > %s",
-        (MAX_AGE_DAYS,),
-    )
-
-    upsert_query = """
-        INSERT INTO internships (company, role, location, date, link, type, season, ats, description, last_seen_at)
-        VALUES %s
-        ON CONFLICT (company, role, location, link)
-        DO UPDATE SET
-            date = EXCLUDED.date,
-            type = EXCLUDED.type,
-            season = EXCLUDED.season,
-            ats = EXCLUDED.ats,
-            description = EXCLUDED.description,
-            last_seen_at = EXCLUDED.last_seen_at
-    """
-    execute_values(cursor, upsert_query, records, page_size=1000)
-
-    cursor.execute("""
-        DELETE FROM internships
-        WHERE last_seen_at < %s
-    """, (current_run_time,))
-
-    conn.commit()
-    conn.close()
-    return f"Done! {len(in_range)} listings upserted."
+        conn.commit()
+        return f"Done! {listing_count} listings upserted."
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":

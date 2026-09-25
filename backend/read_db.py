@@ -17,6 +17,8 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 _cache: list | None = None
 _cache_time: float = 0
 _CACHE_TTL = 3300  # 55 minutes (refresh before the hourly scrape)
+_cache_lock = Lock()
+_JOB_LIST_COLUMNS = "id, company, role, location, date, link, type, season, ats, last_seen_at"
 
 _agent_tables_ready = False
 _agent_tables_checked_at = 0.0
@@ -70,24 +72,33 @@ def get_conn():
 
 def invalidate_cache():
     global _cache, _cache_time
-    _cache = None
-    _cache_time = 0
+    with _cache_lock:
+        _cache = None
+        _cache_time = 0
 
 
 # Get all internships ordered by date (cached in memory)
 def recent_internships():
     global _cache, _cache_time
     now = time()
-    if _cache is not None and now - _cache_time < _CACHE_TTL:
+    with _cache_lock:
+        if _cache is not None and now - _cache_time < _CACHE_TTL:
+            return _cache
+        conn = get_conn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(f"SELECT {_JOB_LIST_COLUMNS} FROM internships ORDER BY date")
+                rows = cur.fetchall()
+        except psycopg2.errors.UndefinedTable:
+            conn.rollback()
+            _cache = []
+            _cache_time = now
+            return _cache
+        finally:
+            conn.close()
+        _cache = [dict(row) for row in rows]
+        _cache_time = now
         return _cache
-    conn = get_conn()
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute("SELECT * FROM internships ORDER BY date")
-        rows = cur.fetchall()
-    conn.close()
-    _cache = [dict(row) for row in rows]
-    _cache_time = now
-    return _cache
 
 
 # Get a single internship by id (for the public job detail pages)
@@ -105,7 +116,7 @@ def search_location(x):
     conn = get_conn()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            "SELECT * FROM internships WHERE location ILIKE %s ORDER BY date",
+            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE location ILIKE %s ORDER BY date",
             (f"%{x}%",)
         )
         rows = cur.fetchall()
@@ -118,7 +129,7 @@ def find_keywords(x):
     conn = get_conn()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            "SELECT * FROM internships WHERE role ILIKE %s ORDER BY date",
+            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE role ILIKE %s ORDER BY date",
             (f"%{x}%",)
         )
         rows = cur.fetchall()
@@ -131,7 +142,7 @@ def search_company(x):
     conn = get_conn()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            "SELECT * FROM internships WHERE company ILIKE %s ORDER BY date",
+            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE company ILIKE %s ORDER BY date",
             (f"%{x}%",)
         )
         rows = cur.fetchall()
