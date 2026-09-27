@@ -1,19 +1,24 @@
+import { lazy, Suspense } from "react"
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { SpeedInsights } from "@vercel/speed-insights/react"
 import { Analytics } from "@vercel/analytics/react"
 import Navbar from "./components/Navbar"
-import Home from "./pages/Home"
-import Jobs from "./pages/Jobs"
-import JobDetail from "./pages/JobDetail"
-import Tracker from "./pages/Tracker"
-import Auth from "./pages/Auth"
-import Privacy from "./pages/Privacy"
-import Settings from "./pages/Settings"
 import { TrackerProvider } from "./components/TrackerContext"
 import { AuthProvider } from "./components/AuthContext"
 import { AgentOverlay } from "./components/AgentOverlay"
 import { usePageMeta } from "./utils/seo"
 import type { PageMeta } from "./utils/seo"
+
+// Split per route: react-pdf (Resume/Settings), dnd-kit (Tracker) and the
+// agent panel are dead weight on the job board, and the board is the landing
+// page. Costs one extra RTT on navigation, saves ~half the first-load bundle.
+const Home = lazy(() => import("./pages/Home"))
+const Jobs = lazy(() => import("./pages/Jobs"))
+const JobDetail = lazy(() => import("./pages/JobDetail"))
+const Tracker = lazy(() => import("./pages/Tracker"))
+const Auth = lazy(() => import("./pages/Auth"))
+const Settings = lazy(() => import("./pages/Settings"))
+const Privacy = lazy(() => import("./pages/Privacy"))
 
 const SITE_ORG = {
     "@context": "https://schema.org",
@@ -36,6 +41,7 @@ function App() {
                     <div>
                         <Navbar />
                         <div className="app-content">
+                            <Suspense fallback={<p className="home-empty">Loading...</p>}>
                             <Routes>
                                 <Route
                                     path="/"
@@ -129,6 +135,7 @@ function App() {
                                     }
                                 />
                             </Routes>
+                            </Suspense>
                         </div>
                         <AgentOverlay />
                         <SpeedInsights />

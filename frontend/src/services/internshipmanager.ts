@@ -1,18 +1,26 @@
-// This will handles job data from api
-import { pullUpdateBackend, pullRecent, pullLocation, pullKeyword } from "../api/internships.ts";
+// Fetches the search index in slices so the page is usable before the whole
+// list has landed. The browser caches each slice (max-age=300) and the CDN
+// caches them an hour (s-maxage=3600), so the hourly refresh is a handful of
+// 304s rather than a full re-download.
+import { pullIndexSlice, type Job } from "../api/internships.ts";
 
-interface Job{
-    id: number,
-    company: string,
-    role: string,
-    location: string,
-    date: string,
-    link: string,
-    type?: string,
-    season?: string
+export interface IndexSnapshot {
+    jobs: Job[]
+    /** rows held so far */
+    loaded: number
+    /** rows the index actually has */
+    total: number
+    /** false while the remaining slices are still in flight */
+    complete: boolean
+    /** set when the index could not be loaded at all */
+    error?: string
 }
 
-let cached: Job[] | null = null
+// 4 slices keeps the fan-out well under Vercel's 12-invocation limit and makes
+// the first slice ~25% of the list.
+const SLICES = 4
+
+let cached: IndexSnapshot | null = null
 let cachedAt = 0
 
 function isCurrentHour(ts: number): boolean {
@@ -21,36 +29,57 @@ function isCurrentHour(ts: number): boolean {
     return ts >= hourStart.getTime()
 }
 
-export async function getRecent() {
+/**
+ * Load the index. `onProgress` fires as soon as the first slice is in (so the
+ * caller can render), then again when every slice has merged. While
+ * `complete` is false the caller's filters run against a partial list, which is
+ * why Jobs.tsx shows a progress count rather than a final tally.
+ */
+export async function getRecent(onProgress?: (snap: IndexSnapshot) => void): Promise<IndexSnapshot> {
     if (cached && isCurrentHour(cachedAt)) {
-        return { success: true, data: cached } as const
+        onProgress?.(cached)
+        return cached
     }
-    const result = await pullRecent()
-    if (result && result.length > 0) {
-        cached = result
+
+    const first = await pullIndexSlice(1, SLICES)
+    // A failed first slice is the only unrecoverable case: there is nothing to
+    // render and nothing to retry into. Report it instead of returning zero
+    // rows, which reads as "we have no jobs" rather than "we are broken".
+    if (first.error) {
+        const failed: IndexSnapshot = { jobs: [], loaded: 0, total: 0, complete: true, error: first.error }
+        onProgress?.(failed)
+        return failed
+    }
+    const parts = first.total > 0 ? Math.max(1, first.parts) : 1
+    const jobs: Job[] = first.jobs
+
+    const partial: IndexSnapshot = { jobs, loaded: jobs.length, total: first.total, complete: parts <= 1 }
+    onProgress?.(partial)
+    if (parts <= 1) {
+        cached = partial
         cachedAt = Date.now()
+        return partial
     }
-    return { success: Boolean(result), data: result || [] } as const
-}
 
-export async function searchByLocation(searchterm: string){
-    const result = await pullLocation(searchterm);
-    if(!result) return { success: false, data: [] } as const
-    return { success: true, data: result } as const
-}
+    const rest = await Promise.all(
+        Array.from({ length: parts - 1 }, (_, i) => pullIndexSlice(i + 2, parts))
+    )
+    for (const slice of rest) jobs.push(...slice.jobs)
 
-export async function searchByKeyword(searchterm: string){
-    const result = await pullKeyword(searchterm);
-    if(!result) return { success: false, data: [] } as const
-    return { success: true, data: result } as const
-}
-
-export async function getDatabase() {
-    const result = await pullUpdateBackend()
-    if (!result) return { success: false, data: [] } as const
-    cached = result
+    // A later slice can still fail on its own; the rows we did get are still
+    // worth showing, so degrade rather than discard.
+    const failedSlices = rest.filter(s => s.error)
+    const full: IndexSnapshot = {
+        jobs,
+        loaded: jobs.length,
+        total: first.total,
+        complete: true,
+        error: failedSlices.length ? `slice ${failedSlices.length + 1} failed` : undefined,
+    }
+    cached = full
     cachedAt = Date.now()
-    return { success: true, data: result } as const
+    onProgress?.(full)
+    return full
 }
 
 export function clearCache() {

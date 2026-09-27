@@ -1,7 +1,8 @@
+import { findJob } from "./_jobs";
+
 export const config = { runtime: "edge" };
 
 const SITE = "https://searchtern.ksaif.dev";
-const API = process.env.VITE_API_URL || "http://127.0.0.1:8000";
 const DEFAULT_TITLE = "SearchTern — Software Internship & New-Grad Job Tracker";
 const DEFAULT_DESC = "Find thousands of active software internships and new-grad jobs, then track your applications in one place.";
 
@@ -20,10 +21,13 @@ function isRemote(location: string): boolean {
 }
 
 async function jobMeta(id: string) {
-    const res = await fetch(`${API}/jobs/${id}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const j = data?.result;
+    // Read from the CDN-cached index, so a Google crawl never hits the backend.
+    let j
+    try {
+        j = await findJob(id)
+    } catch {
+        return null
+    }
     if (!j) return null;
     const desc = `${j.role} in ${j.location || "remote/US"}. Apply directly through ${j.company}.`;
     const loc = j.location || "";

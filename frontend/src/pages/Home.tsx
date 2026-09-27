@@ -2,20 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Text, Divider, RingProgress } from '@mantine/core';
 import { getRecent } from '../services/internshipmanager';
+import type { Job } from '../api/internships';
 import { useTracker } from '../components/TrackerContext';
 import type { ActivityEvent } from '../components/TrackerContext';
 import '../styles/Home.css';
-
-interface Job {
-    id: number;
-    company: string;
-    role: string;
-    location: string;
-    date: string;
-    link: string;
-    type?: string;
-    season?: string;
-}
 
 function formatTimeAgo(isoString: string): string {
     const diff = Date.now() - new Date(isoString).getTime();
@@ -40,9 +30,9 @@ function Home() {
     const { trackedJobs, activityLog } = useTracker();
 
     useEffect(() => {
-        getRecent().then(res => {
-            if (res.success) setJobs(res.data);
-            setLoading(false);
+        getRecent(snap => {
+            if (snap.complete) setLoading(false);
+            setJobs(snap.jobs);
         });
     }, []);
 
