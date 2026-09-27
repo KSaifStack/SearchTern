@@ -17,6 +17,13 @@ function formatTimeAgo(isoString: string): string {
     return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// Listings pack every city into one field, ';'- or '|'-separated. A 12-city
+// row would swallow the homepage list, so show at most the first five.
+function trimLocations(location: string): string {
+    const parts = location.split(/[;|]/).map(p => p.trim()).filter(Boolean);
+    return parts.length > 5 ? parts.slice(0, 5).join('; ') : location;
+}
+
 function activityDescription(event: ActivityEvent): string {
     if (event.type === 'added') return `Saved ${event.company} to tracker`;
     if (event.type === 'removed') return `Removed ${event.company} from tracker`;
@@ -150,7 +157,7 @@ function Home() {
                                     <span className="recent-job-company">{job.company}</span>
                                 </div>
                                 <span className="recent-job-role">{job.role}</span>
-                                <span className="recent-job-location">{job.location}</span>
+                                <span className="recent-job-location">{trimLocations(job.location)}</span>
                             </a>
                         ))
                     )}

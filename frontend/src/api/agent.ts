@@ -2,7 +2,7 @@ import type { JobStatus } from "../components/TrackerContext";
 import { supabase } from "../lib/supabase";
 
 const api_key = import.meta.env.VITE_API_KEY;
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const BASE_URL = import.meta.env.VITE_API_URL || "/backend";
 
 let cachedSessionToken: string | null = null;
 
