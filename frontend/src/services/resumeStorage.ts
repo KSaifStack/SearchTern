@@ -6,13 +6,24 @@
 // preview and the one agents are told to use. Active is stored locally and
 // mirrored to a small `_active` marker file in the user's cloud bucket so the
 // backend can tell agents which resume is current.
-import { pdfjs } from 'react-pdf';
 import { supabase } from '../lib/supabase';
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url,
-).toString();
+// react-pdf is ~127KB gzip. It is only needed to turn a PDF into text, so it is
+// loaded on demand: JobDetail imports this module just to check whether a
+// resume exists, and used to drag the whole library onto that route.
+let pdfjsPromise: Promise<typeof import('react-pdf').pdfjs> | null = null
+function loadPdfjs() {
+    if (!pdfjsPromise) {
+        pdfjsPromise = import('react-pdf').then(({ pdfjs }) => {
+            pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+                'pdfjs-dist/build/pdf.worker.min.mjs',
+                import.meta.url,
+            ).toString()
+            return pdfjs
+        })
+    }
+    return pdfjsPromise
+}
 
 export interface ResumeRecord {
     id: string;
@@ -166,6 +177,7 @@ export async function resumeToText(r: ResumeRecord): Promise<string | null> {
         return await r.blob.text()
     }
     if (lower.endsWith('.pdf')) {
+        const pdfjs = await loadPdfjs()
         const doc = await pdfjs.getDocument({ data: new Uint8Array(await r.blob.arrayBuffer()) }).promise
         const pages: string[] = []
         for (let p = 1; p <= doc.numPages; p++) {

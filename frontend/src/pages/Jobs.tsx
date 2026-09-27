@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Table, Pagination, Popover, Text, Select, Badge } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { checkHealth, fetchSources } from "../api/internships"
+import { checkHealth, fetchSources, type Job } from "../api/internships"
 import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple, GlobeSimple, Buildings, Clock, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
@@ -10,17 +10,6 @@ import { makeJobFingerprint } from "../utils/jobFingerprint"
 import { parseLocation, US_STATES } from "../utils/locationFilter"
 import type { ParsedLocation } from "../utils/locationFilter"
 import { matchCompanyMeta, EMPLOYEE_BUCKETS, inEmployeeBucket } from "../utils/companyMeta"
-
-interface Job {
-  id: number
-  company: string
-  role: string
-  location: string
-  date: string
-  link: string
-  type?: string
-  season?: string
-}
 
 const STALE_DAYS = 21
 const RECENCY_OPTIONS = [
@@ -43,6 +32,9 @@ function jobKey(c: string, r: string, l: string): string {
 
 function Jobs() {
   const [allJobs, setAllJobs] = useState<Job[]>([])
+  const [totalJobs, setTotalJobs] = useState(0)
+  const [partial, setPartial] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const { addJob, removeJob, isJobTracked } = useTracker()
   const [page, setPage] = useState(1)
@@ -71,24 +63,35 @@ function Jobs() {
   const perPage = 15;
 
   useEffect(() => {
-    getRecent().then(res => {
-      if (res.success) setAllJobs(res.data)
+    let alive = true
+    // First slice renders on its own; the rest merge in behind it.
+    getRecent(snap => {
+      if (!alive) return
+      setAllJobs(snap.jobs)
+      setTotalJobs(snap.total)
+      setPartial(!snap.complete)
+      setLoadError(snap.error ?? null)
       setLoading(false)
     })
+    return () => { alive = false }
   }, [])
 
   useEffect(() => {
+    let alive = true
     const interval = setInterval(() => {
       const remaining = getSecondsUntilNextHour()
       if (remaining >= 3599) {
         clearCache()
-        getRecent().then(res => {
-          if (res.success) setAllJobs(res.data)
+        getRecent(snap => {
+          if (!alive) return
+          setAllJobs(snap.jobs)
+          setTotalJobs(snap.total)
+          setPartial(!snap.complete)
         })
       }
       setRefreshCountdown(remaining)
     }, 1000)
-    return () => clearInterval(interval)
+    return () => { alive = false; clearInterval(interval) }
   }, [])
 
   const parsedLocations = useMemo(() => {
@@ -220,7 +223,10 @@ function Jobs() {
     <>
       <section className="feature">
         <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <p className="result-count" style={{ margin: 0 }}>Refreshes in: {String(Math.floor(refreshCountdown / 60)).padStart(2, '0')}:{String(refreshCountdown % 60).padStart(2, '0')}</p>
+          {/* Scraper runs on the hour; the CDN serves the result for up to one
+              TTL after that, so this counts down to the scrape, not to the
+              data changing. Saying otherwise was the misleading part. */}
+          <p className="result-count" style={{ margin: 0 }}>Next scrape in: {String(Math.floor(refreshCountdown / 60)).padStart(2, '0')}:{String(refreshCountdown % 60).padStart(2, '0')}</p>
           <Popover width={250} position="bottom-start" withArrow shadow="md" opened={popoverOpened} onChange={setPopoverOpened}>
             <Popover.Target>
               <button className="health_btn" onClick={() => {
@@ -289,7 +295,15 @@ function Jobs() {
         />
 
         <div className="results-header">
-          <p className="result-count">{loading ? 'Loading...' : `${filtered.length.toLocaleString()} listings found`}</p>
+          <p className="result-count">
+            {loading
+              ? 'Loading...'
+              : loadError
+                ? `Couldn't load listings (${loadError}). Refresh to retry.`
+                : partial
+                  ? `Showing ${filtered.length.toLocaleString()} of ${totalJobs.toLocaleString()} — loading more...`
+                  : `${filtered.length.toLocaleString()} listings found`}
+          </p>
           <div style={{ display: 'flex', gap: 6 }}>
             <Popover opened={sortOpen} onChange={setSortOpen} width={180} position="bottom-end" withArrow shadow="md">
               <Popover.Target>

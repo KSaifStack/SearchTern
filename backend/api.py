@@ -262,11 +262,34 @@ def update_base(request: Request, verified=Depends(verify_key)):
     return {"result": read_db.recent_internships()}
 
 #Search recent internships
+def _days_ago(value):
+    """`date` is stored as days-ago (0 = today). Unparseable sorts last."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 999.0
+
+#Optional ?part=N&parts=M splits the list into M slices so a browser can render
+#the first one immediately and fetch the rest in parallel. No params (the
+#sitemap build, agents, curl) still gets the whole list, unchanged.
 @app.get("/recent")
 @limiter.limit("30/minute")
-def pull_recent(request: Request, response: Response):
+def pull_recent(request: Request, response: Response, part: int = 0, parts: int = 1):
     data = read_db.recent_internships()
-    body = json.dumps({"result": data}, default=str).encode()
+    total = len(data)
+    parts = max(1, min(parts, 8))  # public param: cap so it can't be absurd
+    if parts > 1 and 1 <= part <= parts:
+        # `date` is days-ago, so ascending puts the stalest rows first. Slices
+        # are ordered newest-first so the first one a browser fetches is the
+        # useful one. Parsed, not string-sorted: "10" < "2" as text.
+        data = sorted(data, key=lambda j: _days_ago(j.get("date")))
+        per = -(-total // parts)  # ceil, so the last slice is never empty
+        data = data[(part - 1) * per:part * per]
+    else:
+        parts = 1
+    body = json.dumps(
+        {"count": total, "part": part, "parts": parts, "result": data}, default=str
+    ).encode()
     etag = '"' + hashlib.md5(body).hexdigest() + '"'
     headers = {
         "ETag": etag,
