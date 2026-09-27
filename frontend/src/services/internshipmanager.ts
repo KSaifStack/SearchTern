@@ -51,9 +51,7 @@ export async function getRecent(onProgress?: (snap: IndexSnapshot) => void): Pro
         return failed
     }
     const parts = first.total > 0 ? Math.max(1, first.parts) : 1
-    const jobs: Job[] = first.jobs
-
-    const partial: IndexSnapshot = { jobs, loaded: jobs.length, total: first.total, complete: parts <= 1 }
+    const partial: IndexSnapshot = { jobs: first.jobs, loaded: first.jobs.length, total: first.total, complete: parts <= 1 }
     onProgress?.(partial)
     if (parts <= 1) {
         cached = partial
@@ -64,14 +62,18 @@ export async function getRecent(onProgress?: (snap: IndexSnapshot) => void): Pro
     const rest = await Promise.all(
         Array.from({ length: parts - 1 }, (_, i) => pullIndexSlice(i + 2, parts))
     )
-    for (const slice of rest) jobs.push(...slice.jobs)
-
-    // A later slice can still fail on its own; the rows we did get are still
-    // worth showing, so degrade rather than discard.
     const failedSlices = rest.filter(s => s.error)
+
+    // Merged list must be a NEW array. `partial` already handed the caller
+    // `first.jobs`, and React bails out of setState when the reference is
+    // unchanged — merging in place left the first slice (2,874 rows) on the
+    // jobs table forever while reporting the full count. (Bit us in prod.)
+    const merged: Job[] = [...first.jobs]
+    for (const slice of rest) merged.push(...slice.jobs)
+
     const full: IndexSnapshot = {
-        jobs,
-        loaded: jobs.length,
+        jobs: merged,
+        loaded: merged.length,
         total: first.total,
         complete: true,
         error: failedSlices.length ? `slice ${failedSlices.length + 1} failed` : undefined,
