@@ -34,7 +34,9 @@ SUPABASE_SERVICE_ROLE_KEY=
 Create `frontend/.env.local` (you can copy `frontend/.env.local.template`):
 ```env
 VITE_API_KEY=your_secure_random_string_here
-VITE_API_URL=http://localhost:8000
+# VITE_API_URL is optional — the app uses the same-origin /backend path by
+# default, which the vite dev proxy forwards to 127.0.0.1:8000.
+# VITE_API_URL=http://127.0.0.1:8000
 
 # Optional — enables sign-in and the AI Agent Hub. Without these you browse
 # as a guest and the agent features are hidden.
