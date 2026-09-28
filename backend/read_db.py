@@ -16,10 +16,16 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 _cache: list | None = None
 _cache_time: float = 0
-# 15 minutes, not 55. The old value was picked so the cache would still be warm
-# across the top of the hour — which is exactly when the scrape runs and memory
-# is scarcest. 15 clears the whole table long before :00.
-_CACHE_TTL = 900
+# A fallback, not a freshness mechanism. Every successful scrape calls
+# invalidate_cache(), so normal freshness is event-driven and immediate — this
+# only decides how stale the site can get when scrapes fail.
+#
+# It was 3300s, "refresh before the hourly scrape". Dropping it to 900 cut the
+# gap but quadrupled the whole-table refetch: this query pulls ~13k rows (~10MB)
+# out of Postgres every time it fires, so 900s meant ~29GB/month of Supabase
+# egress against a 5GB allowance, to save ~8MB of resident memory the cache held
+# either way. An hour is enough slack for a failed scrape or two.
+_CACHE_TTL = 3600
 _cache_lock = Lock()
 _JOB_LIST_COLUMNS = "id, company, role, location, date, link, type, season, ats, last_seen_at"
 

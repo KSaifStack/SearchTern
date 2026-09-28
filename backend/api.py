@@ -169,21 +169,31 @@ def scheduled_scrape():
 
 scheduler = BackgroundScheduler()
 
+# The scrape peaks at ~104MB and used to run inside this process, which is how a
+# scrape took the whole site down at 512MB. .github/workflows/scrape.yml runs it
+# on a GitHub runner instead (2 cores, 7GB), so SCRAPE_IN_PROCESS defaults to
+# off: leave the web service doing reads only. Set it to 1 only while migrating,
+# or if the Actions workflow is not running.
+SCRAPE_IN_PROCESS = os.environ.get("SCRAPE_IN_PROCESS", "0") == "1"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    scheduler.add_job(
-        scheduled_scrape,
-        CronTrigger(minute=0),
-        id="hourly-scrape",
-        # A free Render instance spins down when idle, so by the time it wakes
-        # the :00 tick is already minutes in the past. APScheduler's 1-second
-        # default misfire window discarded those runs silently, which is how a
-        # site can go days without scraping while reporting healthy.
-        misfire_grace_time=600,
-    )
-    scheduler.start()
+    if SCRAPE_IN_PROCESS:
+        scheduler.add_job(
+            scheduled_scrape,
+            CronTrigger(minute=0),
+            id="hourly-scrape",
+            # A free instance spins down when idle, so by the time it wakes the
+            # :00 tick is already minutes in the past. APScheduler's 1-second
+            # default misfire window discarded those runs silently.
+            misfire_grace_time=600,
+        )
+        scheduler.start()
+    else:
+        logger.info("Scheduler: in-process scrape disabled (SCRAPE_IN_PROCESS=0)")
     yield
-    scheduler.shutdown()
+    if scheduler.running:
+        scheduler.shutdown()
 
 # This connects the backend to the frontend using FastAPI
 # http://localhost:8000/ by default
