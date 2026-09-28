@@ -351,7 +351,7 @@ def pull_recent(request: Request, response: Response, part: int = 0, parts: int 
 @app.get("/count")
 @limiter.limit("30/minute")
 def listing_count(request: Request):
-    return {"result": len(read_db.recent_internships())}
+    return {"result": read_db.count_internships()}
 
 #Resolve a job's current numeric id from its content fingerprint. Tracked jobs
 #store fingerprints (stable across rescrapes) but detail links need the live id.
@@ -360,11 +360,10 @@ def listing_count(request: Request):
 def job_lookup(request: Request, company: str = "", role: str = "", location: str = ""):
     if not (company or role or location):
         raise HTTPException(status_code=400, detail="company, role, or location required.")
-    want = _job_fingerprint(company, role, location)
-    for job in read_db.recent_internships():
-        if _job_fingerprint(job.get("company"), job.get("role"), job.get("location")) == want:
-            return {"result": {"id": job.get("id")}}
-    raise HTTPException(status_code=404, detail="Job not found.")
+    job_id = read_db.find_internship_id(company, role, location)
+    if job_id is None:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return {"result": {"id": job_id}}
 
 #Single internship by id — powers the public /jobs/<id> detail pages
 @app.get("/jobs/{job_id}")
@@ -490,18 +489,6 @@ def agent_tracker(
 
 
 _TRACKER_STATUSES = ("Saved", "Applied", "Interview", "Offer", "Rejected")
-
-def _job_fingerprint(company, role, location):
-    """Content-based fingerprint matching the frontend makeJobFingerprint().
-
-    Stable across backend ID rotation so the tracker row keys line up between
-    the UI and the agent proposals."""
-    def norm(s):
-        s = (s or "").lower()
-        s = re.sub(r"[^a-z0-9\s]", "", s)
-        s = re.sub(r"\s+", " ", s).strip()
-        return s
-    return f"{norm(company)}|{norm(role)}|{norm(location)}"
 
 
 def _execute_tracker_mutation(user_id, tool, body):

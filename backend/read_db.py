@@ -4,6 +4,7 @@ import psycopg2.extras
 import psycopg2.pool as pgpool
 import json
 import hashlib
+import re
 import secrets
 import os
 from threading import Lock
@@ -147,6 +148,23 @@ def get_internship(job_id):
     return dict(row) if row else None
 
 
+def job_fingerprint(company, role, location):
+    """Content-based fingerprint matching the frontend makeJobFingerprint().
+
+    Stable across backend ID rotation so tracker rows key line up between the UI
+    and the agent proposals. It lives here, not in api.py, because the scraper
+    writes the same value into the indexed `fingerprint` column: two copies of
+    this normaliser would drift apart on the first tweak, and a drifted
+    fingerprint is a silent 404 on every tracked job, not a crash.
+    """
+    def norm(s):
+        s = (s or "").lower()
+        s = re.sub(r"[^a-z0-9\s]", "", s)
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
+    return f"{norm(company)}|{norm(role)}|{norm(location)}"
+
+
 # Search by location
 def search_location(x):
     conn = get_conn()
@@ -184,6 +202,46 @@ def search_company(x):
         rows = cur.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+# Row count for /count. This used to be len(recent_internships()), which pulled
+# the whole visible table — ~10MB — out of Postgres to return one integer.
+def count_internships():
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT count(*) FROM internships")
+            row = cur.fetchone()
+    except psycopg2.errors.UndefinedTable:
+        # Same contract as recent_internships(): no table yet is 0, not a 500.
+        conn.rollback()
+        row = (0,)
+    finally:
+        conn.close()
+    return row[0] if row else 0
+
+
+# Resolve a job's live id from its content fingerprint. One indexed lookup.
+# This used to walk all ~13k rows of the resident table and fingerprint each one
+# in Python on every request, so a lookup could not be answered without the
+# 10MB whole-table cache being warm, and it was the reason a 0.1 vCPU host felt
+# slow even when idle.
+def find_internship_id(company, role, location):
+    want = job_fingerprint(company, role, location)
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM internships WHERE fingerprint = %s LIMIT 1",
+                (want,),
+            )
+            row = cur.fetchone()
+    except psycopg2.errors.UndefinedTable:
+        conn.rollback()
+        row = None
+    finally:
+        conn.close()
+    return row[0] if row else None
 
 
 # ── Agent approval bridge ─────────────────────────────────────────────────────

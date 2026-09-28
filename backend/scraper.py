@@ -11,6 +11,11 @@ from dotenv import load_dotenv
 from datetime import datetime, timezone
 from threading import Lock
 
+# The fingerprint normaliser is shared with the read path so /jobs/lookup can
+# match what we store here. read_db's pool is lazy, so importing it opens no
+# connection.
+from read_db import job_fingerprint
+
 load_dotenv()
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
@@ -483,7 +488,7 @@ def update_database():
 
 
 _UPSERT_SQL = """
-    INSERT INTO internships (company, role, location, date, link, type, season, ats, description, last_seen_at)
+    INSERT INTO internships (company, role, location, date, link, type, season, ats, description, fingerprint, last_seen_at)
     VALUES %s
     ON CONFLICT (company, role, location, link)
     DO UPDATE SET
@@ -492,6 +497,7 @@ _UPSERT_SQL = """
         season = EXCLUDED.season,
         ats = EXCLUDED.ats,
         description = EXCLUDED.description,
+        fingerprint = EXCLUDED.fingerprint,
         last_seen_at = EXCLUDED.last_seen_at
 """
 
@@ -530,12 +536,40 @@ def _flush(cursor, batch, run_time):
         _UPSERT_SQL,
         (
             (j["company"], j["role"], j["location"], j["date"], j["link"],
-             j["type"], j["season"], j.get("ats", ""), j.get("description"), run_time)
+             j["type"], j["season"], j.get("ats", ""), j.get("description"),
+             job_fingerprint(j["company"], j["role"], j["location"]), run_time)
             for j in batch
         ),
         page_size=1000,
     )
     return len(batch)
+
+
+def _backfill_fingerprints(cursor):
+    """Fill fingerprint on rows written before the column existed.
+
+    In Python rather than SQL, deliberately. The value has to come out of the
+    exact same normaliser the upsert uses, and a SQL translation of those
+    regexes would quietly diverge from it — per-field .strip() versus a
+    single btrim over the joined string, for one. A mismatched fingerprint is
+    not a crash; it is a 404 on every tracked job until that row is re-scraped,
+    which is the worst possible failure for the feature that motivated this.
+    Idempotent: a no-op once every row is populated.
+    """
+    cursor.execute(
+        "SELECT id, company, role, location FROM internships WHERE fingerprint IS NULL"
+    )
+    rows = cursor.fetchall()
+    if not rows:
+        return 0
+    execute_values(
+        cursor,
+        "UPDATE internships AS i SET fingerprint = v.fp "
+        "FROM (VALUES %s) AS v(id, fp) WHERE i.id = v.id",
+        ((r[0], job_fingerprint(r[1], r[2], r[3])) for r in rows),
+        page_size=1000,
+    )
+    return len(rows)
 
 
 def _update_database():
@@ -578,6 +612,7 @@ def _update_database():
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS season TEXT")
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS ats TEXT")
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS description TEXT")
+        cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS fingerprint TEXT")
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT NOW()")
 
         cursor.execute("""
@@ -606,6 +641,11 @@ def _update_database():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_date ON internships(date)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_role ON internships(role)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_location ON internships(location)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_fingerprint ON internships(fingerprint)")
+
+        backfilled = _backfill_fingerprints(cursor)
+        if backfilled:
+            print(f"  backfilled fingerprint on {backfilled} pre-existing rows", flush=True)
 
         # Age purge is safe to run first: it keys off the stored date, not off
         # anything a source told us this cycle.

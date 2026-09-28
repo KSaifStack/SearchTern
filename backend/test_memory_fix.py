@@ -14,13 +14,26 @@ import read_db
 import scraper
 
 
+class _ClientEncoding:
+    # execute_values encodes the statement through cur.connection.encoding,
+    # looked up in psycopg2.extensions.encodings — whose key is "UTF8".
+    encoding = "UTF8"
+
+
 class FakeCursor:
     def __init__(self, constraint=True):
         self.constraint = constraint
         self.row = None
         self.queries = []
+        self.rows = []
+        self.mogrified = []
+        self.connection = _ClientEncoding()
 
     def execute(self, query, params=None):
+        # execute_values hands over the encoded statement as bytes; a real
+        # cursor takes either, so this does too.
+        if isinstance(query, bytes):
+            query = query.decode("utf8", "replace")
         self.queries.append(query)
         if "pg_get_constraintdef" in query:
             self.row = ("UNIQUE (company, role, location, link)",) if self.constraint else None
@@ -29,6 +42,18 @@ class FakeCursor:
 
     def fetchone(self):
         return self.row
+
+    def fetchall(self):
+        return self.rows
+
+    def mogrify(self, query, params=None):
+        # execute_values folds the rows into the statement via mogrify, so
+        # keeping the params here is the only way to assert on what a batch
+        # actually wrote. It hands the query in already encoded and expects
+        # bytes back, which it then joins.
+        encoded = query if isinstance(query, bytes) else query.encode("utf8")
+        self.mogrified.append((encoded.decode("utf8", "replace"), params))
+        return encoded
 
     def __enter__(self):
         return self
@@ -205,6 +230,75 @@ class MemoryFixTests(unittest.TestCase):
         finally:
             api.scraper.update_database = original
         self.assertEqual(calls, [])
+
+    # ── /count and /jobs/lookup used to read the whole table ──────────────────
+
+    def test_count_and_lookup_never_read_the_whole_table(self):
+        """Both went through recent_internships(): /count returned len() of a
+        ~10MB pull, and /jobs/lookup walked all 13k rows in Python per request.
+        That whole-table read is most of the Supabase egress, so it is worth a
+        test that fails if either endpoint regresses to it."""
+        conn = FakeConnection()
+        with patch.object(read_db, "get_conn", return_value=conn), \
+             patch.object(read_db, "recent_internships",
+                          side_effect=AssertionError("read the whole table")):
+            self.assertEqual(read_db.count_internships(), 0)
+            self.assertIsNone(read_db.find_internship_id("Acme, Inc.", "Intern", "Remote"))
+        queries = " ".join(conn.cursor_obj.queries)
+        self.assertIn("SELECT count(*) FROM internships", queries)
+        self.assertIn("WHERE fingerprint = %s", queries)
+
+    def test_fingerprint_ignores_case_and_punctuation(self):
+        """Tracked jobs key off this string, so it has to survive the tidying
+        the frontend does before it ever reaches the API."""
+        self.assertEqual(
+            read_db.job_fingerprint("Acme, Inc.", "C++ Intern", "New York, NY"),
+            read_db.job_fingerprint("acme inc", "c intern", "new york ny"),
+        )
+        self.assertNotEqual(
+            read_db.job_fingerprint("Acme", "Intern", "Remote"),
+            read_db.job_fingerprint("Acme", "Intern", "SF"),
+        )
+
+    def test_upsert_stores_the_fingerprint_the_reader_looks_up(self):
+        """The scraper writes it and /jobs/lookup reads it. If the two copies
+        ever disagree the result is a 404 on every tracked job that looks
+        perfectly healthy, so pin them to one implementation."""
+        cursor = FakeCursor()
+        row = {"company": "Acme, Inc.", "role": "C++ Intern",
+               "location": "New York, NY", "date": "0", "link": "https://x/y",
+               "type": "internship", "season": "2027", "ats": "",
+               "description": None}
+        scraper._flush(cursor, [row], None)
+        # execute_values mogrifies a row template; the assembled statement is
+        # what reaches execute().
+        sql, params = cursor.queries[-1], cursor.mogrified[0][1]
+        self.assertIn("fingerprint", sql)
+        self.assertIn("fingerprint = EXCLUDED.fingerprint", sql)
+        self.assertIn(
+            read_db.job_fingerprint("acme inc", "c intern", "new york ny"),
+            list(params),
+        )
+
+    def test_backfill_only_touches_rows_with_no_fingerprint(self):
+        """Rows written before the column existed. The normaliser has to be the
+        Python one rather than a SQL translation of the same regexes: per-field
+        .strip() versus a single btrim over the joined string drifts for one,
+        and a drifted fingerprint silently 404s until that row is re-scraped."""
+        cursor = FakeCursor()
+        self.assertEqual(scraper._backfill_fingerprints(cursor), 0)
+        self.assertEqual(cursor.mogrified, [])
+
+        cursor = FakeCursor()
+        cursor.rows = [(1, "Acme, Inc.", "C++ Intern", "New York, NY")]
+        self.assertEqual(scraper._backfill_fingerprints(cursor), 1)
+        self.assertIn("WHERE fingerprint IS NULL", cursor.queries[0])
+        sql, params = cursor.queries[-1], cursor.mogrified[0][1]
+        self.assertIn("SET fingerprint", sql)
+        self.assertIn(
+            read_db.job_fingerprint("acme inc", "c intern", "new york ny"),
+            list(params),
+        )
 
 
 if __name__ == "__main__":
