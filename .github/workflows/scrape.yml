@@ -37,6 +37,26 @@ jobs:
           SCRAPER_MAX_AGE_DAYS: '90'
         run: python backend/scraper.py
 
+      # The scrape wrote backend/recent.jobs.json (read_db.write_snapshot()).
+      # Publish it to R2 as the CDN-served index, so the frontend — and any
+      # number of visitors — read it from a zero-egress static object instead
+      # of the API. Cache-Control is 1h to match the hourly scrape: browsers and
+      # CDN POPs hold the file one hour, then refetch; stale-while-revalidate
+      # serves instantly while a replaced object loads in the background.
+      - name: Publish index to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3api put-object \
+            --endpoint-url "https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com" \
+            --bucket searchtern-jobs \
+            --key jobs.json \
+            --body backend/recent.jobs.json \
+            --content-type application/json \
+            --cache-control "public, max-age=3600, stale-while-revalidate=60"
+
       - name: Report
         if: always()
         run: echo "scraper.py prints its per-source RSS and row counts to this log."

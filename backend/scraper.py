@@ -12,9 +12,9 @@ from datetime import datetime, timezone
 from threading import Lock
 
 # The fingerprint normaliser is shared with the read path so /jobs/lookup can
-# match what we store here. read_db's pool is lazy, so importing it opens no
-# connection.
-from read_db import job_fingerprint
+# match what we store here, and the snapshot writer refreshes the file /recent
+# serves. read_db's pool is lazy, so importing it opens no connection.
+from read_db import job_fingerprint, write_snapshot
 
 load_dotenv()
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -720,6 +720,19 @@ def _update_database():
             cursor.execute("DELETE FROM internships WHERE last_seen_at < %s", (current_run_time,))
 
         conn.commit()
+
+        # Snapshot refresh. In-process (SCRAPE_IN_PROCESS=1) it keeps this API's
+        # /recent current without a Postgres read on the request path; standalone
+        # (GitHub Actions) it produces the file the workflow uploads to R2, so
+        # the CDN — not the API — serves the list. One ~4.2MB read per scrape
+        # either way.
+        try:
+            write_snapshot()
+            print("  rewrote job snapshot", flush=True)
+        except Exception as e:
+            # The API rebuilds it on demand; a scrape must not fail over this.
+            print(f"  ! snapshot refresh failed (API will rebuild on demand): {e}", flush=True)
+
         return f"Done! {written} listings upserted." + (f" ({len(failures)} source failures.)" if failures else "")
     finally:
         conn.close()

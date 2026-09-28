@@ -162,7 +162,9 @@ def scheduled_scrape():
         if result is None:
             logger.info("Scheduler: scrape skipped (already running, or out of memory)")
         else:
-            read_db.invalidate_cache()
+            # No invalidate_cache() here: in-process runs rewrite the snapshot
+            # file themselves (see scraper._update_database), so the next
+            # /recent picks the fresh data up by identity.
             logger.info(f"Scheduler: {result}")
     except Exception as e:
         logger.error(f"Scheduler: scrape failed — {e}")
@@ -314,10 +316,10 @@ def _days_ago(value):
 @app.get("/recent")
 @limiter.limit("30/minute")
 def pull_recent(request: Request, response: Response, part: int = 0, parts: int = 1):
-    # Read the generation first — see read_db.cache_generation() for why the
-    # order matters.
-    generation = read_db.cache_generation()
-    data = read_db.recent_internships()
+    # (generation, rows) come from one read, so there is no window where a
+    # snapshot rewrite sneaks between two calls and pairs an old generation
+    # with new data.
+    generation, data = read_db.snapshot()
     total = len(data)
     parts = max(1, min(parts, 8))  # public param: cap so it can't be absurd
     if parts > 1 and 1 <= part <= parts:

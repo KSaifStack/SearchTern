@@ -240,6 +240,8 @@ class MemoryFixTests(unittest.TestCase):
         test that fails if either endpoint regresses to it."""
         conn = FakeConnection()
         with patch.object(read_db, "get_conn", return_value=conn), \
+             patch.object(read_db, "snapshot",
+                          side_effect=AssertionError("read the whole table")), \
              patch.object(read_db, "recent_internships",
                           side_effect=AssertionError("read the whole table")):
             self.assertEqual(read_db.count_internships(), 0)

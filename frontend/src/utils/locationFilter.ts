@@ -3,6 +3,48 @@ export interface ParsedLocation {
   states: string[]
 }
 
+const NAME_TO_CODE = new Map(Object.entries(US_STATES).map(([name, code]) => [name, code]))
+const COUNTRIES = new Set(['United States', 'United States of America', 'USA', 'US', 'United Kingdom', 'UK', 'Canada'])
+
+function stateCode(tok: string): string | null {
+  return US_STATES[tok] ? tok : (NAME_TO_CODE.get(tok) ?? null)
+}
+
+// Comma-joined multi-city list ("Phoenix, AZ, Tempe, AZ, ..."): a location
+// ends at a state or country token — unless a country follows the state
+// ("Denver, Colorado, United States") or the next token is that same state
+// ("New York, NY", where the city matches the state *name*). Unknown tokens
+// just stay grouped.
+export function splitCommaLocations(location: string): string[] {
+  const tokens = location.split(',').map(t => t.trim()).filter(Boolean)
+  const groups: string[] = []
+  let cur: string[] = []
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i]
+    const next = tokens[i + 1] ?? ''
+    cur.push(tok)
+    const code = stateCode(tok)
+    const continues =
+      COUNTRIES.has(next) ||
+      (code !== null && code === stateCode(next))
+    if (COUNTRIES.has(tok) || !next || (code !== null && !continues)) {
+      groups.push(cur.join(', '))
+      cur = []
+    }
+  }
+  if (cur.length) groups.push(cur.join(', '))
+  return groups
+}
+
+// Listings pack every city into one field. Show at most five locations so a
+// 46-city Amazon row doesn't swallow a list page.
+export function trimLocations(location: string): string {
+  let parts = location.split(/[;|]/).map(s => s.trim()).filter(Boolean)
+  if (parts.length <= 5) parts = splitCommaLocations(location)
+  if (parts.length <= 5) return location
+  return parts.slice(0, 5).join('; ') + ` +${parts.length - 5} more`
+}
+
 export const US_STATES: Record<string, string> = {
   AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
   CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', FL: 'Florida', GA: 'Georgia',

@@ -15,20 +15,32 @@ from dotenv import load_dotenv
 load_dotenv()
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-_cache: list | None = None
-_cache_time: float = 0
-# A fallback, not a freshness mechanism. Every successful scrape calls
-# invalidate_cache(), so normal freshness is event-driven and immediate — this
-# only decides how stale the site can get when scrapes fail.
+# The whole visible table used to live in a resident Python list (~13k rows,
+# ~10MB) that was re-read from Postgres whenever the TTL lapsed, regardless of
+# request traffic. It lives in a file now (RECENT_SNAPSHOT_PATH, default
+# recent.jobs.json next to this module): a scrape that runs in this process
+# rewrites it, and the API serves it from an identity-keyed memo, parsed once
+# per file version rather than once per request. The TTL is only the "how stale
+# if the scraper dies and the file stops updating" fallback — normal freshness
+# is event-driven by the file's mtime.
 #
-# It was 3300s, "refresh before the hourly scrape". Dropping it to 900 cut the
-# gap but quadrupled the whole-table refetch: this query pulls ~13k rows (~10MB)
-# out of Postgres every time it fires, so 900s meant ~29GB/month of Supabase
-# egress against a 5GB allowance, to save ~8MB of resident memory the cache held
-# either way. An hour is enough slack for a failed scrape or two.
+# The file is also the artifact a CDN split can consume: publishing
+# recent.jobs.json as a static asset is what removes Supabase egress entirely,
+# and this change is the format-compatible precursor to that.
 _CACHE_TTL = 3600
-_cache_lock = Lock()
+_snapshot_lock = Lock()
+_SNAPSHOT_PATH = os.environ.get(
+    "RECENT_SNAPSHOT_PATH",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "recent.jobs.json"),
+)
 _JOB_LIST_COLUMNS = "id, company, role, location, date, link, type, season, ats, last_seen_at"
+
+# In-process copy of the snapshot, keyed by the file's identity. Kept because
+# json.loads of the whole table runs on the order of a hundred milliseconds on
+# a 1-vCPU host; serving it from memory is what keeps /recent fast, and keying
+# it by mtime+size is how a rewrite is picked up on the next request.
+_memo_identity: str | None = None
+_memo_rows: list | None = None
 
 _agent_tables_ready = False
 _agent_tables_checked_at = 0.0
@@ -93,49 +105,101 @@ def get_conn():
     return _PooledConn(_get_pool().getconn())
 
 
-def cache_generation():
-    """Identifier for the current contents of _cache, changed whenever the table
-    is re-read or dropped. Callers key derived work off this instead of
-    redoing it per request.
+def _stat():
+    """(identity, mtime) of the snapshot file, or None if it is missing or
+    older than the TTL. The identity — mtime_ns and size — changes whenever the
+    file is rewritten, which is what drives the cache invalidating itself."""
+    try:
+        st = os.stat(_SNAPSHOT_PATH)
+    except OSError:
+        return None
+    if time() - st.st_mtime > _CACHE_TTL:
+        return None
+    return f"{st.st_mtime_ns}-{st.st_size}", st.st_mtime
 
-    Read this BEFORE recent_internships(), never after. If an invalidation
-    lands in between, the generation is then older than the data it describes —
-    so the next request sees a different generation and the ETag changes. Read
-    the other way round, the stale body would be published under a generation
-    that never moves again."""
-    with _cache_lock:
-        return _cache_time
+
+def _snapshot_from_file():
+    """(identity, rows) read straight off the current file."""
+    with open(_SNAPSHOT_PATH) as f:
+        rows = json.load(f)["result"]
+    return _stat()[0], rows
+
+
+def write_snapshot():
+    """Rebuild the snapshot file from Postgres, streaming rows to disk.
+
+    A server-side cursor keeps this process flat — accumulating ~13k rows into
+    a list here is the memory profile the streaming scraper exists to avoid.
+    The temp path + os.replace makes the rewrite atomic, so a concurrent reader
+    never sees a half-written file. Returns (identity, rows)."""
+    conn = get_conn()
+    tmp = f"{_SNAPSHOT_PATH}.{os.getpid()}.tmp"
+    try:
+        try:
+            with conn.cursor(name="snapshot", cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.itersize = 2000
+                cur.execute(f"SELECT {_JOB_LIST_COLUMNS} FROM internships ORDER BY date")
+                with open(tmp, "w") as f:
+                    f.write('{"result": [')
+                    first = True
+                    for row in cur:
+                        if not first:
+                            f.write(",")
+                        first = False
+                        f.write(json.dumps(dict(row), default=str))
+                    f.write("]}")
+        except psycopg2.errors.UndefinedTable:
+            # Same contract as the old cache: no table yet is [], not a 500.
+            conn.rollback()
+            with open(tmp, "w") as f:
+                f.write('{"result": []}')
+        os.replace(tmp, _SNAPSHOT_PATH)
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        conn.close()
+    return _snapshot_from_file()
+
+
+def snapshot():
+    """(generation, rows) for the whole visible table, taken from one read so a
+    caller can never pair a generation with a body that no longer matches it.
+    Serves the identity-keyed memo; parses or rebuilds only when the file
+    changed, vanished, or went stale."""
+    global _memo_identity, _memo_rows
+    st = _stat()
+    if st is not None and st[0] == _memo_identity and _memo_rows is not None:
+        return _memo_identity, _memo_rows
+    with _snapshot_lock:
+        st = _stat()
+        if st is not None and st[0] == _memo_identity and _memo_rows is not None:
+            return _memo_identity, _memo_rows
+        if st is not None:
+            identity, rows = _snapshot_from_file()
+        else:
+            identity, rows = write_snapshot()
+        _memo_identity, _memo_rows = identity, rows
+        return identity, rows
 
 
 def invalidate_cache():
-    global _cache, _cache_time
-    with _cache_lock:
-        _cache = None
-        _cache_time = 0
+    """Drop the snapshot and memo so the next read rebuilds them from Postgres.
+    Called after writes (e.g. /update) when the scraper did not refresh the
+    file itself."""
+    global _memo_identity, _memo_rows
+    _memo_identity, _memo_rows = None, None
+    try:
+        os.unlink(_SNAPSHOT_PATH)
+    except OSError:
+        pass
 
 
-# Get all internships ordered by date (cached in memory)
+# Get all internships ordered by date (snapshot-backed: the file the scraper
+# rewrites is the source now, not a resident list).
 def recent_internships():
-    global _cache, _cache_time
-    now = time()
-    with _cache_lock:
-        if _cache is not None and now - _cache_time < _CACHE_TTL:
-            return _cache
-        conn = get_conn()
-        try:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(f"SELECT {_JOB_LIST_COLUMNS} FROM internships ORDER BY date")
-                rows = cur.fetchall()
-        except psycopg2.errors.UndefinedTable:
-            conn.rollback()
-            _cache = []
-            _cache_time = now
-            return _cache
-        finally:
-            conn.close()
-        _cache = [dict(row) for row in rows]
-        _cache_time = now
-        return _cache
+    return snapshot()[1]
 
 
 # Get a single internship by id (for the public job detail pages)

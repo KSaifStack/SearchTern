@@ -7,7 +7,7 @@ import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
 import { makeJobFingerprint } from "../utils/jobFingerprint"
-import { parseLocation, US_STATES } from "../utils/locationFilter"
+import { parseLocation, trimLocations, US_STATES } from "../utils/locationFilter"
 import type { ParsedLocation } from "../utils/locationFilter"
 import { matchCompanyMeta, EMPLOYEE_BUCKETS, inEmployeeBucket } from "../utils/companyMeta"
 
@@ -531,7 +531,7 @@ function Jobs() {
                         {job.role}
                       </a>
                     </Table.Td>
-                    <Table.Td data-label="Location">{job.location}</Table.Td>
+                    <Table.Td data-label="Location">{trimLocations(job.location)}</Table.Td>
                     <Table.Td data-label="Date">{formatRelativeDate(job.date)}</Table.Td>
                   </Table.Tr>
                 )

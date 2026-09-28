@@ -8,7 +8,7 @@ client = TestClient(api.app)
 
 
 def rows(v):
-    api.read_db.recent_internships = lambda: v
+    api.read_db.snapshot = lambda: ("gen", v)
 
 
 def get(qs):
