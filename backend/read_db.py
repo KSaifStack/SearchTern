@@ -16,7 +16,10 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 _cache: list | None = None
 _cache_time: float = 0
-_CACHE_TTL = 3300  # 55 minutes (refresh before the hourly scrape)
+# 15 minutes, not 55. The old value was picked so the cache would still be warm
+# across the top of the hour — which is exactly when the scrape runs and memory
+# is scarcest. 15 clears the whole table long before :00.
+_CACHE_TTL = 900
 _cache_lock = Lock()
 _JOB_LIST_COLUMNS = "id, company, role, location, date, link, type, season, ats, last_seen_at"
 
@@ -63,11 +66,38 @@ class _PooledConn:
     def __getattr__(self, name):
         return getattr(self._conn, name)
 
+    def __del__(self):
+        # A caller that raises before reaching its conn.close() leaked the slot
+        # permanently: the pool keys _used by id(conn), so once the psycopg2
+        # object is collected the key is dangling, getconn() eventually raises
+        # PoolError, and every DB-backed endpoint 500s until restart. Returning
+        # the slot on collection closes that for every call site, including ones
+        # added later. close() is idempotent, so explicit callers are unaffected.
+        try:
+            self.close()
+        except Exception:
+            pass
+
+
 def now():
     return datetime.now(timezone.utc)
 
 def get_conn():
     return _PooledConn(_get_pool().getconn())
+
+
+def cache_generation():
+    """Identifier for the current contents of _cache, changed whenever the table
+    is re-read or dropped. Callers key derived work off this instead of
+    redoing it per request.
+
+    Read this BEFORE recent_internships(), never after. If an invalidation
+    lands in between, the generation is then older than the data it describes —
+    so the next request sees a different generation and the ETag changes. Read
+    the other way round, the stale body would be published under a generation
+    that never moves again."""
+    with _cache_lock:
+        return _cache_time
 
 
 def invalidate_cache():

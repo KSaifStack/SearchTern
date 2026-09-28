@@ -1,5 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
+import ctypes
+import gc
+import ijson
 import re
 import psycopg2
 from psycopg2.extras import execute_values
@@ -81,6 +84,37 @@ ALL_SOURCES = [
 MAX_AGE_DAYS = int(os.environ.get("SCRAPER_MAX_AGE_DAYS", "90"))
 _update_lock = Lock()
 _SCRAPE_ADVISORY_LOCK_ID = 742031
+
+# Rows are flushed to Postgres in batches of this size rather than accumulating
+# the whole run in memory. The dedup set is shared across sources, so a row seen
+# by an earlier source is still dropped when a later one repeats it.
+_UPSERT_BATCH = 2000
+
+
+def _rss_mb():
+    """Current resident set size. The scrape runs inside the request-serving
+    process, so this is the number that decides whether Render's cgroup kills
+    the whole site."""
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    return round(int(line.split()[1]) / 1024, 1)
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
+def _release_memory():
+    """Dropping Python references does not lower RSS — glibc keeps freed arenas
+    mapped, so the process holds its high-water mark and the next allocation
+    competes with memory that is free but still counted against the 512MB
+    limit. Freeing the object and returning the arena are separate operations."""
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except (OSError, AttributeError):
+        pass
 
 
 def clean_text(text):
@@ -371,36 +405,53 @@ def scrape_markdown_readme(url, job_type, season):
 
 
 def scrape_searchtern_listings(url):
-    response = requests.get(url, timeout=30)
+    """Yields rows from the SearchTern feed, one at a time.
+
+    response.json() is not an option on an 18MB feed: the raw bytes and the
+    fully built object graph must coexist for the duration of the parse, which
+    made this the single largest allocation in the scrape (+84MB measured).
+    ijson keeps one row live at a time, so the peak stops growing with the feed.
+
+    decode_content is required, not optional — urllib3 does not decompress on
+    raw.read(), and raw.githubusercontent.com always answers Content-Encoding:
+    gzip. Without it ijson raises IncompleteJSONError on every single fetch,
+    which per-source error handling would then swallow, leaving the feed
+    contributing zero rows forever while looking like a successful run.
+    """
+    response = requests.get(url, timeout=30, stream=True)
     if response.status_code != 200:
+        response.close()
         raise RuntimeError(f"HTTP {response.status_code} while fetching {url}")
+    response.raw.decode_content = True
 
-    listings = response.json()
-    jobs = []
-    for job in listings:
-        jt = job.get("job_type", "internship")
-        if jt in ("new_grad", "new-grad"):
-            jt = "newgrad"
-        link = job.get("link")
-        if not link or not str(link).startswith(("http://", "https://")):
-            continue
-        description = job.get("description")
-        jobs.append({
-            "company":  clean_text(str(job.get("company", ""))),
-            "role":     clean_text(str(job.get("role", ""))),
-            "location": clean_text(str(job.get("location", ""))),
-            "date":     str(job.get("date", "")).strip(),
-            "link":     link,
-            "type":     jt if jt in ("internship", "newgrad") else "internship",
-            "season":   "searchtern",
-            "ats":      ats_of(link),
-            "description": clean_text(str(description)) if description else None,
-        })
+    count = 0
+    try:
+        for job in ijson.items(response.raw, "item"):
+            jt = job.get("job_type", "internship")
+            if jt in ("new_grad", "new-grad"):
+                jt = "newgrad"
+            link = job.get("link")
+            if not link or not str(link).startswith(("http://", "https://")):
+                continue
+            description = job.get("description")
+            count += 1
+            yield {
+                "company":  clean_text(str(job.get("company", ""))),
+                "role":     clean_text(str(job.get("role", ""))),
+                "location": clean_text(str(job.get("location", ""))),
+                "date":     str(job.get("date", "")).strip(),
+                "link":     link,
+                "type":     jt if jt in ("internship", "newgrad") else "internship",
+                "season":   "searchtern",
+                "ats":      ats_of(link),
+                "description": clean_text(str(description)) if description else None,
+            }
+    finally:
+        response.close()
 
-    if not jobs:
+    if not count:
         raise RuntimeError(f"No rows found in {url}")
-    print(f"  {len(jobs)} rows from SearchTern-Listings")
-    return jobs
+    print(f"  {count} rows from SearchTern-Listings")
 
 
 def update_database():
@@ -414,7 +465,15 @@ def update_database():
         if not lock_cursor.fetchone()[0]:
             return None
         lock_conn.commit()
-        return _update_database()
+        try:
+            return _update_database()
+        except MemoryError:
+            # The scrape runs inside the request-serving process, so there is no
+            # second process to die in — an uncaught MemoryError takes the whole
+            # site down rather than just the scrape. Skipping the run costs one
+            # stale hour and keeps the endpoint serving.
+            print("  ! scrape ran out of memory; skipping this cycle", flush=True)
+            return None
     finally:
         try:
             if lock_conn is not None:
@@ -423,61 +482,75 @@ def update_database():
             _update_lock.release()
 
 
+_UPSERT_SQL = """
+    INSERT INTO internships (company, role, location, date, link, type, season, ats, description, last_seen_at)
+    VALUES %s
+    ON CONFLICT (company, role, location, link)
+    DO UPDATE SET
+        date = EXCLUDED.date,
+        type = EXCLUDED.type,
+        season = EXCLUDED.season,
+        ats = EXCLUDED.ats,
+        description = EXCLUDED.description,
+        last_seen_at = EXCLUDED.last_seen_at
+"""
+
+
+def _iter_source(fetch, entry):
+    """One source's rows, lazily. The feed streams; the README parsers return a
+    list, and yielding from one costs nothing."""
+    url, job_type, season = entry
+    if job_type is None:
+        yield from fetch(url)
+    else:
+        yield from fetch(url, job_type, season)
+
+
+def _keep(job):
+    """None to keep the row, or the name of the filter that dropped it. Same
+    three filters as the pre-batch pipeline, in the same order: a real apply
+    link, US-only, inside the age cap. An unparseable date is kept, as before."""
+    link = str(job.get("link") or "").strip()
+    if not link or re.match(r"^n/?a$", link, re.I):
+        return "bad-link"
+    if not is_us_only(job["location"]):
+        return "non-us"
+    try:
+        days = float(job["date"])
+    except (TypeError, ValueError):
+        return None  # unknown date -> keep
+    return None if days <= MAX_AGE_DAYS else "too-old"
+
+
+def _flush(cursor, batch, run_time):
+    if not batch:
+        return 0
+    execute_values(
+        cursor,
+        _UPSERT_SQL,
+        (
+            (j["company"], j["role"], j["location"], j["date"], j["link"],
+             j["type"], j["season"], j.get("ats", ""), j.get("description"), run_time)
+            for j in batch
+        ),
+        page_size=1000,
+    )
+    return len(batch)
+
+
 def _update_database():
-    all_jobs = []
-
-    print("Scraping SimplifyJobs READMEs...")
-    for source in SIMPLIFY_SOURCES:
-        all_jobs.extend(scrape_simplify_readme(source["url"], source["type"], source["season"]))
-
-    print("Scraping Markdown READMEs...")
-    for source in MARKDOWN_SOURCES:
-        all_jobs.extend(scrape_markdown_readme(source["url"], source["type"], source["season"]))
-
-    print("Scraping SearchTern-Listings...")
-    all_jobs.extend(scrape_searchtern_listings(SEARCHTERN_LISTINGS_URL))
-
-    if not all_jobs:
-        raise RuntimeError("No listings scraped")
-
-    seen = set()
-    deduped = []
-    for job in all_jobs:
-        key = (job["company"].lower(), job["role"].lower(), job["location"].lower())
-        if key in seen:
-            continue
-        seen.add(key)
-        job["date"] = sort_date(job["date"])
-        deduped.append(job)
-
-    print(f"Total after dedup: {len(deduped)}")
-
-    valid_link = [job for job in deduped if (l := str(job.get("link") or "").strip()) and not re.match(r"^n/?a$", l, re.I)]
-    dropped_links = len(deduped) - len(valid_link)
-    if dropped_links:
-        print(f"Removed {dropped_links} listings with empty/N/A links")
-    print(f"Listings with valid links: {len(valid_link)}")
-
-    us_jobs = [job for job in valid_link if is_us_only(job["location"])]
-    filtered = len(valid_link) - len(us_jobs)
-    if filtered:
-        print(f"Removed {filtered} non-US listings")
-    print(f"US-only listings: {len(us_jobs)}")
-
-    in_range = []
-    too_old = 0
-    for job in us_jobs:
-        try:
-            days = float(job["date"])
-        except (TypeError, ValueError):
-            days = -1  # unknown date -> keep
-        if days >= 0 and days > MAX_AGE_DAYS:
-            too_old += 1
-        else:
-            in_range.append(job)
-    if too_old:
-        print(f"Removed {too_old} listings older than {MAX_AGE_DAYS} days")
-    print(f"Listings within {MAX_AGE_DAYS} days: {len(in_range)}")
+    # ORDER IS LOAD-BEARING. Dedup is first-source-wins on
+    # (company, role, location), and only the SearchTern feed carries a
+    # description — the two README parsers don't emit that key at all. Moving
+    # the feed earlier would hand its synthesised boilerplate descriptions to
+    # ~4,100 rows that currently resolve to null, and change which apply link
+    # survives for each colliding key. It is tempting because the feed is the
+    # biggest allocation in the run; it is not free. Leave the order alone.
+    sources = [
+        ("SimplifyJobs", [(s["url"], s["type"], s["season"]) for s in SIMPLIFY_SOURCES], scrape_simplify_readme),
+        ("Markdown", [(s["url"], s["type"], s["season"]) for s in MARKDOWN_SOURCES], scrape_markdown_readme),
+        ("SearchTern-Listings", [(SEARCHTERN_LISTINGS_URL, None, None)], scrape_searchtern_listings),
+    ]
 
     conn = psycopg2.connect(DATABASE_URL, connect_timeout=30)
     try:
@@ -534,45 +607,80 @@ def _update_database():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_role ON internships(role)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_location ON internships(location)")
 
-        listing_count = len(in_range)
-        del all_jobs, seen, deduped, valid_link, us_jobs
-
-        # Purge existing rows older than the age cap (numeric dates only)
+        # Age purge is safe to run first: it keys off the stored date, not off
+        # anything a source told us this cycle.
         cursor.execute(
             r"DELETE FROM internships WHERE date ~ '^[0-9]+(\.[0-9]+)?$' AND date::numeric > %s",
             (MAX_AGE_DAYS,),
         )
 
-        upsert_query = """
-            INSERT INTO internships (company, role, location, date, link, type, season, ats, description, last_seen_at)
-            VALUES %s
-            ON CONFLICT (company, role, location, link)
-            DO UPDATE SET
-                date = EXCLUDED.date,
-                type = EXCLUDED.type,
-                season = EXCLUDED.season,
-                ats = EXCLUDED.ats,
-                description = EXCLUDED.description,
-                last_seen_at = EXCLUDED.last_seen_at
-        """
-        execute_values(
-            cursor,
-            upsert_query,
-            (
-                (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], job.get("ats", ""), job.get("description"), current_run_time)
-                for job in in_range
-            ),
-            page_size=1000,
-        )
-        del in_range
+        # One source at a time, flushed as we go. The previous shape built the
+        # whole run in memory and then four intermediate lists on top of it.
+        seen = set()  # shared across sources, so cross-source dedup is unchanged
+        failures = []
+        dropped = {}
+        written = 0
 
-        cursor.execute("""
-            DELETE FROM internships
-            WHERE last_seen_at < %s
-        """, (current_run_time,))
+        print(f"Scraping (RSS {(_rss_mb() or 0):.1f} MB at start)...", flush=True)
+        for group_name, entries, fetch in sources:
+            for url, job_type, season in entries:
+                label = f"{group_name} {season or ''}".strip()
+                batch = []
+                writing = False
+                try:
+                    for job in _iter_source(fetch, (url, job_type, season)):
+                        key = (job["company"].lower(), job["role"].lower(), job["location"].lower())
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        job["date"] = sort_date(job["date"])
+                        reason = _keep(job)
+                        if reason:
+                            dropped[reason] = dropped.get(reason, 0) + 1
+                            continue
+                        batch.append(job)
+                        if len(batch) >= _UPSERT_BATCH:
+                            writing = True
+                            written += _flush(cursor, batch, current_run_time)
+                            writing = False
+                            batch.clear()
+                            _release_memory()
+                    writing = True
+                    written += _flush(cursor, batch, current_run_time)
+                    writing = False
+                except MemoryError:
+                    raise
+                except Exception as e:
+                    if writing:
+                        # A failed write is not a failed source. Recording it and
+                        # carrying on would report a successful run over a
+                        # half-written table, and the purge would run.
+                        raise
+                    # One 429 or one empty source must not abort the run — that
+                    # skips the upsert for every other source too. Recorded and
+                    # logged so a source that stops contributing is visible.
+                    failures.append(f"{label}: {e}")
+                    print(f"  ! {label} failed: {e}", flush=True)
+                batch.clear()
+                _release_memory()
+                print(f"  [rss] after {label}: {_rss_mb()} MB", flush=True)
+
+        print(f"Upserted {written} listings; {len(seen)} unique after dedup")
+        if dropped:
+            print("Dropped: " + ", ".join(f"{v} {k}" for k, v in sorted(dropped.items())))
+
+        if failures:
+            # Correctness, not memory: a source we could not read may own rows
+            # that are genuinely still open. Purging on their last_seen_at would
+            # delete live listings.
+            print(f"Skipping stale-row purge — {len(failures)} source(s) failed:")
+            for f in failures:
+                print(f"    {f}")
+        else:
+            cursor.execute("DELETE FROM internships WHERE last_seen_at < %s", (current_run_time,))
 
         conn.commit()
-        return f"Done! {listing_count} listings upserted."
+        return f"Done! {written} listings upserted." + (f" ({len(failures)} source failures.)" if failures else "")
     finally:
         conn.close()
 

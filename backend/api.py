@@ -160,7 +160,7 @@ def scheduled_scrape():
     try:
         result = run_scrape()
         if result is None:
-            logger.info("Scheduler: scrape already running")
+            logger.info("Scheduler: scrape skipped (already running, or out of memory)")
         else:
             read_db.invalidate_cache()
             logger.info(f"Scheduler: {result}")
@@ -171,7 +171,16 @@ scheduler = BackgroundScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    scheduler.add_job(scheduled_scrape, CronTrigger(minute=0))
+    scheduler.add_job(
+        scheduled_scrape,
+        CronTrigger(minute=0),
+        id="hourly-scrape",
+        # A free Render instance spins down when idle, so by the time it wakes
+        # the :00 tick is already minutes in the past. APScheduler's 1-second
+        # default misfire window discarded those runs silently, which is how a
+        # site can go days without scraping while reporting healthy.
+        misfire_grace_time=600,
+    )
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -194,14 +203,34 @@ app.add_middleware(
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+def _proc_status_mb(field):
+    """VmRSS / VmHWM from /proc/self/status, in MB.
+
+    Render kills the container on cgroup OOM and takes the evidence with it —
+    the only record is "Ran out of memory (used over 512MB)". Exposing the peak
+    from inside the process is the only way the next crash names its own cause.
+    """
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith(field):
+                    return round(int(line.split()[1]) / 1024, 1)
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
 #Checks health 
 @app.get("/health")
 @app.head("/health")
 def health():
-    next_run = scheduler.get_jobs()[0].next_run_time if scheduler.get_jobs() else None
+    jobs = scheduler.get_jobs()
+    next_run = jobs[0].next_run_time if jobs else None
     return {
         "status": "Active",
-        "next_scrape": str(next_run) if next_run else "unknown"
+        "next_scrape": str(next_run) if next_run else "unknown",
+        "rss_mb": _proc_status_mb("VmRSS:"),
+        "peak_rss_mb": _proc_status_mb("VmHWM:"),
     }
 
 #Lists the data sources the Listing feed pulls from (fetched from the
@@ -275,28 +304,37 @@ def _days_ago(value):
 @app.get("/recent")
 @limiter.limit("30/minute")
 def pull_recent(request: Request, response: Response, part: int = 0, parts: int = 1):
+    # Read the generation first — see read_db.cache_generation() for why the
+    # order matters.
+    generation = read_db.cache_generation()
     data = read_db.recent_internships()
     total = len(data)
     parts = max(1, min(parts, 8))  # public param: cap so it can't be absurd
     if parts > 1 and 1 <= part <= parts:
-        # `date` is days-ago, so ascending puts the stalest rows first. Slices
-        # are ordered newest-first so the first one a browser fetches is the
-        # useful one. Parsed, not string-sorted: "10" < "2" as text.
+        # `date` is days-ago (0 = today), so ascending puts the newest rows
+        # first and the first slice a browser fetches is the useful one.
+        # Parsed, not string-sorted: "10" < "2" as text.
         data = sorted(data, key=lambda j: _days_ago(j.get("date")))
         per = -(-total // parts)  # ceil, so the last slice is never empty
         data = data[(part - 1) * per:part * per]
     else:
         parts = 1
-    body = json.dumps(
-        {"count": total, "part": part, "parts": parts, "result": data}, default=str
-    ).encode()
-    etag = '"' + hashlib.md5(body).hexdigest() + '"'
+
+    # ETag off the data generation, not off the body. Hashing the body meant
+    # every request — including the ones answered 304 — re-serialised the whole
+    # visible table first, so revalidation bought the client a 304 and the
+    # server a full encode. (generation, part, parts, total) fully determines
+    # the response and costs nothing to compute.
+    etag = '"' + hashlib.md5(f"{generation}-{part}-{parts}-{total}".encode()).hexdigest() + '"'
     headers = {
         "ETag": etag,
         "Cache-Control": "public, max-age=300, must-revalidate",
     }
     if request.headers.get("If-None-Match") == etag:
         return Response(status_code=304, headers=headers)
+    body = json.dumps(
+        {"count": total, "part": part, "parts": parts, "result": data}, default=str
+    ).encode()
     return Response(content=body, media_type="application/json", headers=headers)
 
 #Live listing count — powers the counter shown on job detail pages
