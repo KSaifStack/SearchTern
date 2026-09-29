@@ -490,7 +490,7 @@ def update_database():
 _UPSERT_SQL = """
     INSERT INTO internships (company, role, location, date, link, type, season, ats, description, fingerprint, last_seen_at)
     VALUES %s
-    ON CONFLICT
+    ON CONFLICT (fingerprint)
     DO UPDATE SET
         date = EXCLUDED.date,
         type = EXCLUDED.type,
@@ -502,14 +502,17 @@ _UPSERT_SQL = """
 """
 
 
-# No conflict target on the upsert above, because prod carries two unique
-# constraints the code doesn't own: internships_unique_job
-# (company, role, location, link), created in _ensure_schema, and
-# internships_fingerprint_key on `fingerprint`, added by hand in the SQL
-# editor. Naming only the first let a same-job/different-link listing reach
-# the second and abort the whole scrape. With no target, either constraint
-# routes to the same DO UPDATE, and since the SET list omits
-# company/role/location/link the pre-existing row keeps its link.
+# Conflict target is `fingerprint`, not (company, role, location, link).
+# fingerprint is norm(company)|norm(role)|norm(location), so any four-column
+# conflict necessarily implies a fingerprint conflict -- arbitrating on the
+# fingerprint covers both, which matters because Postgres accepts exactly one
+# inference specification per ON CONFLICT and prod has two unique constraints
+# on this table. Targeting only the four columns let a same-job/different-link
+# listing reach internships_fingerprint_key and abort the scrape with
+# UniqueViolation; a bare "ON CONFLICT" is rejected outright, since DO UPDATE
+# requires an inference specification (only DO NOTHING may omit it).
+# The SET list omits company/role/location/link, so a conflicting row keeps
+# its identity -- its existing link survives.
 
 
 def _iter_source(fetch, entry):
@@ -674,6 +677,34 @@ def _update_database():
         backfilled = _backfill_fingerprints(cursor)
         if backfilled:
             print(f"  backfilled fingerprint on {backfilled} pre-existing rows", flush=True)
+
+        # The upsert arbitrates on (fingerprint), so that unique constraint has
+        # to exist. Prod has had it since someone added it by hand, which meant
+        # a fresh database -- or one restored from a dump without it -- failed
+        # every scrape with "there is no unique or exclusion constraint
+        # matching the ON CONFLICT specification". Create it here, after the
+        # backfill, so the rows it covers are already populated.
+        cursor.execute("""
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'internships_fingerprint_key'
+              AND conrelid = 'internships'::regclass
+        """)
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    ALTER TABLE internships
+                    ADD CONSTRAINT internships_fingerprint_key UNIQUE (fingerprint)
+                """)
+            except psycopg2.errors.UniqueViolation:
+                # Leftover content duplicates. The scrape still dedupes in
+                # Python via `seen`, so carry on without the constraint rather
+                # than failing every run until the rows are cleaned up by hand.
+                cursor.connection.rollback()
+                print(
+                    "  skipped internships_fingerprint_key: duplicate fingerprints "
+                    "still present (dedup continues without it)",
+                    flush=True,
+                )
 
         # Age purge is safe to run first: it keys off the stored date, not off
         # anything a source told us this cycle.

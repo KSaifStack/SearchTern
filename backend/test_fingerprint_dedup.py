@@ -45,9 +45,23 @@ def main():
     from scraper import _UPSERT_SQL
 
     flat = " ".join(_UPSERT_SQL.split())
-    assert "ON CONFLICT (" not in flat, "conflict target reintroduced"
+    # Postgres rejects a bare "ON CONFLICT DO UPDATE" -- DO UPDATE requires an
+    # inference specification. Only DO NOTHING may omit it. That typo shipped
+    # once already and only failed against prod.
     assert flat.count("DO UPDATE") == 1, flat
-    assert _re.search(r"\bON CONFLICT\s+DO UPDATE SET\b", flat), flat
+    assert _re.search(r"\bON CONFLICT \(fingerprint\) DO UPDATE SET\b", flat), flat
+    # The fingerprint arbiter must cover the four-column one: identical
+    # (company, role, location) implies an identical fingerprint, so every
+    # four-column conflict is also a fingerprint conflict. Assert that
+    # implication rather than trusting the comment.
+    four_col = [("Acme, Inc.", "Engineer", "NYC", "http://x/1"),
+                ("Acme, Inc.", "Engineer", "NYC", "http://x/1")]
+    assert len({job_fingerprint(c, r, l) for c, r, l, _ in four_col}) == 1
+    # And it must not over-cover: a different link with the same content is a
+    # conflict the arbiter is meant to catch.
+    diff_link = ("Acme, Inc.", "Engineer", "NYC", "http://x/2")
+    assert job_fingerprint(*diff_link[:3]) in {job_fingerprint(*q[:3]) for q in four_col}
+
     # The SET list must omit the columns the upsert arbitrates, so a conflict
     # keeps the pre-existing row's identity (notably its link).
     set_list = flat.split("DO UPDATE SET", 1)[1]
