@@ -53,7 +53,36 @@ def main():
         assert k not in seen, f"over-merged distinct jobs: {company}/{role}/{loc}"
         seen.add(k)
 
-    print("OK: seen-key and fingerprint agree; distinct jobs still kept")
+    # The backfill must be greedy, not blind. Prod already holds content
+    # duplicates, and internships_fingerprint_key forbids two rows sharing a
+    # fingerprint -- filling every NULL row blindly raised UniqueViolation and
+    # killed the scrape.
+    def greedy_backfill(rows, taken=frozenset()):
+        taken = set(taken)
+        out = []
+        for rid, company, role, loc in rows:
+            fp = job_fingerprint(company, role, loc)
+            if fp in taken:
+                continue
+            taken.add(fp)
+            out.append((rid, fp))
+        return out
+
+    null_rows = [
+        (1, "Acme, Inc.", "Engineer", "NYC"),
+        (2, "Acme Inc.", "Engineer", "NYC"),      # same fingerprint as row 1
+        (3, "Widgets, LLC", "Engineer", "NYC"),
+        (4, "Widgets LLC", "Engineer", "NYC"),     # same fingerprint as row 3
+    ]
+    got = greedy_backfill(null_rows)
+    assert [r[0] for r in got] == [1, 3], got
+    assert len({fp for _, fp in got}) == len(got), "backfill emitted a duplicate"
+
+    # A NULL row colliding with an already-populated row must also be skipped.
+    seeded = greedy_backfill(null_rows, taken={job_fingerprint("Acme Inc.", "Engineer", "NYC")})
+    assert 1 not in [r[0] for r in seeded], seeded
+
+    print("OK: seen-key and fingerprint agree; distinct jobs kept; backfill greedy")
 
 
 if __name__ == "__main__":

@@ -565,21 +565,39 @@ def _backfill_fingerprints(cursor):
     not a crash; it is a 404 on every tracked job until that row is re-scraped,
     which is the worst possible failure for the feature that motivated this.
     Idempotent: a no-op once every row is populated.
+
+    Greedy, because prod already holds rows whose content normalises to the
+    same fingerprint ("Acme, Inc." alongside "Acme Inc."), and
+    internships_fingerprint_key forbids two rows sharing one. Blindly filling
+    every NULL row aborted the whole scrape on
+    psycopg2.errors.UniqueViolation. Rows whose fingerprint is already taken
+    are left NULL instead: Postgres treats NULLs as distinct, so they neither
+    violate the index nor block later runs.
     """
+    cursor.execute("SELECT fingerprint FROM internships WHERE fingerprint IS NOT NULL")
+    taken = {r[0] for r in cursor.fetchall()}
     cursor.execute(
         "SELECT id, company, role, location FROM internships WHERE fingerprint IS NULL"
     )
     rows = cursor.fetchall()
     if not rows:
         return 0
-    execute_values(
-        cursor,
-        "UPDATE internships AS i SET fingerprint = v.fp "
-        "FROM (VALUES %s) AS v(id, fp) WHERE i.id = v.id",
-        ((r[0], job_fingerprint(r[1], r[2], r[3])) for r in rows),
-        page_size=1000,
-    )
-    return len(rows)
+    updates = []
+    for r in rows:
+        fp = job_fingerprint(r[1], r[2], r[3])
+        if fp in taken:
+            continue
+        taken.add(fp)
+        updates.append((r[0], fp))
+    if updates:
+        execute_values(
+            cursor,
+            "UPDATE internships AS i SET fingerprint = v.fp "
+            "FROM (VALUES %s) AS v(id, fp) WHERE i.id = v.id",
+            iter(updates),
+            page_size=1000,
+        )
+    return len(updates)
 
 
 def _update_database():
