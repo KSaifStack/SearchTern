@@ -1,9 +1,7 @@
-import { findJob } from "./_jobs";
-import { toDatePosted } from "../src/utils/jobPosting";
-
 export const config = { runtime: "edge" };
 
 const SITE = "https://searchtern.ksaif.dev";
+const API = process.env.VITE_API_URL || "http://127.0.0.1:8000";
 const DEFAULT_TITLE = "SearchTern — Software Internship & New-Grad Job Tracker";
 const DEFAULT_DESC = "Find thousands of active software internships and new-grad jobs, then track your applications in one place.";
 
@@ -11,18 +9,21 @@ function esc(s: string) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+function postedDate(daysValue: string | number): string | undefined {
+    const days = parseFloat(String(daysValue));
+    if (isNaN(days)) return undefined;
+    return new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
+}
+
 function isRemote(location: string): boolean {
     return /remote|anywhere|telecommute/i.test(location);
 }
 
 async function jobMeta(id: string) {
-    // Read from the CDN-cached index, so a Google crawl never hits the backend.
-    let j
-    try {
-        j = await findJob(id)
-    } catch {
-        return null
-    }
+    const res = await fetch(`${API}/jobs/${id}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const j = data?.result;
     if (!j) return null;
     const desc = `${j.role} in ${j.location || "remote/US"}. Apply directly through ${j.company}.`;
     const loc = j.location || "";
@@ -37,7 +38,7 @@ async function jobMeta(id: string) {
             "@type": "JobPosting",
             title: j.role,
             description: desc,
-            datePosted: toDatePosted(j.date),
+            datePosted: postedDate(j.date),
             hiringOrganization: { "@type": "Organization", name: j.company },
             jobLocation: {
                 "@type": "Place",
