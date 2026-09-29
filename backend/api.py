@@ -232,6 +232,12 @@ def _proc_status_mb(field):
     return None
 
 
+#Root route - lightweight status response so the domain root doesn't 404
+@app.get("/")
+@app.head("/")
+def root():
+    return {"status": "active", "api": "SearchTern"}
+
 #Checks health 
 @app.get("/health")
 @app.head("/health")
@@ -348,6 +354,15 @@ def pull_recent(request: Request, response: Response, part: int = 0, parts: int 
         {"count": total, "part": part, "parts": parts, "result": data}, default=str
     ).encode()
     return Response(content=body, media_type="application/json", headers=headers)
+
+#Alias for /recent. In prod this path is normally served by a CDN edge
+#function (see the vite config) that returns the same job index, but only
+#the backend is deployed on Railway right now — the frontend requests
+#/jobs.json directly, so route it to the same handler until that's sorted.
+@app.get("/jobs.json")
+@limiter.limit("30/minute")
+def jobs_json(request: Request, response: Response, part: int = 0, parts: int = 1):
+    return pull_recent(request, response, part, parts)
 
 #Live listing count — powers the counter shown on job detail pages
 @app.get("/count")
