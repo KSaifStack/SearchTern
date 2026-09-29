@@ -802,6 +802,24 @@ def _update_database():
                         # A failed write is not a failed source. Recording it and
                         # carrying on would report a successful run over a
                         # half-written table, and the purge would run.
+                        #
+                        # When the arbiter is bypassed, the losing row is the
+                        # only thing that explains it: a constraint firing means
+                        # ON CONFLICT (fingerprint) found nothing, and that is
+                        # only true if the stored row's fingerprint differs from
+                        # the one we just computed for an identical 4-tuple.
+                        # Print it rather than guess at a fifth run.
+                        detail = getattr(getattr(e, "diag", None), "detail_text", "") or ""
+                        m = re.search(r"link=\((.*?)\)\s+already exists", detail, re.S)
+                        if m:
+                            cursor.connection.rollback()  # statement aborted it
+                            cursor.execute(
+                                "SELECT id, company, role, location, fingerprint "
+                                "FROM internships WHERE link = %s",
+                                (m.group(1),),
+                            )
+                            for row in cursor.fetchall():
+                                print(f"  ! stored row that already owns this link: {row}", flush=True)
                         raise
                     # One 429 or one empty source must not abort the run — that
                     # skips the upsert for every other source too. Recorded and
