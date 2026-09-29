@@ -222,11 +222,22 @@ function Jobs() {
   return (
     <>
       <section className="feature">
-        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+        <div className="jobs-status-row">
+          <div className="jobs-status-summary">
           {/* Scraper runs on the hour; the CDN serves the result for up to one
               TTL after that, so this counts down to the scrape, not to the
               data changing. Saying otherwise was the misleading part. */}
-          <p className="result-count" style={{ margin: 0 }}>Next scrape in: {String(Math.floor(refreshCountdown / 60)).padStart(2, '0')}:{String(refreshCountdown % 60).padStart(2, '0')}</p>
+            <p className="result-count" style={{ margin: 0 }}>Next scrape in: {String(Math.floor(refreshCountdown / 60)).padStart(2, '0')}:{String(refreshCountdown % 60).padStart(2, '0')}</p>
+            <p className="result-count jobs-mobile-result-count">
+              {loading
+                ? 'Loading...'
+                : loadError
+                  ? `Couldn't load listings (${loadError}). Refresh to retry.`
+                  : partial
+                    ? `Showing ${filtered.length.toLocaleString()} of ${totalJobs.toLocaleString()} — loading more...`
+                    : `${filtered.length.toLocaleString()} listings found`}
+            </p>
+          </div>
           <Popover width={250} position="bottom-start" withArrow shadow="md" opened={popoverOpened} onChange={setPopoverOpened}>
             <Popover.Target>
               <button className="health_btn" onClick={() => {
@@ -295,7 +306,7 @@ function Jobs() {
         />
 
         <div className="results-header">
-          <p className="result-count">
+          <p className="result-count desktop-result-count">
             {loading
               ? 'Loading...'
               : loadError
@@ -304,7 +315,7 @@ function Jobs() {
                   ? `Showing ${filtered.length.toLocaleString()} of ${totalJobs.toLocaleString()} — loading more...`
                   : `${filtered.length.toLocaleString()} listings found`}
           </p>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div className="results-controls">
             <Popover opened={sortOpen} onChange={setSortOpen} width={180} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
                 <button className="sort_btn" onClick={() => setSortOpen(o => !o)}>

@@ -2,9 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useElementSize } from "@mantine/hooks"
 import { Modal } from "@mantine/core"
 import { notifications } from "@mantine/notifications"
-import { Document, Page } from "react-pdf"
+import { Document, Page, pdfjs } from "react-pdf"
 import "react-pdf/dist/Page/TextLayer.css"
 import "react-pdf/dist/Page/AnnotationLayer.css"
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.mjs",
+    import.meta.url,
+).toString()
+
 import {
     CloudArrowUp,
     Files,

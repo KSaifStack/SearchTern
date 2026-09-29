@@ -2,7 +2,7 @@
 
 ## Quickstart
 
-Requires Python 3.8+, Node.js 16+, and a running PostgreSQL database.
+Requires Python 3.8+, Node.js 20.19+ (or 22.12+), and a running PostgreSQL database.
 
 **1. Clone the repo**
 

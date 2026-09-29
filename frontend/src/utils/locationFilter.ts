@@ -3,7 +3,6 @@ export interface ParsedLocation {
   states: string[]
 }
 
-const NAME_TO_CODE = new Map(Object.entries(US_STATES).map(([name, code]) => [name, code]))
 const COUNTRIES = new Set(['United States', 'United States of America', 'USA', 'US', 'United Kingdom', 'UK', 'Canada'])
 
 function stateCode(tok: string): string | null {
@@ -36,13 +35,12 @@ export function splitCommaLocations(location: string): string[] {
   return groups
 }
 
-// Listings pack every city into one field. Show at most five locations so a
-// 46-city Amazon row doesn't swallow a list page.
+// Listings pack every city into one field. Keep long location lists compact.
 export function trimLocations(location: string): string {
   let parts = location.split(/[;|]/).map(s => s.trim()).filter(Boolean)
-  if (parts.length <= 5) parts = splitCommaLocations(location)
-  if (parts.length <= 5) return location
-  return parts.slice(0, 5).join('; ') + ` +${parts.length - 5} more`
+  if (parts.length <= 3) parts = splitCommaLocations(location)
+  if (parts.length <= 3) return location
+  return parts.slice(0, 3).join('; ') + '...'
 }
 
 export const US_STATES: Record<string, string> = {
@@ -58,6 +56,8 @@ export const US_STATES: Record<string, string> = {
   VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
   DC: 'District of Columbia',
 }
+
+const NAME_TO_CODE = new Map(Object.entries(US_STATES).map(([name, code]) => [name, code]))
 
 const STATE_NAME_TO_ABBR: Record<string, string> = Object.fromEntries(
   Object.entries(US_STATES).map(([abbr, name]) => [name.toLowerCase(), abbr])

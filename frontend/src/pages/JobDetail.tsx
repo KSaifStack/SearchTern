@@ -8,6 +8,7 @@ import { usePageMeta } from "../utils/seo"
 import { useAuth } from "../components/AuthContext"
 import { useTracker } from "../components/TrackerContext"
 import { matchCompanyMeta, type CompanyMatch } from "../utils/companyMeta"
+import { toDatePosted } from "../utils/jobPosting"
 import { activeResumeText, getLocalResumes } from "../services/resumeStorage"
 import "../styles/Home.css"
 
@@ -22,17 +23,12 @@ function formatPosted(dateValue: string | number): string {
     return `${Math.floor(parsed)} days ago`
 }
 
-function postedDate(dateValue: string | number): string | undefined {
-    const parsed = parseFloat(String(dateValue))
-    if (!isNaN(parsed)) {
-        return new Date(Date.now() - parsed * 86400e3).toISOString().slice(0, 10)
-    }
-    const iso = new Date(String(dateValue).replace("Z", "+00:00"))
-    return isNaN(iso.getTime()) ? undefined : iso.toISOString().slice(0, 10)
+function jobPostingDescription(job: Job): string {
+    return (job.description ?? "").replace(/\s+/g, " ").trim() || `${job.role} in ${job.location || 'remote/US'}. Apply directly through ${job.company}.`
 }
 
 function metaDescription(job: Job): string {
-    return (job.description ?? "").replace(/\s+/g, " ").trim().slice(0, 155) || `${job.role} in ${job.location || 'remote/US'}. Apply directly through ${job.company}.`
+    return jobPostingDescription(job).slice(0, 155)
 }
 
 function JobDetail() {
@@ -143,7 +139,7 @@ function JobDetail() {
             "@context": "https://schema.org",
             "@type": "JobPosting",
             title: job.role,
-            description: job.description ?? `${job.role} in ${job.location || 'remote/US'}. Apply directly through ${job.company}.`,
+            description: jobPostingDescription(job),
             hiringOrganization: { "@type": "Organization", name: job.company },
             jobLocation: {
                 "@type": "Place",
@@ -157,7 +153,7 @@ function JobDetail() {
             jobLocationType: /remote|anywhere|telecommute/i.test(job.location ?? '') ? "TELECOMMUTE" : undefined,
             directApply: true,
             employmentType: job.type === 'newgrad' ? "FULL_TIME" : job.type === 'internship' ? "INTERN" : undefined,
-            datePosted: postedDate(job.date),
+            datePosted: toDatePosted(job.date),
         } as Record<string, unknown>,
     } : {
         title: loading ? "Job Listing | SearchTern" : "Job Not Found | SearchTern",
