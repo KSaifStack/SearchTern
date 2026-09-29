@@ -678,31 +678,33 @@ def _update_database():
         if backfilled:
             print(f"  backfilled fingerprint on {backfilled} pre-existing rows", flush=True)
 
-        # The upsert arbitrates on (fingerprint), so that unique constraint has
-        # to exist. Prod has had it since someone added it by hand, which meant
-        # a fresh database -- or one restored from a dump without it -- failed
-        # every scrape with "there is no unique or exclusion constraint
-        # matching the ON CONFLICT specification". Create it here, after the
-        # backfill, so the rows it covers are already populated.
-        cursor.execute("""
-            SELECT 1 FROM pg_constraint
-            WHERE conname = 'internships_fingerprint_key'
-              AND conrelid = 'internships'::regclass
-        """)
-        if not cursor.fetchone():
-            try:
-                cursor.execute("""
-                    ALTER TABLE internships
-                    ADD CONSTRAINT internships_fingerprint_key UNIQUE (fingerprint)
-                """)
-            except psycopg2.errors.UniqueViolation:
-                # Leftover content duplicates. The scrape still dedupes in
-                # Python via `seen`, so carry on without the constraint rather
-                # than failing every run until the rows are cleaned up by hand.
-                cursor.connection.rollback()
-                print(
-                    "  skipped internships_fingerprint_key: duplicate fingerprints "
-                    "still present (dedup continues without it)",
+        # The upsert arbitrates on (fingerprint), so a unique index over that
+        # column has to exist -- ON CONFLICT infers from a unique index or an
+        # exclusion constraint, and from nothing else. Prod has had one since
+        # someone added it by hand, so a fresh or restored database failed
+        # every scrape with "no unique or exclusion constraint matching the
+        # ON CONFLICT specification". Created after the backfill, so the rows
+        # it covers are already populated.
+        #
+        # CREATE UNIQUE INDEX IF NOT EXISTS rather than ADD CONSTRAINT: the
+        # existing object is an index, so a constraint would collide on the
+        # name (DuplicateTable) even though the guard found nothing to add.
+        # IF NOT EXISTS is satisfied by either form, since a constraint is
+        # backed by an index of the same name.
+        try:
+            cursor.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS internships_fingerprint_key
+                ON internships(fingerprint)
+            """)
+        except psycopg2.errors.UniqueViolation:
+            # Leftover content duplicates. The scrape still dedupes in Python
+            # via `seen`, so carry on without the index rather than failing
+            # every run until the rows are cleaned up by hand.
+            cursor.connection.rollback()
+            print(
+                "  skipped the fingerprint unique index: duplicate fingerprints "
+                "still present (dedup continues without it)",
+
                     flush=True,
                 )
 
