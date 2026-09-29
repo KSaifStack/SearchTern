@@ -559,7 +559,7 @@ def _flush(cursor, batch, run_time):
 
 
 def _backfill_fingerprints(cursor):
-    """Fill fingerprint on rows written before the column existed.
+    """Make every row's fingerprint the normaliser's own value for its columns.
 
     In Python rather than SQL, deliberately. The value has to come out of the
     exact same normaliser the upsert uses, and a SQL translation of those
@@ -567,15 +567,25 @@ def _backfill_fingerprints(cursor):
     single btrim over the joined string, for one. A mismatched fingerprint is
     not a crash; it is a 404 on every tracked job until that row is re-scraped,
     which is the worst possible failure for the feature that motivated this.
-    Idempotent: a no-op once every row is populated.
 
-    Greedy, because prod holds 212 rows whose content normalises to a
-    fingerprint another row already holds ("Acme, Inc." alongside "Acme Inc."),
-    and the unique index over `fingerprint` forbids two rows sharing one.
-    Filling every NULL row blindly aborted the scrape on
-    psycopg2.errors.UniqueViolation.
+    Every row, not just the NULL ones. Non-NULL is not the same as correct, and
+    being wrong is a hard failure rather than a cosmetic one: the upsert
+    arbitrates on (fingerprint) and nothing else, so a row whose stored
+    fingerprint is not what job_fingerprint computes for its own columns is
+    invisible to that arbiter while still holding
+    (company, role, location, link). An insert matching it there aborts the
+    run on internships_unique_job — which is exactly how 52 rows written by a
+    normaliser that does not exist anywhere in this repo ("intelligent
+    creation, camera" kept its space, "NYC" collapsed to "ny") killed every
+    scrape after the backfill was thought finished. Recomputing is a no-op for
+    a correct row, so the cost of covering them is one comparison.
 
-    Those collisions are deleted rather than left NULL. Leaving them NULL was
+    Greedy, because prod holds rows whose content normalises to a fingerprint
+    another row already holds ("Acme, Inc." alongside "Acme Inc."), and the
+    unique index over `fingerprint` forbids two rows sharing one. Filling every
+    row blindly aborted the scrape on psycopg2.errors.UniqueViolation.
+
+    Those collisions are deleted rather than left stale. Leaving them NULL was
     tried first and does not work: a NULL is invisible to ON CONFLICT
     (fingerprint), so a later insert matching one of those rows on
     (company, role, location, link) found no arbiter and died on
@@ -588,26 +598,31 @@ def _backfill_fingerprints(cursor):
     tracked job. Nothing references internships by foreign key; job references
     live in agent_proposals.payload as JSONB.
     """
-    cursor.execute("SELECT fingerprint FROM internships WHERE fingerprint IS NOT NULL")
-    taken = {r[0] for r in cursor.fetchall()}
     # ORDER BY id so "keep the oldest" is deterministic rather than dependent
     # on whatever order the heap happens to return.
     cursor.execute(
-        "SELECT id, company, role, location FROM internships "
-        "WHERE fingerprint IS NULL ORDER BY id"
+        "SELECT id, company, role, location, fingerprint FROM internships ORDER BY id"
     )
     rows = cursor.fetchall()
     if not rows:
         return 0
     updates = []
     doomed = []
-    for r in rows:
-        fp = job_fingerprint(r[1], r[2], r[3])
+    # Assigned in id order, seeded with nothing: every row passes through, so
+    # "already taken" means an earlier row, not a pre-existing value. Seeding
+    # from the stored column instead is what let a drifted row block its own
+    # correction.
+    taken = set()
+    for rid, company, role, loc, stored in rows:
+        fp = job_fingerprint(company, role, loc)
+        if fp == stored:
+            taken.add(fp)
+            continue
         if fp in taken:
-            doomed.append(r[0])
+            doomed.append(rid)
             continue
         taken.add(fp)
-        updates.append((r[0], fp))
+        updates.append((rid, fp))
     if doomed:
         cursor.execute("DELETE FROM internships WHERE id = ANY(%s)", (doomed,))
         print(
@@ -699,7 +714,11 @@ def _update_database():
 
         backfilled = _backfill_fingerprints(cursor)
         if backfilled:
-            print(f"  backfilled fingerprint on {backfilled} pre-existing rows", flush=True)
+            print(
+                f"  reconciled fingerprint on {backfilled} row(s) whose stored "
+                f"value was not the normaliser's own value for their columns",
+                flush=True,
+            )
 
         # What the upsert is actually arbitrating against. Worth one line per
         # run: the fingerprint arbiter is the load-bearing piece of the write
@@ -716,26 +735,6 @@ def _update_database():
             "SELECT count(*) FROM internships WHERE fingerprint IS NULL"
         )
         print(f"  rows still lacking a fingerprint: {cursor.fetchone()[0]}", flush=True)
-
-        # Non-NULL is not the same as correct. The upsert arbitrates on
-        # (fingerprint) and nothing else, so a row whose stored fingerprint is
-        # not what the current normaliser computes for its own columns is
-        # invisible to the arbiter while still sitting on
-        # internships_unique_job -- an insert matching it on the four columns
-        # then aborts the whole run. Recompute every row and count the
-        # disagreements, so this is visible on every run instead of inferred
-        # from a UniqueViolation three layers up. Pure Python on purpose: the
-        # backfill above already argued why a SQL translation of these regexes
-        # would drift from job_fingerprint.
-        cursor.execute("SELECT id, company, role, location, fingerprint FROM internships")
-        drifted = [
-            (rid, fp, job_fingerprint(co, ro, lo))
-            for rid, co, ro, lo, fp in cursor.fetchall()
-            if fp != job_fingerprint(co, ro, lo)
-        ]
-        print(f"  rows whose fingerprint disagrees with the normaliser: {len(drifted)}", flush=True)
-        for rid, fp, want in drifted[:5]:
-            print(f"    id={rid} stored={fp!r} normaliser={want!r}", flush=True)
 
         # The upsert arbitrates on (fingerprint), so a unique index over that
         # column has to exist -- ON CONFLICT infers from a unique index or an
@@ -835,9 +834,10 @@ def _update_database():
                         if detail:
                             print(f"  ! write conflict -- {detail.strip()}", flush=True)
                         print(
-                            "  ! see the fingerprint-drift count above: a stored "
+                            "  ! if the reconcile count above was 0, a stored "
                             "fingerprint that is not the normaliser's own value "
-                            "for its row is invisible to ON CONFLICT (fingerprint)",
+                            "for its row is what is invisible to "
+                            "ON CONFLICT (fingerprint)",
                             flush=True,
                         )
                         raise

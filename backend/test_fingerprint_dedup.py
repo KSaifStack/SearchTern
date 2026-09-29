@@ -84,16 +84,22 @@ def main():
         assert k not in seen, f"over-merged distinct jobs: {company}/{role}/{loc}"
         seen.add(k)
 
-    # The backfill must delete content duplicates, not leave them NULL. A NULL
-    # is invisible to ON CONFLICT (fingerprint), so an insert matching such a
-    # row on (company, role, location, link) finds no arbiter and dies on
-    # internships_unique_job. Prod had 212 of these.
-    def backfill(rows, taken=frozenset()):
-        """Returns (updates, doomed). Mirrors _backfill_fingerprints()."""
-        taken = set(taken)
-        updates, doomed = [], []
-        for rid, company, role, loc in rows:  # caller supplies ORDER BY id
+    # The backfill must delete content duplicates, not leave them stale. A
+    # stale or NULL fingerprint is invisible to ON CONFLICT (fingerprint), so
+    # an insert matching such a row on (company, role, location, link) finds no
+    # arbiter and dies on internships_unique_job. Prod had 212 of these, and 52
+    # more that were non-NULL but held a foreign normaliser's value.
+    def reconcile(rows):
+        """Returns (updates, doomed). Mirrors _backfill_fingerprints().
+
+        `rows` is (id, company, role, location, stored_fingerprint) in id order.
+        """
+        updates, doomed, taken = [], [], set()
+        for rid, company, role, loc, stored in rows:
             fp = job_fingerprint(company, role, loc)
+            if fp == stored:
+                taken.add(fp)
+                continue
             if fp in taken:
                 doomed.append(rid)
                 continue
@@ -102,23 +108,52 @@ def main():
         return updates, doomed
 
     null_rows = [
-        (1, "Acme, Inc.", "Engineer", "NYC"),
-        (2, "Acme Inc.", "Engineer", "NYC"),      # same fingerprint as row 1
-        (3, "Widgets, LLC", "Engineer", "NYC"),
-        (4, "Widgets LLC", "Engineer", "NYC"),     # same fingerprint as row 3
+        (1, "Acme, Inc.", "Engineer", "NYC", None),
+        (2, "Acme Inc.", "Engineer", "NYC", None),      # same fingerprint as row 1
+        (3, "Widgets, LLC", "Engineer", "NYC", None),
+        (4, "Widgets LLC", "Engineer", "NYC", None),     # same fingerprint as row 3
     ]
-    updates, doomed = backfill(null_rows)
+    updates, doomed = reconcile(null_rows)
     assert [r[0] for r in updates] == [1, 3], updates
     assert doomed == [2, 4], doomed
-    assert len({fp for _, fp in updates}) == len(updates), "backfill emitted a duplicate"
-    # No surviving row may be left NULL, or it becomes the next abort.
+    assert len({fp for _, fp in updates}) == len(updates), "reconcile emitted a duplicate"
+    # No surviving row may be left stale, or it becomes the next abort.
     assert not (set(doomed) & {r[0] for r in updates})
 
-    # A collision with an already-populated row is deleted too, not skipped.
-    seeded_fp = job_fingerprint("Acme Inc.", "Engineer", "NYC")
-    updates, doomed = backfill(null_rows, taken={seeded_fp})
-    assert 1 in doomed, (updates, doomed)
-    assert 3 in [r[0] for r in updates], updates
+    # A row whose stored value is already correct is left alone — no write.
+    correct = job_fingerprint("Acme Inc.", "Engineer", "NYC")
+    updates, doomed = reconcile([(1, "Acme Inc.", "Engineer", "NYC", correct)])
+    assert updates == [] and doomed == [], (updates, doomed)
+
+    # A drifted row -- non-NULL, but not the normaliser's value for its own
+    # columns -- must be corrected. This is the 52-row case: the old code seeded
+    # `taken` from the stored column, so a drifted row could not be corrected if
+    # its stale value were anything but its own fingerprint, and if the stale
+    # value *was* its own fingerprint the row survived while remaining invisible
+    # to the arbiter. The DETAIL that proved it:
+    #   stored    'tiktok|software engineer intern intelligent creation camera|san jose ca'
+    #   normaliser 'tiktok|software engineer intern intelligent creationcamera|san jose ca'
+    drifted = [
+        (1, "TikTok", "Software Engineer Intern, Intelligent Creation/Camera", "San Jose, CA",
+         "tiktok|software engineer intern intelligent creation camera|san jose ca"),
+        (2, "American Express", "Digital Product Analyst Intern", "NYC",
+         "american express|digital product analyst intern|ny"),
+    ]
+    updates, doomed = reconcile(drifted)
+    assert [r[0] for r in updates] == [1, 2], updates
+    assert doomed == [], doomed
+    # The corrections are the normaliser's values, punctuation deleted rather
+    # than spaced, and no location aliasing.
+    assert dict(updates) == {
+        1: "tiktok|software engineer intern intelligent creationcamera|san jose ca",
+        2: "american express|digital product analyst intern|nyc",
+    }, updates
+
+    # And a drifted row whose corrected fingerprint is already held by an
+    # earlier row is deleted, not left holding a value the arbiter can't see.
+    updates, doomed = reconcile([(1, "Acme Inc.", "Engineer", "NYC", correct),
+                                 (2, "Acme, Inc.", "Engineer", "NYC", "acme inc old")])
+    assert updates == [] and doomed == [2], (updates, doomed)
 
     print("OK: seen-key and fingerprint agree; distinct jobs kept; dupes deleted")
 
