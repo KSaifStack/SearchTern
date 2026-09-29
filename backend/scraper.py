@@ -490,7 +490,7 @@ def update_database():
 _UPSERT_SQL = """
     INSERT INTO internships (company, role, location, date, link, type, season, ats, description, fingerprint, last_seen_at)
     VALUES %s
-    ON CONFLICT (company, role, location, link)
+    ON CONFLICT DO UPDATE
     DO UPDATE SET
         date = EXCLUDED.date,
         type = EXCLUDED.type,
@@ -500,6 +500,16 @@ _UPSERT_SQL = """
         fingerprint = EXCLUDED.fingerprint,
         last_seen_at = EXCLUDED.last_seen_at
 """
+
+
+# No conflict target on the upsert above, because prod carries two unique
+# constraints the code doesn't own: internships_unique_job
+# (company, role, location, link), created in _ensure_schema, and
+# internships_fingerprint_key on `fingerprint`, added by hand in the SQL
+# editor. Naming only the first let a same-job/different-link listing reach
+# the second and abort the whole scrape. With no target, either constraint
+# routes to the same DO UPDATE, and since the SET list omits
+# company/role/location/link the pre-existing row keeps its link.
 
 
 def _iter_source(fetch, entry):
@@ -669,7 +679,14 @@ def _update_database():
                 writing = False
                 try:
                     for job in _iter_source(fetch, (url, job_type, season)):
-                        key = (job["company"].lower(), job["role"].lower(), job["location"].lower())
+                        # Keyed on the fingerprint, not the raw lowercase triple,
+                        # so this dedup and internships_fingerprint_key agree.
+                        # They disagreed: "Acme, Inc." and "Acme Inc." are
+                        # distinct here but collapse to one fingerprint, which
+                        # would put both in one batch and make Postgres raise
+                        # "ON CONFLICT DO UPDATE command cannot affect row a
+                        # second time".
+                        key = job_fingerprint(job["company"], job["role"], job["location"])
                         if key in seen:
                             continue
                         seen.add(key)
