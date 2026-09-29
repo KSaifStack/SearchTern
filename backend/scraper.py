@@ -717,6 +717,26 @@ def _update_database():
         )
         print(f"  rows still lacking a fingerprint: {cursor.fetchone()[0]}", flush=True)
 
+        # Non-NULL is not the same as correct. The upsert arbitrates on
+        # (fingerprint) and nothing else, so a row whose stored fingerprint is
+        # not what the current normaliser computes for its own columns is
+        # invisible to the arbiter while still sitting on
+        # internships_unique_job -- an insert matching it on the four columns
+        # then aborts the whole run. Recompute every row and count the
+        # disagreements, so this is visible on every run instead of inferred
+        # from a UniqueViolation three layers up. Pure Python on purpose: the
+        # backfill above already argued why a SQL translation of these regexes
+        # would drift from job_fingerprint.
+        cursor.execute("SELECT id, company, role, location, fingerprint FROM internships")
+        drifted = [
+            (rid, fp, job_fingerprint(co, ro, lo))
+            for rid, co, ro, lo, fp in cursor.fetchall()
+            if fp != job_fingerprint(co, ro, lo)
+        ]
+        print(f"  rows whose fingerprint disagrees with the normaliser: {len(drifted)}", flush=True)
+        for rid, fp, want in drifted[:5]:
+            print(f"    id={rid} stored={fp!r} normaliser={want!r}", flush=True)
+
         # The upsert arbitrates on (fingerprint), so a unique index over that
         # column has to exist -- ON CONFLICT infers from a unique index or an
         # exclusion constraint, and from nothing else. Prod has had one since
@@ -803,23 +823,23 @@ def _update_database():
                         # carrying on would report a successful run over a
                         # half-written table, and the purge would run.
                         #
-                        # When the arbiter is bypassed, the losing row is the
-                        # only thing that explains it: a constraint firing means
-                        # ON CONFLICT (fingerprint) found nothing, and that is
-                        # only true if the stored row's fingerprint differs from
-                        # the one we just computed for an identical 4-tuple.
-                        # Print it rather than guess at a fifth run.
+                        # Print the server's own DETAIL verbatim. An earlier
+                        # attempt parsed it with a regex anchored on "link=(",
+                        # which never appears -- Postgres writes
+                        # "Key (company, role, location, link)=(...) already
+                        # exists", so the parse silently matched nothing and
+                        # the diagnostic printed nothing on the one run it
+                        # existed for. The server states the conflict better
+                        # than a parser would.
                         detail = getattr(getattr(e, "diag", None), "detail_text", "") or ""
-                        m = re.search(r"link=\((.*?)\)\s+already exists", detail, re.S)
-                        if m:
-                            cursor.connection.rollback()  # statement aborted it
-                            cursor.execute(
-                                "SELECT id, company, role, location, fingerprint "
-                                "FROM internships WHERE link = %s",
-                                (m.group(1),),
-                            )
-                            for row in cursor.fetchall():
-                                print(f"  ! stored row that already owns this link: {row}", flush=True)
+                        if detail:
+                            print(f"  ! write conflict -- {detail.strip()}", flush=True)
+                        print(
+                            "  ! see the fingerprint-drift count above: a stored "
+                            "fingerprint that is not the normaliser's own value "
+                            "for its row is invisible to ON CONFLICT (fingerprint)",
+                            flush=True,
+                        )
                         raise
                     # One 429 or one empty source must not abort the run — that
                     # skips the upsert for every other source too. Recorded and
