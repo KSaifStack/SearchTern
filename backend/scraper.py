@@ -701,6 +701,22 @@ def _update_database():
         if backfilled:
             print(f"  backfilled fingerprint on {backfilled} pre-existing rows", flush=True)
 
+        # What the upsert is actually arbitrating against. Worth one line per
+        # run: the fingerprint arbiter is the load-bearing piece of the write
+        # path, and "is it unique, and is it partial" is not something you want
+        # to infer from a UniqueViolation three layers up.
+        cursor.execute("""
+            SELECT indexname, indexdef FROM pg_indexes
+            WHERE tablename = 'internships' AND indexdef ILIKE '%UNIQUE%'
+            ORDER BY indexname
+        """)
+        for name, d in cursor.fetchall():
+            print(f"  unique: {d}", flush=True)
+        cursor.execute(
+            "SELECT count(*) FROM internships WHERE fingerprint IS NULL"
+        )
+        print(f"  rows still lacking a fingerprint: {cursor.fetchone()[0]}", flush=True)
+
         # The upsert arbitrates on (fingerprint), so a unique index over that
         # column has to exist -- ON CONFLICT infers from a unique index or an
         # exclusion constraint, and from nothing else. Prod has had one since
