@@ -3,46 +3,6 @@ export interface ParsedLocation {
   states: string[]
 }
 
-const COUNTRIES = new Set(['United States', 'United States of America', 'USA', 'US', 'United Kingdom', 'UK', 'Canada'])
-
-function stateCode(tok: string): string | null {
-  return US_STATES[tok] ? tok : (NAME_TO_CODE.get(tok) ?? null)
-}
-
-// Comma-joined multi-city list ("Phoenix, AZ, Tempe, AZ, ..."): a location
-// ends at a state or country token — unless a country follows the state
-// ("Denver, Colorado, United States") or the next token is that same state
-// ("New York, NY", where the city matches the state *name*). Unknown tokens
-// just stay grouped.
-export function splitCommaLocations(location: string): string[] {
-  const tokens = location.split(',').map(t => t.trim()).filter(Boolean)
-  const groups: string[] = []
-  let cur: string[] = []
-  for (let i = 0; i < tokens.length; i++) {
-    const tok = tokens[i]
-    const next = tokens[i + 1] ?? ''
-    cur.push(tok)
-    const code = stateCode(tok)
-    const continues =
-      COUNTRIES.has(next) ||
-      (code !== null && code === stateCode(next))
-    if (COUNTRIES.has(tok) || !next || (code !== null && !continues)) {
-      groups.push(cur.join(', '))
-      cur = []
-    }
-  }
-  if (cur.length) groups.push(cur.join(', '))
-  return groups
-}
-
-// Listings pack every city into one field. Keep long location lists compact.
-export function trimLocations(location: string): string {
-  let parts = location.split(/[;|]/).map(s => s.trim()).filter(Boolean)
-  if (parts.length <= 3) parts = splitCommaLocations(location)
-  if (parts.length <= 3) return location
-  return parts.slice(0, 3).join('; ') + '...'
-}
-
 export const US_STATES: Record<string, string> = {
   AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
   CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', FL: 'Florida', GA: 'Georgia',
@@ -56,8 +16,6 @@ export const US_STATES: Record<string, string> = {
   VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
   DC: 'District of Columbia',
 }
-
-const NAME_TO_CODE = new Map(Object.entries(US_STATES).map(([name, code]) => [name, code]))
 
 const STATE_NAME_TO_ABBR: Record<string, string> = Object.fromEntries(
   Object.entries(US_STATES).map(([abbr, name]) => [name.toLowerCase(), abbr])
@@ -97,16 +55,15 @@ const COUNTRY_KEYWORDS: Array<[string, string[]]> = [
 
 const word = (s: string) => `\\b${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`
 
-// Precompiled once: detectCountries ran per-job over 11k listings, rebuilding
-// ~260k RegExps on every load.
-const COUNTRY_KEYWORDS_RE: Array<[string, RegExp[]]> = COUNTRY_KEYWORDS.map(
-  ([country, keywords]) => [country, keywords.map(k => new RegExp(word(k), 'i'))]
-)
-
 function detectCountries(lower: string): string[] {
   const found: string[] = []
-  for (const [country, regexes] of COUNTRY_KEYWORDS_RE) {
-    if (regexes.some(re => re.test(lower))) found.push(country)
+  for (const [country, keywords] of COUNTRY_KEYWORDS) {
+    for (const kw of keywords) {
+      if (new RegExp(word(kw), 'i').test(lower)) {
+        found.push(country)
+        break
+      }
+    }
   }
   return found
 }

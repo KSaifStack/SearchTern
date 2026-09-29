@@ -1,7 +1,5 @@
 {
   "rewrites": [
-    { "source": "/backend/:path*", "destination": "https://api.searchtern.ksaif.dev/:path*" },
-    { "source": "/jobs.json", "destination": "/api/index" },
     { "source": "/jobs", "destination": "/index.html" },
     { "source": "/jobs/:id", "destination": "/api/og?id=:id" },
     { "source": "/tracker", "destination": "/index.html" },

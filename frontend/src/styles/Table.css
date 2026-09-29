@@ -38,24 +38,6 @@
   margin-bottom: 10px;
 }
 
-.jobs-status-row {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.jobs-status-summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.jobs-mobile-result-count {
-  display: none;
-}
-
 .check-btn {
   width: 15px;
   height: 15px;
@@ -150,11 +132,6 @@
   margin-bottom: 16px;
 }
 
-.results-controls {
-  display: flex;
-  gap: 6px;
-}
-
 .sort_btn {
   border-radius: 6px;
   padding: 6px 14px;
@@ -199,42 +176,6 @@
 }
 
 @media (max-width: 640px) {
-  .jobs-status-row {
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .jobs-status-summary {
-    flex: 1;
-    min-width: 0;
-    gap: 8px;
-  }
-
-  .jobs-status-summary .result-count {
-    font-size: 12px;
-    white-space: nowrap;
-    margin: 0;
-  }
-
-  .jobs-mobile-result-count {
-    display: block;
-  }
-
-  .results-header {
-    justify-content: center;
-  }
-
-  .results-header .desktop-result-count {
-    display: none;
-  }
-
-  .results-controls {
-    width: 100%;
-    justify-content: center;
-    gap: 8px;
-    flex-wrap: nowrap;
-  }
-
   /* Hide thead */
   .mantine-Table-thead { display: none; }
 

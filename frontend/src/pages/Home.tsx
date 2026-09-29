@@ -2,11 +2,20 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Text, Divider, RingProgress } from '@mantine/core';
 import { getRecent } from '../services/internshipmanager';
-import type { Job } from '../api/internships';
 import { useTracker } from '../components/TrackerContext';
 import type { ActivityEvent } from '../components/TrackerContext';
-import { trimLocations } from '../utils/locationFilter';
 import '../styles/Home.css';
+
+interface Job {
+    id: number;
+    company: string;
+    role: string;
+    location: string;
+    date: string;
+    link: string;
+    type?: string;
+    season?: string;
+}
 
 function formatTimeAgo(isoString: string): string {
     const diff = Date.now() - new Date(isoString).getTime();
@@ -31,9 +40,9 @@ function Home() {
     const { trackedJobs, activityLog } = useTracker();
 
     useEffect(() => {
-        getRecent(snap => {
-            if (snap.complete) setLoading(false);
-            setJobs(snap.jobs);
+        getRecent().then(res => {
+            if (res.success) setJobs(res.data);
+            setLoading(false);
         });
     }, []);
 
@@ -151,7 +160,7 @@ function Home() {
                                     <span className="recent-job-company">{job.company}</span>
                                 </div>
                                 <span className="recent-job-role">{job.role}</span>
-                                <span className="recent-job-location">{trimLocations(job.location)}</span>
+                                <span className="recent-job-location">{job.location}</span>
                             </a>
                         ))
                     )}

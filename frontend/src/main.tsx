@@ -6,7 +6,6 @@ import '@mantine/core/styles.css'
 import '@mantine/notifications/styles.css'
 import './index.css'
 import App from './App.tsx'
-import { CHUNK_ERROR_RE, reloadOnceForNewBuild } from './App.tsx'
 
 const mantineTheme = {
   fontFamily: "'Lexend', sans-serif",
@@ -37,19 +36,6 @@ function Root() {
     </MantineProvider>
   )
 }
-
-// The route boundary in App.tsx only sees chunks imported through React.lazy.
-// Mantine pulls in its own chunks for modals and icon components, and a deploy
-// takes those out from under an open tab just as effectively. Those rejections
-// never reach a React boundary, so watch for them globally. Same one-shot
-// guard, so the two hooks cannot stack into a reload loop.
-window.addEventListener('unhandledrejection', (event) => {
-  const { reason } = event
-  if (reason instanceof Error && CHUNK_ERROR_RE.test(reason.message)) {
-    event.preventDefault()
-    reloadOnceForNewBuild()
-  }
-})
 
 createRoot(document.getElementById('root')!).render(
   <ThemeProvider>

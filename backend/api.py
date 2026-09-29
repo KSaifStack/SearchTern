@@ -17,7 +17,6 @@ import json
 import re
 import base64
 import requests
-from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote_plus, quote
 
@@ -154,15 +153,6 @@ def get_agent_identity(authorization: str = Header(None)):
 
 logger = logging.getLogger(__name__)
 
-# Last scrape outcome (in-process scheduler and manual /update), surfaced in
-# /health so a silent scraper death shows up without digging through logs.
-_last_scrape: dict = {}
-
-def _record_scrape(result, error=None):
-    _last_scrape["ran_at"] = datetime.now(timezone.utc).isoformat()
-    _last_scrape["result"] = result if result is not None else "skipped (locked / OOM)"
-    _last_scrape["error"] = error
-
 def run_scrape():
     return scraper.update_database()
 
@@ -170,45 +160,21 @@ def scheduled_scrape():
     try:
         result = run_scrape()
         if result is None:
-            _record_scrape(None)
-            logger.info("Scheduler: scrape skipped (already running, or out of memory)")
+            logger.info("Scheduler: scrape already running")
         else:
-            _record_scrape(result)
-            # No invalidate_cache() here: in-process runs rewrite the snapshot
-            # file themselves (see scraper._update_database), so the next
-            # /recent picks the fresh data up by identity.
+            read_db.invalidate_cache()
             logger.info(f"Scheduler: {result}")
     except Exception as e:
-        _record_scrape(None, error=str(e))
         logger.error(f"Scheduler: scrape failed — {e}")
 
 scheduler = BackgroundScheduler()
 
-# The scrape peaks at ~104MB and used to run inside this process, which is how a
-# scrape took the whole site down at 512MB. .github/workflows/scrape.yml runs it
-# on a GitHub runner instead (2 cores, 7GB), so SCRAPE_IN_PROCESS defaults to
-# off: leave the web service doing reads only. Set it to 1 only while migrating,
-# or if the Actions workflow is not running.
-SCRAPE_IN_PROCESS = os.environ.get("SCRAPE_IN_PROCESS", "0") == "1"
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if SCRAPE_IN_PROCESS:
-        scheduler.add_job(
-            scheduled_scrape,
-            CronTrigger(minute=0),
-            id="hourly-scrape",
-            # A free instance spins down when idle, so by the time it wakes the
-            # :00 tick is already minutes in the past. APScheduler's 1-second
-            # default misfire window discarded those runs silently.
-            misfire_grace_time=600,
-        )
-        scheduler.start()
-    else:
-        logger.info("Scheduler: in-process scrape disabled (SCRAPE_IN_PROCESS=0)")
+    scheduler.add_job(scheduled_scrape, CronTrigger(minute=0))
+    scheduler.start()
     yield
-    if scheduler.running:
-        scheduler.shutdown()
+    scheduler.shutdown()
 
 # This connects the backend to the frontend using FastAPI
 # http://localhost:8000/ by default
@@ -228,41 +194,14 @@ app.add_middleware(
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-def _proc_status_mb(field):
-    """VmRSS / VmHWM from /proc/self/status, in MB.
-
-    Render kills the container on cgroup OOM and takes the evidence with it —
-    the only record is "Ran out of memory (used over 512MB)". Exposing the peak
-    from inside the process is the only way the next crash names its own cause.
-    """
-    try:
-        with open("/proc/self/status") as f:
-            for line in f:
-                if line.startswith(field):
-                    return round(int(line.split()[1]) / 1024, 1)
-    except (OSError, ValueError, IndexError):
-        pass
-    return None
-
-
-#Root route - lightweight status response so the domain root doesn't 404
-@app.get("/")
-@app.head("/")
-def root():
-    return {"status": "active", "api": "SearchTern"}
-
 #Checks health 
 @app.get("/health")
 @app.head("/health")
 def health():
-    jobs = scheduler.get_jobs()
-    next_run = jobs[0].next_run_time if jobs else None
+    next_run = scheduler.get_jobs()[0].next_run_time if scheduler.get_jobs() else None
     return {
         "status": "Active",
-        "next_scrape": str(next_run) if next_run else "unknown",
-        "rss_mb": _proc_status_mb("VmRSS:"),
-        "peak_rss_mb": _proc_status_mb("VmHWM:"),
-        "last_scrape": _last_scrape,
+        "next_scrape": str(next_run) if next_run else "unknown"
     }
 
 #Lists the data sources the Listing feed pulls from (fetched from the
@@ -316,79 +255,32 @@ def sources(request: Request):
 @app.post("/update")
 @limiter.limit("5/minute")
 def update_base(request: Request, verified=Depends(verify_key)):
-    try:
-        result = run_scrape()
-    except Exception as e:
-        _record_scrape(None, error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+    result = run_scrape()
     if result is None:
-        _record_scrape(None)
         raise HTTPException(status_code=409, detail="Scrape already running.")
-    _record_scrape(result)
     read_db.invalidate_cache()
     return {"result": read_db.recent_internships()}
 
 #Search recent internships
-def _days_ago(value):
-    """`date` is stored as days-ago (0 = today). Unparseable sorts last."""
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 999.0
-
-#Optional ?part=N&parts=M splits the list into M slices so a browser can render
-#the first one immediately and fetch the rest in parallel. No params (the
-#sitemap build, agents, curl) still gets the whole list, unchanged.
 @app.get("/recent")
 @limiter.limit("30/minute")
-def pull_recent(request: Request, response: Response, part: int = 0, parts: int = 1):
-    # (generation, rows) come from one read, so there is no window where a
-    # snapshot rewrite sneaks between two calls and pairs an old generation
-    # with new data.
-    generation, data = read_db.snapshot()
-    total = len(data)
-    parts = max(1, min(parts, 8))  # public param: cap so it can't be absurd
-    if parts > 1 and 1 <= part <= parts:
-        # `date` is days-ago (0 = today), so ascending puts the newest rows
-        # first and the first slice a browser fetches is the useful one.
-        # Parsed, not string-sorted: "10" < "2" as text.
-        data = sorted(data, key=lambda j: _days_ago(j.get("date")))
-        per = -(-total // parts)  # ceil, so the last slice is never empty
-        data = data[(part - 1) * per:part * per]
-    else:
-        parts = 1
-
-    # ETag off the data generation, not off the body. Hashing the body meant
-    # every request — including the ones answered 304 — re-serialised the whole
-    # visible table first, so revalidation bought the client a 304 and the
-    # server a full encode. (generation, part, parts, total) fully determines
-    # the response and costs nothing to compute.
-    etag = '"' + hashlib.md5(f"{generation}-{part}-{parts}-{total}".encode()).hexdigest() + '"'
+def pull_recent(request: Request, response: Response):
+    data = read_db.recent_internships()
+    body = json.dumps({"result": data}, default=str).encode()
+    etag = '"' + hashlib.md5(body).hexdigest() + '"'
     headers = {
         "ETag": etag,
         "Cache-Control": "public, max-age=300, must-revalidate",
     }
     if request.headers.get("If-None-Match") == etag:
         return Response(status_code=304, headers=headers)
-    body = json.dumps(
-        {"count": total, "part": part, "parts": parts, "result": data}, default=str
-    ).encode()
     return Response(content=body, media_type="application/json", headers=headers)
-
-#Alias for /recent. In prod this path is normally served by a CDN edge
-#function (see the vite config) that returns the same job index, but only
-#the backend is deployed on Railway right now — the frontend requests
-#/jobs.json directly, so route it to the same handler until that's sorted.
-@app.get("/jobs.json")
-@limiter.limit("30/minute")
-def jobs_json(request: Request, response: Response, part: int = 0, parts: int = 1):
-    return pull_recent(request, response, part, parts)
 
 #Live listing count — powers the counter shown on job detail pages
 @app.get("/count")
 @limiter.limit("30/minute")
 def listing_count(request: Request):
-    return {"result": read_db.count_internships()}
+    return {"result": len(read_db.recent_internships())}
 
 #Resolve a job's current numeric id from its content fingerprint. Tracked jobs
 #store fingerprints (stable across rescrapes) but detail links need the live id.
@@ -397,10 +289,11 @@ def listing_count(request: Request):
 def job_lookup(request: Request, company: str = "", role: str = "", location: str = ""):
     if not (company or role or location):
         raise HTTPException(status_code=400, detail="company, role, or location required.")
-    job_id = read_db.find_internship_id(company, role, location)
-    if job_id is None:
-        raise HTTPException(status_code=404, detail="Job not found.")
-    return {"result": {"id": job_id}}
+    want = _job_fingerprint(company, role, location)
+    for job in read_db.recent_internships():
+        if _job_fingerprint(job.get("company"), job.get("role"), job.get("location")) == want:
+            return {"result": {"id": job.get("id")}}
+    raise HTTPException(status_code=404, detail="Job not found.")
 
 #Single internship by id — powers the public /jobs/<id> detail pages
 @app.get("/jobs/{job_id}")
@@ -526,6 +419,18 @@ def agent_tracker(
 
 
 _TRACKER_STATUSES = ("Saved", "Applied", "Interview", "Offer", "Rejected")
+
+def _job_fingerprint(company, role, location):
+    """Content-based fingerprint matching the frontend makeJobFingerprint().
+
+    Stable across backend ID rotation so the tracker row keys line up between
+    the UI and the agent proposals."""
+    def norm(s):
+        s = (s or "").lower()
+        s = re.sub(r"[^a-z0-9\s]", "", s)
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
+    return f"{norm(company)}|{norm(role)}|{norm(location)}"
 
 
 def _execute_tracker_mutation(user_id, tool, body):

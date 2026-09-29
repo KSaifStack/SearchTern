@@ -98,18 +98,6 @@ function Navbar() {
             </ul>
 
             <div className="nav-auth" ref={dropdownRef}>
-                {!user && (
-                    <div className="nav-auth-actions">
-                        <Link to="/auth" className="nav-auth-login">
-                            <SignIn weight="bold" />
-                            <span>Log In</span>
-                        </Link>
-                        <Link to="/auth?tab=signup" className="nav-auth-signup">
-                            <UserPlus weight="bold" />
-                            <span>Sign Up</span>
-                        </Link>
-                    </div>
-                )}
                 <button
                     className="nav-profile-trigger"
                     aria-label="Account menu"
@@ -166,6 +154,22 @@ function Navbar() {
                                     <GearSix weight="bold" />
                                     <span>Settings</span>
                                 </Link>
+                                <div className="nav-profile-divider" />
+                                <button
+                                    className="nav-profile-item"
+                                    onClick={() => { navigate('/auth'); setProfileOpen(false); setMenuOpen(false); }}
+                                >
+                                    <SignIn weight="bold" />
+                                    <span>Log In</span>
+                                </button>
+                                <div className="nav-profile-divider" />
+                                <button
+                                    className="nav-profile-item"
+                                    onClick={() => { navigate('/auth?tab=signup'); setProfileOpen(false); setMenuOpen(false); }}
+                                >
+                                    <UserPlus weight="bold" />
+                                    <span>Sign Up</span>
+                                </button>
                             </>
                         )}
                     </div>

@@ -27,44 +27,8 @@ nav {
 .nav-auth {
     position: relative;
     display: flex;
-    gap: 12px;
     justify-content: flex-end;
     align-items: center;
-}
-
-.nav-auth-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.nav-auth-actions a {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    min-height: 40px;
-    padding: 0 12px;
-    border-radius: 6px;
-    color: var(--text-dark);
-    font-size: 14px;
-    font-weight: 600;
-    text-decoration: none;
-    white-space: nowrap;
-}
-
-.nav-auth-actions a:hover {
-    background: var(--hover-bg);
-}
-
-.nav-auth-actions .nav-auth-signup {
-    background: var(--accent-color);
-    color: #fff;
-}
-
-.nav-auth-actions .nav-auth-signup:hover {
-    background: var(--accent-color);
-    filter: brightness(0.94);
 }
 
 /* Dropdown trigger */
