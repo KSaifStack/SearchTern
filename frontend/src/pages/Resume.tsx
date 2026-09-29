@@ -37,7 +37,6 @@ import {
     removeResumeFromCloud,
     syncResumeWithCloud,
     setActiveEverywhere,
-    setCloudActive,
     cloudAvailable,
     isValidResumeFile,
     uniqueResumeName,
@@ -149,8 +148,7 @@ function Resume({ onCountChange }: { onCountChange?: (count: number) => void }) 
         setResumes(prev => [record, ...prev.filter(r => r.id !== record.id)])
         setActiveId(record.id)
         if (userId && cloudAvailable()) {
-            await pushResumeToCloud(userId, record)
-            await setCloudActive(userId, record.name)
+            await setActiveEverywhere(userId, record)
         }
         notifications.show({ title: existing ? 'Resume Updated' : 'Resume Saved', message: record.name, color: 'teal', icon: <CheckCircle size={18} /> })
     }, [resumes, userId])

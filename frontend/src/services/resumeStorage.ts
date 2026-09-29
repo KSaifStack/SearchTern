@@ -339,8 +339,8 @@ export async function syncResumeWithCloud(userId: string, current: ResumeRecord[
     }
 
     // Collapse same-file re-uploads across the merged set and delete the
-    // losers from the cloud bucket — otherwise the " (2)" copies keep coming
-    // back on every sync.
+    // losers from both the cloud bucket and IndexedDB — otherwise the " (2)"
+    // copies keep coming back on every sync and the local row never goes away.
     const activeIdAtMerge = await getActiveResumeId();
     const kept: ResumeRecord[] = [];
     for (const r of result) {
@@ -357,14 +357,9 @@ export async function syncResumeWithCloud(userId: string, current: ResumeRecord[
         kept[i] = winner;
         changed = true;
         await removeResumeFromCloud(userId, loser);
+        await removeLocalResume(loser.id);
     }
     result = kept;
-
-    for (const r of kept) {
-        if (!cloudNames.has(r.name)) {
-            await pushResumeToCloud(userId, r);
-        }
-    }
 
     const activeName = await getCloudActive(userId);
     const activeId = await getActiveResumeId();
