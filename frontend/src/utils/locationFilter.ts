@@ -97,15 +97,16 @@ const COUNTRY_KEYWORDS: Array<[string, string[]]> = [
 
 const word = (s: string) => `\\b${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`
 
+// Precompiled once: detectCountries ran per-job over 11k listings, rebuilding
+// ~260k RegExps on every load.
+const COUNTRY_KEYWORDS_RE: Array<[string, RegExp[]]> = COUNTRY_KEYWORDS.map(
+  ([country, keywords]) => [country, keywords.map(k => new RegExp(word(k), 'i'))]
+)
+
 function detectCountries(lower: string): string[] {
   const found: string[] = []
-  for (const [country, keywords] of COUNTRY_KEYWORDS) {
-    for (const kw of keywords) {
-      if (new RegExp(word(kw), 'i').test(lower)) {
-        found.push(country)
-        break
-      }
-    }
+  for (const [country, regexes] of COUNTRY_KEYWORDS_RE) {
+    if (regexes.some(re => re.test(lower))) found.push(country)
   }
   return found
 }
