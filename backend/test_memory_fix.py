@@ -282,25 +282,48 @@ class MemoryFixTests(unittest.TestCase):
             list(params),
         )
 
-    def test_backfill_only_touches_rows_with_no_fingerprint(self):
-        """Rows written before the column existed. The normaliser has to be the
-        Python one rather than a SQL translation of the same regexes: per-field
-        .strip() versus a single btrim over the joined string drifts for one,
-        and a drifted fingerprint silently 404s until that row is re-scraped."""
+    def test_backfill_reconciles_every_row_not_just_nulls(self):
+        """Rows written before the column existed, plus rows whose stored value
+        is not the normaliser's own value for their own columns. The normaliser
+        has to be the Python one rather than a SQL translation of the same
+        regexes: per-field .strip() versus a single btrim over the joined
+        string drifts for one, and a drifted fingerprint silently 404s until
+        that row is re-scraped.
+
+        A drifted row is not cosmetic. The upsert arbitrates on (fingerprint)
+        and nothing else, so a row the normaliser disagrees with is invisible
+        to that arbiter while still holding (company, role, location, link) --
+        an insert matching it there aborts the whole run. That killed every
+        scrape for 52 rows holding a foreign normaliser's value. So the pass
+        must not stop at IS NULL."""
         cursor = FakeCursor()
         self.assertEqual(scraper._backfill_fingerprints(cursor), 0)
         self.assertEqual(cursor.mogrified, [])
 
+        fp = read_db.job_fingerprint("acme inc", "c intern", "new york ny")
+        # A NULL is filled in.
         cursor = FakeCursor()
-        cursor.rows = [(1, "Acme, Inc.", "C++ Intern", "New York, NY")]
+        cursor.rows = [(1, "Acme, Inc.", "C++ Intern", "New York, NY", None)]
         self.assertEqual(scraper._backfill_fingerprints(cursor), 1)
-        self.assertIn("WHERE fingerprint IS NULL", cursor.queries[0])
         sql, params = cursor.queries[-1], cursor.mogrified[0][1]
         self.assertIn("SET fingerprint", sql)
+        self.assertIn(fp, list(params))
+
+        # A drifted value is corrected.
+        cursor = FakeCursor()
+        cursor.rows = [(2, "American Express", "Intern", "NYC",
+                        "american express|intern|ny")]
+        self.assertEqual(scraper._backfill_fingerprints(cursor), 1)
         self.assertIn(
-            read_db.job_fingerprint("acme inc", "c intern", "new york ny"),
-            list(params),
+            read_db.job_fingerprint("american express", "intern", "nyc"),
+            list(cursor.mogrified[0][1]),
         )
+
+        # A row already carrying the right value is left alone -- no write.
+        cursor = FakeCursor()
+        cursor.rows = [(3, "Acme, Inc.", "C++ Intern", "New York, NY", fp)]
+        self.assertEqual(scraper._backfill_fingerprints(cursor), 0)
+        self.assertEqual(cursor.mogrified, [])
 
 
 if __name__ == "__main__":
