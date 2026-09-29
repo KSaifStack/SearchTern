@@ -490,7 +490,7 @@ def update_database():
 _UPSERT_SQL = """
     INSERT INTO internships (company, role, location, date, link, type, season, ats, description, fingerprint, last_seen_at)
     VALUES %s
-    ON CONFLICT DO UPDATE
+    ON CONFLICT
     DO UPDATE SET
         date = EXCLUDED.date,
         type = EXCLUDED.type,

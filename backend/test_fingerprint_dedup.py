@@ -37,6 +37,23 @@ def dedup_key(job):
 
 
 def main():
+    # The upsert is a bare string literal, so py_compile says nothing about it.
+    # A duplicated clause here only surfaces as a psycopg2 SyntaxError against
+    # prod, which is how the "ON CONFLICT DO UPDATE / DO UPDATE SET" typo got
+    # pushed. Check the shape instead.
+    import re as _re
+    from scraper import _UPSERT_SQL
+
+    flat = " ".join(_UPSERT_SQL.split())
+    assert "ON CONFLICT (" not in flat, "conflict target reintroduced"
+    assert flat.count("DO UPDATE") == 1, flat
+    assert _re.search(r"\bON CONFLICT\s+DO UPDATE SET\b", flat), flat
+    # The SET list must omit the columns the upsert arbitrates, so a conflict
+    # keeps the pre-existing row's identity (notably its link).
+    set_list = flat.split("DO UPDATE SET", 1)[1]
+    for col in ("company", "role", "location", "link"):
+        assert f"{col} = EXCLUDED" not in set_list, f"SET list overwrites {col}"
+
     for a, b in PAIRS:
         ja = {"company": a, "role": "Engineer", "location": "NYC"}
         jb = {"company": b, "role": "Engineer", "location": "NYC"}
