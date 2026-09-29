@@ -372,6 +372,7 @@ function Resume({ onCountChange }: { onCountChange?: (count: number) => void }) 
                         <div ref={pdfWrapRef} className="resume-pdf-wrap">
                             <Document
                                 file={previewUrl}
+                                suspense={false}
                                 onLoadSuccess={async (doc) => {
                                     setNumPages(doc.numPages)
                                     try {
