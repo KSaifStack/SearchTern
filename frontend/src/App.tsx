@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react"
+import { Component, lazy, Suspense } from "react"
+import type { ReactNode } from "react"
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { SpeedInsights } from "@vercel/speed-insights/react"
 import { Analytics } from "@vercel/analytics/react"
@@ -33,6 +34,29 @@ function RouteMeta({ meta }: { meta: PageMeta }) {
     return null
 }
 
+// A failed lazy() chunk import leaves the Suspense fallback stuck forever
+// (React doesn't retry). Catch it and offer a reload instead of a silent
+// "Loading..." page.
+class RouteErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+    state = { failed: false }
+
+    static getDerivedStateFromError() {
+        return { failed: true }
+    }
+
+    render() {
+        if (this.state.failed) {
+            return (
+                <p className="home-empty">
+                    Couldn&apos;t load this page.{" "}
+                    <button className="health_btn" onClick={() => window.location.reload()}>Reload</button>
+                </p>
+            )
+        }
+        return this.props.children
+    }
+}
+
 function App() {
     return (
         <BrowserRouter>
@@ -41,6 +65,7 @@ function App() {
                     <div>
                         <Navbar />
                         <div className="app-content">
+                            <RouteErrorBoundary>
                             <Suspense fallback={<p className="home-empty">Loading...</p>}>
                             <Routes>
                                 <Route
@@ -136,6 +161,7 @@ function App() {
                                 />
                             </Routes>
                             </Suspense>
+                        </RouteErrorBoundary>
                         </div>
                         <AgentOverlay />
                         <SpeedInsights />
