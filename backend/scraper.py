@@ -586,12 +586,20 @@ def _backfill_fingerprints(cursor):
     if not rows:
         return 0
     updates = []
+    skipped = 0
     for r in rows:
         fp = job_fingerprint(r[1], r[2], r[3])
         if fp in taken:
+            skipped += 1
             continue
         taken.add(fp)
         updates.append((r[0], fp))
+    if skipped:
+        print(
+            f"  {skipped} row(s) share a fingerprint with an existing row and were "
+            f"left NULL (they are the same job listed twice)",
+            flush=True,
+        )
     if updates:
         execute_values(
             cursor,
