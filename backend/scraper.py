@@ -569,35 +569,50 @@ def _backfill_fingerprints(cursor):
     which is the worst possible failure for the feature that motivated this.
     Idempotent: a no-op once every row is populated.
 
-    Greedy, because prod already holds rows whose content normalises to the
-    same fingerprint ("Acme, Inc." alongside "Acme Inc."), and
-    internships_fingerprint_key forbids two rows sharing one. Blindly filling
-    every NULL row aborted the whole scrape on
-    psycopg2.errors.UniqueViolation. Rows whose fingerprint is already taken
-    are left NULL instead: Postgres treats NULLs as distinct, so they neither
-    violate the index nor block later runs.
+    Greedy, because prod holds 212 rows whose content normalises to a
+    fingerprint another row already holds ("Acme, Inc." alongside "Acme Inc."),
+    and the unique index over `fingerprint` forbids two rows sharing one.
+    Filling every NULL row blindly aborted the scrape on
+    psycopg2.errors.UniqueViolation.
+
+    Those collisions are deleted rather than left NULL. Leaving them NULL was
+    tried first and does not work: a NULL is invisible to ON CONFLICT
+    (fingerprint), so a later insert matching one of those rows on
+    (company, role, location, link) found no arbiter and died on
+    internships_unique_job instead. One error traded for another.
+
+    Deleting is the same reconciliation _ensure_schema already performs when
+    internships_unique_job's definition changes -- keep the lowest id, drop the
+    later copy. The surviving row is the one the frontend tracker already
+    resolved to, since a drifted or absent fingerprint is a 404 on every
+    tracked job. Nothing references internships by foreign key; job references
+    live in agent_proposals.payload as JSONB.
     """
     cursor.execute("SELECT fingerprint FROM internships WHERE fingerprint IS NOT NULL")
     taken = {r[0] for r in cursor.fetchall()}
+    # ORDER BY id so "keep the oldest" is deterministic rather than dependent
+    # on whatever order the heap happens to return.
     cursor.execute(
-        "SELECT id, company, role, location FROM internships WHERE fingerprint IS NULL"
+        "SELECT id, company, role, location FROM internships "
+        "WHERE fingerprint IS NULL ORDER BY id"
     )
     rows = cursor.fetchall()
     if not rows:
         return 0
     updates = []
-    skipped = 0
+    doomed = []
     for r in rows:
         fp = job_fingerprint(r[1], r[2], r[3])
         if fp in taken:
-            skipped += 1
+            doomed.append(r[0])
             continue
         taken.add(fp)
         updates.append((r[0], fp))
-    if skipped:
+    if doomed:
+        cursor.execute("DELETE FROM internships WHERE id = ANY(%s)", (doomed,))
         print(
-            f"  {skipped} row(s) share a fingerprint with an existing row and were "
-            f"left NULL (they are the same job listed twice)",
+            f"  deleted {len(doomed)} duplicate row(s) sharing a fingerprint "
+            f"with an existing row (same job listed twice)",
             flush=True,
         )
     if updates:

@@ -84,20 +84,22 @@ def main():
         assert k not in seen, f"over-merged distinct jobs: {company}/{role}/{loc}"
         seen.add(k)
 
-    # The backfill must be greedy, not blind. Prod already holds content
-    # duplicates, and internships_fingerprint_key forbids two rows sharing a
-    # fingerprint -- filling every NULL row blindly raised UniqueViolation and
-    # killed the scrape.
-    def greedy_backfill(rows, taken=frozenset()):
+    # The backfill must delete content duplicates, not leave them NULL. A NULL
+    # is invisible to ON CONFLICT (fingerprint), so an insert matching such a
+    # row on (company, role, location, link) finds no arbiter and dies on
+    # internships_unique_job. Prod had 212 of these.
+    def backfill(rows, taken=frozenset()):
+        """Returns (updates, doomed). Mirrors _backfill_fingerprints()."""
         taken = set(taken)
-        out = []
-        for rid, company, role, loc in rows:
+        updates, doomed = [], []
+        for rid, company, role, loc in rows:  # caller supplies ORDER BY id
             fp = job_fingerprint(company, role, loc)
             if fp in taken:
+                doomed.append(rid)
                 continue
             taken.add(fp)
-            out.append((rid, fp))
-        return out
+            updates.append((rid, fp))
+        return updates, doomed
 
     null_rows = [
         (1, "Acme, Inc.", "Engineer", "NYC"),
@@ -105,15 +107,20 @@ def main():
         (3, "Widgets, LLC", "Engineer", "NYC"),
         (4, "Widgets LLC", "Engineer", "NYC"),     # same fingerprint as row 3
     ]
-    got = greedy_backfill(null_rows)
-    assert [r[0] for r in got] == [1, 3], got
-    assert len({fp for _, fp in got}) == len(got), "backfill emitted a duplicate"
+    updates, doomed = backfill(null_rows)
+    assert [r[0] for r in updates] == [1, 3], updates
+    assert doomed == [2, 4], doomed
+    assert len({fp for _, fp in updates}) == len(updates), "backfill emitted a duplicate"
+    # No surviving row may be left NULL, or it becomes the next abort.
+    assert not (set(doomed) & {r[0] for r in updates})
 
-    # A NULL row colliding with an already-populated row must also be skipped.
-    seeded = greedy_backfill(null_rows, taken={job_fingerprint("Acme Inc.", "Engineer", "NYC")})
-    assert 1 not in [r[0] for r in seeded], seeded
+    # A collision with an already-populated row is deleted too, not skipped.
+    seeded_fp = job_fingerprint("Acme Inc.", "Engineer", "NYC")
+    updates, doomed = backfill(null_rows, taken={seeded_fp})
+    assert 1 in doomed, (updates, doomed)
+    assert 3 in [r[0] for r in updates], updates
 
-    print("OK: seen-key and fingerprint agree; distinct jobs kept; backfill greedy")
+    print("OK: seen-key and fingerprint agree; distinct jobs kept; dupes deleted")
 
 
 if __name__ == "__main__":
