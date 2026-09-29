@@ -118,6 +118,16 @@ export function fileToRecord(file: File, uploadedAt = new Date().toISOString()):
     };
 }
 
+/**
+ * Identity of a resume for deduping: the same file uploaded twice shows up as
+ * "Resume.pdf" then "Resume (2).pdf". Strip the " (N)" suffix and compare by
+ * base name + byte size.
+ */
+export function resumeKey(name: string, size: number): string {
+    const base = name.toLowerCase().replace(/\s*\(\d+\)(?=\.[^.]+$)/, '');
+    return `${base}|${size}`;
+}
+
 /** If `preferred` collides with an existing name, append " (2)", " (3)", … */
 export function uniqueResumeName(names: string[], preferred: string): string {
     const lower = (n: string) => n.toLowerCase();
@@ -136,7 +146,21 @@ function isRecord(v: unknown): v is ResumeRecord {
 
 export async function getLocalResumes(): Promise<ResumeRecord[]> {
     const rows = await idbAll();
-    const resumes = rows.filter(isRecord);
+    let resumes = rows.filter(isRecord);
+    // Collapse same-file re-uploads (base name + size). Keep the active copy
+    // if it is in the group, otherwise the newest.
+    const activeId = await getActiveResumeId();
+    const byKey = new Map<string, ResumeRecord>();
+    for (const r of resumes) {
+        const key = resumeKey(r.name, r.size);
+        const ex = byKey.get(key);
+        if (!ex) {
+            byKey.set(key, r);
+        } else if (r.id === activeId || (ex.id !== activeId && r.uploadedAt > ex.uploadedAt)) {
+            byKey.set(key, r);
+        }
+    }
+    resumes = [...byKey.values()];
     return resumes.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
 }
 
@@ -295,7 +319,7 @@ export async function syncResumeWithCloud(userId: string, current: ResumeRecord[
     if (!cloud.ok) return;
 
     const cloudNames = new Set(cloud.names.map(p => p.replace(`${userId}/`, '')));
-    const result = [...current];
+    let result = [...current];
     let changed = false;
 
     for (const path of cloud.names) {
@@ -313,6 +337,29 @@ export async function syncResumeWithCloud(userId: string, current: ResumeRecord[
             await pushResumeToCloud(userId, record);
         }
     }
+
+    // Collapse same-file re-uploads across the merged set and delete the
+    // losers from both the cloud bucket and IndexedDB — otherwise the " (2)"
+    // copies keep coming back on every sync and the local row never goes away.
+    const activeIdAtMerge = await getActiveResumeId();
+    const kept: ResumeRecord[] = [];
+    for (const r of result) {
+        const key = resumeKey(r.name, r.size);
+        const i = kept.findIndex(k => resumeKey(k.name, k.size) === key);
+        if (i === -1) {
+            kept.push(r);
+            continue;
+        }
+        const ex = kept[i];
+        const preferNew = r.id === activeIdAtMerge || (ex.id !== activeIdAtMerge && r.uploadedAt > ex.uploadedAt);
+        const loser = preferNew ? ex : r;
+        const winner = preferNew ? r : ex;
+        kept[i] = winner;
+        changed = true;
+        await removeResumeFromCloud(userId, loser);
+        await removeLocalResume(loser.id);
+    }
+    result = kept;
 
     const activeName = await getCloudActive(userId);
     const activeId = await getActiveResumeId();
