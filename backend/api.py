@@ -232,6 +232,12 @@ def _proc_status_mb(field):
     return None
 
 
+#Root route - lightweight status response so the domain root doesn't 404
+@app.get("/")
+@app.head("/")
+def root():
+    return {"status": "active", "api": "SearchTern"}
+
 #Checks health 
 @app.get("/health")
 @app.head("/health")
