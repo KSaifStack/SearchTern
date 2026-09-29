@@ -40,6 +40,7 @@ import {
     cloudAvailable,
     isValidResumeFile,
     uniqueResumeName,
+    resumeKey,
     resumeToText,
 } from "../services/resumeStorage"
 import { useAuth } from "../components/AuthContext"
@@ -134,15 +135,22 @@ function Resume({ onCountChange }: { onCountChange?: (count: number) => void }) 
             notifications.show({ title: 'Resume limit reached', message: `You can store up to ${MAX_RESUMES} resumes. Remove one first.`, color: 'orange', icon: <WarningCircle size={18} /> })
             return
         }
-        const record = fileToRecord(file)
-        record.name = uniqueResumeName(resumes.map(r => r.name), record.name)
+        let record = fileToRecord(file)
+        const existing = resumes.find(r => resumeKey(r.name, r.size) === resumeKey(file.name, file.size))
+        if (existing) {
+            // Same file re-uploaded: replace in place, keep id and name, so a
+            // re-upload never spawns a " (2)" duplicate.
+            record = { ...existing, blob: file, size: file.size, type: file.type || existing.type, uploadedAt: record.uploadedAt }
+        } else {
+            record.name = uniqueResumeName(resumes.map(r => r.name), record.name)
+        }
         await upsertLocalResume(record)
-        setResumes(prev => [record, ...prev])
+        setResumes(prev => [record, ...prev.filter(r => r.id !== record.id)])
         setActiveId(record.id)
         if (userId && cloudAvailable()) {
             await setActiveEverywhere(userId, record)
         }
-        notifications.show({ title: 'Resume Saved', message: record.name, color: 'teal', icon: <CheckCircle size={18} /> })
+        notifications.show({ title: existing ? 'Resume Updated' : 'Resume Saved', message: record.name, color: 'teal', icon: <CheckCircle size={18} /> })
     }, [resumes, userId])
 
     const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
