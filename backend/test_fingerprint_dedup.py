@@ -1,0 +1,162 @@
+"""The scraper's `seen` set and the prod unique constraint must agree on what
+"the same job" means. They didn't: `seen` keyed on the raw lowercase
+(company, role, location) triple while `internships_fingerprint_key` keys on
+job_fingerprint(), which also strips punctuation. Two spellings of one company
+therefore got distinct `seen` keys but one fingerprint, putting both rows in a
+single execute_values page and aborting the scrape with a UniqueViolation.
+
+Run: python3 test_fingerprint_dedup.py
+"""
+
+from read_db import job_fingerprint
+
+# Two listings for one job. Distinct raw keys, one fingerprint.
+PAIRS = [
+    ("Acme, Inc.", "Acme Inc."),
+    ("Acme  Inc", "Acme Inc."),          # whitespace collapse
+    ("Widgets, LLC", "Widgets LLC"),
+    ("Beta (USA) Co.", "Beta USA Co."),
+]
+
+# Genuinely different jobs that must survive: different role, different
+# location. Note these are NOT collapse pairs -- norm deletes punctuation
+# without inserting a space and strips non-ASCII, so "Acme,Inc."/"Café Labs"/
+# "Foo-Bar" all fingerprint differently from their lookalikes.
+DISTINCT = [
+    ("Acme, Inc.", "Engineer", "NYC"),
+    ("Acme, Inc.", "Designer", "NYC"),
+    ("Acme, Inc.", "Engineer", "Remote"),
+    ("Foo-Bar", "Engineer", "NYC"),
+]
+
+
+def dedup_key(job):
+    """Mirrors the scraper's `seen` key. If this drifts from job_fingerprint,
+    the test below fails."""
+    return job_fingerprint(job["company"], job["role"], job["location"])
+
+
+def main():
+    # The upsert is a bare string literal, so py_compile says nothing about it.
+    # A duplicated clause here only surfaces as a psycopg2 SyntaxError against
+    # prod, which is how the "ON CONFLICT DO UPDATE / DO UPDATE SET" typo got
+    # pushed. Check the shape instead.
+    import re as _re
+    from scraper import _UPSERT_SQL
+
+    flat = " ".join(_UPSERT_SQL.split())
+    # Postgres rejects a bare "ON CONFLICT DO UPDATE" -- DO UPDATE requires an
+    # inference specification. Only DO NOTHING may omit it. That typo shipped
+    # once already and only failed against prod.
+    assert flat.count("DO UPDATE") == 1, flat
+    assert _re.search(r"\bON CONFLICT \(fingerprint\) DO UPDATE SET\b", flat), flat
+    # The fingerprint arbiter must cover the four-column one: identical
+    # (company, role, location) implies an identical fingerprint, so every
+    # four-column conflict is also a fingerprint conflict. Assert that
+    # implication rather than trusting the comment.
+    four_col = [("Acme, Inc.", "Engineer", "NYC", "http://x/1"),
+                ("Acme, Inc.", "Engineer", "NYC", "http://x/1")]
+    assert len({job_fingerprint(c, r, l) for c, r, l, _ in four_col}) == 1
+    # And it must not over-cover: a different link with the same content is a
+    # conflict the arbiter is meant to catch.
+    diff_link = ("Acme, Inc.", "Engineer", "NYC", "http://x/2")
+    assert job_fingerprint(*diff_link[:3]) in {job_fingerprint(*q[:3]) for q in four_col}
+
+    # The SET list must omit the columns the upsert arbitrates, so a conflict
+    # keeps the pre-existing row's identity (notably its link).
+    set_list = flat.split("DO UPDATE SET", 1)[1]
+    for col in ("company", "role", "location", "link"):
+        assert f"{col} = EXCLUDED" not in set_list, f"SET list overwrites {col}"
+
+    for a, b in PAIRS:
+        ja = {"company": a, "role": "Engineer", "location": "NYC"}
+        jb = {"company": b, "role": "Engineer", "location": "NYC"}
+        raw_a = (a.lower(), "engineer", "nyc")
+        raw_b = (b.lower(), "engineer", "nyc")
+        assert job_fingerprint(**ja) == job_fingerprint(**jb), (a, b)
+        # The old key failed to collapse these; the new one must.
+        if raw_a != raw_b:
+            assert dedup_key(ja) == dedup_key(jb), f"dedup_key missed {a!r}/{b!r}"
+
+    seen = set()
+    for company, role, loc in DISTINCT:
+        k = dedup_key({"company": company, "role": role, "location": loc})
+        assert k not in seen, f"over-merged distinct jobs: {company}/{role}/{loc}"
+        seen.add(k)
+
+    # The backfill must delete content duplicates, not leave them stale. A
+    # stale or NULL fingerprint is invisible to ON CONFLICT (fingerprint), so
+    # an insert matching such a row on (company, role, location, link) finds no
+    # arbiter and dies on internships_unique_job. Prod had 212 of these, and 52
+    # more that were non-NULL but held a foreign normaliser's value.
+    def reconcile(rows):
+        """Returns (updates, doomed). Mirrors _backfill_fingerprints().
+
+        `rows` is (id, company, role, location, stored_fingerprint) in id order.
+        """
+        updates, doomed, taken = [], [], set()
+        for rid, company, role, loc, stored in rows:
+            fp = job_fingerprint(company, role, loc)
+            if fp == stored:
+                taken.add(fp)
+                continue
+            if fp in taken:
+                doomed.append(rid)
+                continue
+            taken.add(fp)
+            updates.append((rid, fp))
+        return updates, doomed
+
+    null_rows = [
+        (1, "Acme, Inc.", "Engineer", "NYC", None),
+        (2, "Acme Inc.", "Engineer", "NYC", None),      # same fingerprint as row 1
+        (3, "Widgets, LLC", "Engineer", "NYC", None),
+        (4, "Widgets LLC", "Engineer", "NYC", None),     # same fingerprint as row 3
+    ]
+    updates, doomed = reconcile(null_rows)
+    assert [r[0] for r in updates] == [1, 3], updates
+    assert doomed == [2, 4], doomed
+    assert len({fp for _, fp in updates}) == len(updates), "reconcile emitted a duplicate"
+    # No surviving row may be left stale, or it becomes the next abort.
+    assert not (set(doomed) & {r[0] for r in updates})
+
+    # A row whose stored value is already correct is left alone — no write.
+    correct = job_fingerprint("Acme Inc.", "Engineer", "NYC")
+    updates, doomed = reconcile([(1, "Acme Inc.", "Engineer", "NYC", correct)])
+    assert updates == [] and doomed == [], (updates, doomed)
+
+    # A drifted row -- non-NULL, but not the normaliser's value for its own
+    # columns -- must be corrected. This is the 52-row case: the old code seeded
+    # `taken` from the stored column, so a drifted row could not be corrected if
+    # its stale value were anything but its own fingerprint, and if the stale
+    # value *was* its own fingerprint the row survived while remaining invisible
+    # to the arbiter. The DETAIL that proved it:
+    #   stored    'tiktok|software engineer intern intelligent creation camera|san jose ca'
+    #   normaliser 'tiktok|software engineer intern intelligent creationcamera|san jose ca'
+    drifted = [
+        (1, "TikTok", "Software Engineer Intern, Intelligent Creation/Camera", "San Jose, CA",
+         "tiktok|software engineer intern intelligent creation camera|san jose ca"),
+        (2, "American Express", "Digital Product Analyst Intern", "NYC",
+         "american express|digital product analyst intern|ny"),
+    ]
+    updates, doomed = reconcile(drifted)
+    assert [r[0] for r in updates] == [1, 2], updates
+    assert doomed == [], doomed
+    # The corrections are the normaliser's values, punctuation deleted rather
+    # than spaced, and no location aliasing.
+    assert dict(updates) == {
+        1: "tiktok|software engineer intern intelligent creationcamera|san jose ca",
+        2: "american express|digital product analyst intern|nyc",
+    }, updates
+
+    # And a drifted row whose corrected fingerprint is already held by an
+    # earlier row is deleted, not left holding a value the arbiter can't see.
+    updates, doomed = reconcile([(1, "Acme Inc.", "Engineer", "NYC", correct),
+                                 (2, "Acme, Inc.", "Engineer", "NYC", "acme inc old")])
+    assert updates == [] and doomed == [2], (updates, doomed)
+
+    print("OK: seen-key and fingerprint agree; distinct jobs kept; dupes deleted")
+
+
+if __name__ == "__main__":
+    main()

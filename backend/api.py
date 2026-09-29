@@ -17,6 +17,7 @@ import json
 import re
 import base64
 import requests
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote_plus, quote
 
@@ -153,6 +154,15 @@ def get_agent_identity(authorization: str = Header(None)):
 
 logger = logging.getLogger(__name__)
 
+# Last scrape outcome (in-process scheduler and manual /update), surfaced in
+# /health so a silent scraper death shows up without digging through logs.
+_last_scrape: dict = {}
+
+def _record_scrape(result, error=None):
+    _last_scrape["ran_at"] = datetime.now(timezone.utc).isoformat()
+    _last_scrape["result"] = result if result is not None else "skipped (locked / OOM)"
+    _last_scrape["error"] = error
+
 def run_scrape():
     return scraper.update_database()
 
@@ -160,13 +170,16 @@ def scheduled_scrape():
     try:
         result = run_scrape()
         if result is None:
+            _record_scrape(None)
             logger.info("Scheduler: scrape skipped (already running, or out of memory)")
         else:
+            _record_scrape(result)
             # No invalidate_cache() here: in-process runs rewrite the snapshot
             # file themselves (see scraper._update_database), so the next
             # /recent picks the fresh data up by identity.
             logger.info(f"Scheduler: {result}")
     except Exception as e:
+        _record_scrape(None, error=str(e))
         logger.error(f"Scheduler: scrape failed — {e}")
 
 scheduler = BackgroundScheduler()
@@ -249,6 +262,7 @@ def health():
         "next_scrape": str(next_run) if next_run else "unknown",
         "rss_mb": _proc_status_mb("VmRSS:"),
         "peak_rss_mb": _proc_status_mb("VmHWM:"),
+        "last_scrape": _last_scrape,
     }
 
 #Lists the data sources the Listing feed pulls from (fetched from the
@@ -302,9 +316,15 @@ def sources(request: Request):
 @app.post("/update")
 @limiter.limit("5/minute")
 def update_base(request: Request, verified=Depends(verify_key)):
-    result = run_scrape()
+    try:
+        result = run_scrape()
+    except Exception as e:
+        _record_scrape(None, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
     if result is None:
+        _record_scrape(None)
         raise HTTPException(status_code=409, detail="Scrape already running.")
+    _record_scrape(result)
     read_db.invalidate_cache()
     return {"result": read_db.recent_internships()}
 
