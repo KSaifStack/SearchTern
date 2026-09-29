@@ -1,4 +1,5 @@
 import { findJob } from "./_jobs";
+import { toDatePosted } from "../src/utils/jobPosting";
 
 export const config = { runtime: "edge" };
 
@@ -8,12 +9,6 @@ const DEFAULT_DESC = "Find thousands of active software internships and new-grad
 
 function esc(s: string) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-function postedDate(daysValue: string | number): string | undefined {
-    const days = parseFloat(String(daysValue));
-    if (isNaN(days)) return undefined;
-    return new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
 }
 
 function isRemote(location: string): boolean {
@@ -42,7 +37,7 @@ async function jobMeta(id: string) {
             "@type": "JobPosting",
             title: j.role,
             description: desc,
-            datePosted: postedDate(j.date),
+            datePosted: toDatePosted(j.date),
             hiringOrganization: { "@type": "Organization", name: j.company },
             jobLocation: {
                 "@type": "Place",

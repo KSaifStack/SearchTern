@@ -5,6 +5,7 @@ import { getRecent } from '../services/internshipmanager';
 import type { Job } from '../api/internships';
 import { useTracker } from '../components/TrackerContext';
 import type { ActivityEvent } from '../components/TrackerContext';
+import { trimLocations } from '../utils/locationFilter';
 import '../styles/Home.css';
 
 function formatTimeAgo(isoString: string): string {
@@ -15,13 +16,6 @@ function formatTimeAgo(isoString: string): string {
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs}h ago`;
     return `${Math.floor(hrs / 24)}d ago`;
-}
-
-// Listings pack every city into one field, ';'- or '|'-separated. A 12-city
-// row would swallow the homepage list, so show at most the first five.
-function trimLocations(location: string): string {
-    const parts = location.split(/[;|]/).map(p => p.trim()).filter(Boolean);
-    return parts.length > 5 ? parts.slice(0, 5).join('; ') : location;
 }
 
 function activityDescription(event: ActivityEvent): string {
