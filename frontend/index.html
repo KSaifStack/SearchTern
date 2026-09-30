@@ -4,6 +4,10 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" href="/favicon.png" />
+  <!-- Google probes /favicon.ico directly rather than parsing the tag above, and
+       falls back to a generic globe when it 404s. Same art, multi-size. -->
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/favicon.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://fonts.googleapis.com/css2?family=Lexend&display=swap" rel="stylesheet">
   <title>SearchTern — Software Internship & New-Grad Job Tracker</title>
