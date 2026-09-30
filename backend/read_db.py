@@ -111,6 +111,18 @@ def get_internship(job_id):
     return dict(row) if row else None
 
 
+# When the scraper last wrote. Backed by idx_last_seen, so this is an index
+# lookup, not a scan. /health reports it because the scheduler's next_run_time
+# looks healthy even when the process has been dead for days.
+def last_scrape_at():
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT max(last_seen_at) FROM internships")
+        row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
 # Search by location
 def search_location(x):
     conn = get_conn()
