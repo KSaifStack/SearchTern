@@ -7,7 +7,7 @@ import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
 import { makeJobFingerprint } from "../utils/jobFingerprint"
-import { parseLocation, US_STATES } from "../utils/locationFilter"
+import { parseLocation, US_STATES, trimLocations } from "../utils/locationFilter"
 import type { ParsedLocation } from "../utils/locationFilter"
 import { matchCompanyMeta, EMPLOYEE_BUCKETS, inEmployeeBucket } from "../utils/companyMeta"
 
@@ -219,8 +219,13 @@ function Jobs() {
   return (
     <>
       <section className="feature">
-        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <p className="result-count" style={{ margin: 0 }}>Refreshes in: {String(Math.floor(refreshCountdown / 60)).padStart(2, '0')}:{String(refreshCountdown % 60).padStart(2, '0')}</p>
+        <div className="jobs-status-row">
+          <div className="jobs-status-summary">
+            <p className="result-count" style={{ margin: 0 }}>Refreshes in: {String(Math.floor(refreshCountdown / 60)).padStart(2, '0')}:{String(refreshCountdown % 60).padStart(2, '0')}</p>
+            <p className="result-count jobs-mobile-result-count">
+              {loading ? 'Loading...' : `${filtered.length.toLocaleString()} listings found`}
+            </p>
+          </div>
           <Popover width={250} position="bottom-start" withArrow shadow="md" opened={popoverOpened} onChange={setPopoverOpened}>
             <Popover.Target>
               <button className="health_btn" onClick={() => {
@@ -289,8 +294,8 @@ function Jobs() {
         />
 
         <div className="results-header">
-          <p className="result-count">{loading ? 'Loading...' : `${filtered.length.toLocaleString()} listings found`}</p>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <p className="result-count desktop-result-count">{loading ? 'Loading...' : `${filtered.length.toLocaleString()} listings found`}</p>
+          <div className="results-controls">
             <Popover opened={sortOpen} onChange={setSortOpen} width={180} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
                 <button className="sort_btn" onClick={() => setSortOpen(o => !o)}>
@@ -517,7 +522,7 @@ function Jobs() {
                         {job.role}
                       </a>
                     </Table.Td>
-                    <Table.Td data-label="Location">{job.location}</Table.Td>
+                    <Table.Td data-label="Location">{trimLocations(job.location)}</Table.Td>
                     <Table.Td data-label="Date">{formatRelativeDate(job.date)}</Table.Td>
                   </Table.Tr>
                 )

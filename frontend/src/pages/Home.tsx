@@ -4,6 +4,7 @@ import { Text, Divider, RingProgress } from '@mantine/core';
 import { getRecent } from '../services/internshipmanager';
 import { useTracker } from '../components/TrackerContext';
 import type { ActivityEvent } from '../components/TrackerContext';
+import { trimLocations } from '../utils/locationFilter';
 import '../styles/Home.css';
 
 interface Job {
@@ -160,7 +161,7 @@ function Home() {
                                     <span className="recent-job-company">{job.company}</span>
                                 </div>
                                 <span className="recent-job-role">{job.role}</span>
-                                <span className="recent-job-location">{job.location}</span>
+                                <span className="recent-job-location">{trimLocations(job.location)}</span>
                             </a>
                         ))
                     )}
