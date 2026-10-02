@@ -537,9 +537,27 @@ def _update_database():
         listing_count = len(in_range)
         del all_jobs, seen, deduped, valid_link, us_jobs
 
+        # Ids are SERIAL and never reused, so every delete below kills a public
+        # /jobs/<id> URL forever. Remember what we removed so the API can answer
+        # 410 Gone instead of pretending the id never existed.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pruned_job_ids (
+                id BIGINT PRIMARY KEY,
+                pruned_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
+
         # Purge existing rows older than the age cap (numeric dates only)
         cursor.execute(
-            r"DELETE FROM internships WHERE date ~ '^[0-9]+(\.[0-9]+)?$' AND date::numeric > %s",
+            r"""
+            WITH gone AS (
+                DELETE FROM internships
+                WHERE date ~ '^[0-9]+(\.[0-9]+)?$' AND date::numeric > %s
+                RETURNING id
+            )
+            INSERT INTO pruned_job_ids (id) SELECT id FROM gone
+            ON CONFLICT (id) DO NOTHING
+            """,
             (MAX_AGE_DAYS,),
         )
 
@@ -567,9 +585,18 @@ def _update_database():
         del in_range
 
         cursor.execute("""
-            DELETE FROM internships
-            WHERE last_seen_at < %s
-        """, (current_run_time,))
+            WITH gone AS (
+                DELETE FROM internships
+                WHERE last_seen_at < %s
+                RETURNING id
+            )
+            INSERT INTO pruned_job_ids (id) SELECT id FROM gone
+            ON CONFLICT (id) DO NOTHING
+            """, (current_run_time,))
+
+        # Ids older than the age cap are indistinguishable from ids we never had,
+        # so keeping them longer only grows the table.
+        cursor.execute("DELETE FROM pruned_job_ids WHERE pruned_at < now() - interval '90 days'")
 
         conn.commit()
         return f"Done! {listing_count} listings upserted."

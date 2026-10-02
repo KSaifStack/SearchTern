@@ -278,6 +278,28 @@ def pull_recent(request: Request, response: Response):
         return Response(status_code=304, headers=headers)
     return Response(content=body, media_type="application/json", headers=headers)
 
+# Sitemap, rebuilt per request from the in-memory listing cache. It used to be a
+# build artifact, which froze it at deploy time: after one day's scraping a third
+# of its URLs were deleted jobs and half the live feed had no URL at all.
+_SITE = "https://searchtern.ksaif.dev"
+_STATIC_SITEMAP_URLS = (
+    (f"{_SITE}/", "1.0"),
+    (f"{_SITE}/jobs", "0.9"),
+    (f"{_SITE}/privacy", "0.3"),
+)
+
+@app.get("/sitemap.xml")
+@limiter.limit("10/minute")
+def sitemap(request: Request):
+    jobs = read_db.recent_internships()
+    lines = [f"  <url><loc>{u}</loc><priority>{p}</priority></url>" for u, p in _STATIC_SITEMAP_URLS]
+    lines += [f"  <url><loc>{_SITE}/jobs/{j['id']}</loc><priority>0.6</priority></url>" for j in jobs]
+    body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + "\n".join(lines) + "\n</urlset>\n").encode()
+    return Response(content=body, media_type="application/xml",
+                    headers={"Cache-Control": "public, max-age=300, s-maxage=3600, must-revalidate"})
+
 #Live listing count — powers the counter shown on job detail pages
 @app.get("/count")
 @limiter.limit("30/minute")
@@ -303,6 +325,8 @@ def job_lookup(request: Request, company: str = "", role: str = "", location: st
 def job_detail(request: Request, job_id: int):
     job = read_db.get_internship(job_id)
     if not job:
+        if read_db.job_pruned(job_id):
+            raise HTTPException(status_code=410, detail="Listing no longer available.")
         raise HTTPException(status_code=404, detail="Job not found.")
     return {"result": job}
 
