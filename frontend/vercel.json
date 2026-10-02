@@ -6,6 +6,7 @@
     { "source": "/resume", "destination": "/index.html" },
     { "source": "/auth", "destination": "/index.html" },
     { "source": "/privacy", "destination": "/index.html" },
-    { "source": "/settings", "destination": "/index.html" }
+    { "source": "/settings", "destination": "/index.html" },
+    { "source": "/sitemap.xml", "destination": "https://api.searchtern.ksaif.dev/sitemap.xml" }
   ]
 }

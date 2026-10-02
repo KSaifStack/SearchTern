@@ -9,7 +9,13 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="apple-touch-icon" href="/favicon.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://fonts.googleapis.com/css2?family=Lexend&display=swap" rel="stylesheet">
+  <!-- Non-blocking font load: the stylesheet still downloads immediately but
+       stops gating first paint on a round trip to Google. -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lexend&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend&display=swap" rel="stylesheet" />
+  </noscript>
   <title>SearchTern — Software Internship & New-Grad Job Tracker</title>
   <meta name="description" content="SearchTern finds and tracks thousands of active software engineering internships and new-grad roles. Search by company, role, or location, and manage every application in one tracker." />
   <meta property="og:type" content="website" />

@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -8,6 +9,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).parent))
 os.environ.setdefault("API_KEY", "test-only")
 
+from fastapi.testclient import TestClient
 import api
 import read_db
 import scraper
@@ -121,6 +123,33 @@ class MemoryFixTests(unittest.TestCase):
         finally:
             api.scraper.update_database = original
         self.assertEqual(calls, [])
+
+
+class PrunedJobTests(unittest.TestCase):
+    def test_pulled_listing_answers_410_and_unknown_id_answers_404(self):
+        client = TestClient(api.app, raise_server_exceptions=False)
+        with patch.object(read_db, "get_internship", return_value=None), patch.object(
+            read_db, "job_pruned", return_value=True
+        ):
+            self.assertEqual(client.get("/jobs/12345").status_code, 410)
+        with patch.object(read_db, "get_internship", return_value=None), patch.object(
+            read_db, "job_pruned", return_value=False
+        ):
+            self.assertEqual(client.get("/jobs/12345").status_code, 404)
+        job = {"id": 12345, "company": "Example", "role": "Intern", "location": "NY, NY", "date": "0"}
+        with patch.object(read_db, "get_internship", return_value=job):
+            self.assertEqual(client.get("/jobs/12345").json()["result"]["id"], 12345)
+
+
+class SitemapTests(unittest.TestCase):
+    def test_sitemap_lists_every_live_job_and_nothing_else(self):
+        jobs = [{"id": 111}, {"id": 222}, {"id": 333}]
+        with patch.object(read_db, "recent_internships", return_value=jobs):
+            body = TestClient(api.app).get("/sitemap.xml").text
+        self.assertIn("<loc>https://searchtern.ksaif.dev/</loc>", body)
+        self.assertIn("<loc>https://searchtern.ksaif.dev/jobs</loc>", body)
+        ids = re.findall(r"/jobs/(\d+)</loc>", body)
+        self.assertEqual(sorted(ids, key=int), ["111", "222", "333"])
 
 
 if __name__ == "__main__":

@@ -111,6 +111,22 @@ def get_internship(job_id):
     return dict(row) if row else None
 
 
+def job_pruned(job_id):
+    """True if this id used to be a live listing and was deliberately removed."""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM pruned_job_ids WHERE id = %s", (job_id,))
+            found = cur.fetchone() is not None
+    except psycopg2.errors.UndefinedTable:
+        # Table is created by the scraper; a fresh deploy can serve a 404 before
+        # the first run of the hour creates it.
+        conn.rollback()
+        found = False
+    conn.close()
+    return found
+
+
 # When the scraper last wrote. Backed by idx_last_seen, so this is an index
 # lookup, not a scan. /health reports it because the scheduler's next_run_time
 # looks healthy even when the process has been dead for days.

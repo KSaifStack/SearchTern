@@ -21,7 +21,9 @@ function isRemote(location: string): boolean {
 
 async function jobMeta(id: string) {
     const res = await fetch(`${API}/jobs/${id}`);
-    if (!res.ok) return null;
+    // 410 = the listing existed and was pulled. Distinct from 404 so the page
+    // can answer the same way instead of looking like a bad URL.
+    if (!res.ok) return res.status === 410 ? { gone: true } : null;
     const data = await res.json();
     const j = data?.result;
     if (!j) return null;
@@ -63,21 +65,29 @@ export default async function handler(req: Request) {
     let html = await spa.text();
 
     const meta = id ? await jobMeta(id) : null;
+    const gone = !!meta && "gone" in meta;
+    const live = !!meta && !gone;
 
-    const title = meta ? meta.title : DEFAULT_TITLE;
-    const desc = meta ? meta.description : DEFAULT_DESC;
-    const pageUrl = meta ? `${SITE}/jobs/${id}` : SITE;
+    // A job id that no longer exists is a real 404, not a 200 carrying the
+    // homepage title and a canonical pointing at / — that made crawlers index
+    // every dead posting as a duplicate of the homepage. 410 marks the ones we
+    // deliberately pulled.
+    const status = gone ? 410 : id && !meta ? 404 : 200;
+
+    const title = live ? meta.title : DEFAULT_TITLE;
+    const desc = live ? meta.description : DEFAULT_DESC;
+    const pageUrl = live ? `${SITE}/jobs/${id}` : SITE;
 
     html = html
         .replaceAll(DEFAULT_TITLE, esc(title))
         .replaceAll(DEFAULT_DESC, esc(desc))
         .replace(`content="${SITE}"`, `content="${pageUrl}"`);
 
-    if (meta) {
+    if (live) {
         const headTags = `<link rel="canonical" href="${SITE}/jobs/${id}" />\n<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>`;
         html = html.replace("</head>", `${headTags}\n</head>`);
     }
 
-    return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+    return new Response(html, { status, headers: { "content-type": "text/html; charset=utf-8" } });
 
 }
