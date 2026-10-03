@@ -96,11 +96,15 @@ MONTHS = {
 }
 
 
+# Sorts last in every days-ago comparison, and _update_database drops these
+# rows rather than storing a date it had to invent.
+UNKNOWN_DAYS = "999"
+
 def sort_date(date: str) -> str:
-    """Normalize any source date into 'days ago' as a string, or '999' when unknown."""
+    """Normalize any source date into 'days ago' as a string, or UNKNOWN_DAYS."""
     date = str(date).strip(" '\"").strip()
     if not date:
-        return "999"
+        return UNKNOWN_DAYS
 
     # Already a plain day count
     if date.isdigit():
@@ -127,7 +131,7 @@ def sort_date(date: str) -> str:
             return str(val * 30)
         if unit.startswith("h"):
             return "0"
-        return "999"
+        return UNKNOWN_DAYS
 
     # Month-day without year e.g. Jul 24 / Sept 03 — infer the year.
     # If it lands more than a week in the future it belongs to last year's cycle.
@@ -145,7 +149,7 @@ def sort_date(date: str) -> str:
             except ValueError:
                 pass
 
-    return "999"
+    return UNKNOWN_DAYS
 
 
 US_STATES = {
@@ -466,17 +470,27 @@ def _update_database():
 
     in_range = []
     too_old = 0
+    undated = 0
     for job in us_jobs:
+        if job["date"] == UNKNOWN_DAYS:
+            # sort_date could not read the format. Storing the sentinel would
+            # create rows the age purge can never retire, so drop them — but
+            # count them, or a source quietly changing its date format looks
+            # like the whole source going away.
+            undated += 1
+            continue
         try:
             days = float(job["date"])
         except (TypeError, ValueError):
-            days = -1  # unknown date -> keep
+            days = -1
         if days >= 0 and days > MAX_AGE_DAYS:
             too_old += 1
         else:
             in_range.append(job)
     if too_old:
         print(f"Removed {too_old} listings older than {MAX_AGE_DAYS} days")
+    if undated:
+        print(f"WARNING: dropped {undated} listings with an unrecognised date format")
     print(f"Listings within {MAX_AGE_DAYS} days: {len(in_range)}")
 
     conn = psycopg2.connect(DATABASE_URL, connect_timeout=30)

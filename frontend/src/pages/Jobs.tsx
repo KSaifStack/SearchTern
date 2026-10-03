@@ -65,7 +65,15 @@ function Jobs() {
   const [faangOnly, setFaangOnly] = useState(false)
   const [employeeBucket, setEmployeeBucket] = useState<string>('')
   const [recencyDays, setRecencyDays] = useState(0)
-  const [hideStale, setHideStale] = useState(() => localStorage.getItem('searchtern-hide-stale') === '1')
+  const [hideStale, setHideStale] = useState(() => {
+    try {
+      return localStorage.getItem('searchtern-hide-stale') === '1'
+    } catch {
+      // Private mode / blocked storage: the filter is a preference, not a
+      // requirement, so fall back to the default rather than failing the render.
+      return false
+    }
+  })
   const [freshnessOpen, setFreshnessOpen] = useState(false)
 
   const perPage = 15;
@@ -185,6 +193,9 @@ function Jobs() {
       setPage(1)
     }, 200)
   }
+
+  // A pending debounce that fires after unmount writes state to a dead component.
+  useEffect(() => () => clearTimeout(debounceRef.current), [])
 
   const formatRelativeDate = (val: string | number) => {
     if (typeof val === 'number') return "N/A";
@@ -344,7 +355,11 @@ function Jobs() {
                       type="checkbox"
                       checked={hideStale}
                       onChange={() => {
-                        localStorage.setItem('searchtern-hide-stale', hideStale ? '0' : '1')
+                        try {
+                          localStorage.setItem('searchtern-hide-stale', hideStale ? '0' : '1')
+                        } catch {
+                          // Preference just won't survive the session.
+                        }
                         setHideStale(!hideStale)
                         setPage(1)
                       }}

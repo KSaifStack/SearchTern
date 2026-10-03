@@ -109,6 +109,12 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const [syncing, setSyncing] = useState(false);
     const [pendingMerge, setPendingMerge] = useState<{ local: TrackedJob[], cloud: TrackedJob[], userId: string } | null>(null);
 
+    // fetchFromSupabase runs on a 15s poll and must not be rebuilt when the job
+    // list changes, or the poll effect would restart on every edit. A ref gives
+    // it the current list without making it a dependency.
+    const jobsRef = React.useRef(trackedJobs);
+    useEffect(() => { jobsRef.current = trackedJobs; }, [trackedJobs]);
+
     // ── Persist to localStorage whenever jobs change (guest fallback) ──────────
     useEffect(() => {
         localStorage.setItem(LS_JOBS, JSON.stringify(trackedJobs));
@@ -136,17 +142,17 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
             // Merge logic: Check if there are local-only jobs
             const cloudIds = new Set(cloudJobs.map(j => j.id));
-            setTrackedJobs(prev => {
-                const localOnly = prev.filter(j => !cloudIds.has(j.id));
-                if (localOnly.length > 0) {
-                    // Instead of automatic upload, ask the user
-                    setPendingMerge({ local: localOnly, cloud: cloudJobs, userId });
-                    // Return prev for now while the modal is open
-                    return prev;
-                }
+            // Read the current list rather than filtering inside the updater:
+            // updaters must stay pure, and calling setPendingMerge from one
+            // fires that side effect twice under StrictMode.
+            const localOnly = jobsRef.current.filter(j => !cloudIds.has(j.id));
+            if (localOnly.length > 0) {
+                // Instead of automatic upload, ask the user
+                setPendingMerge({ local: localOnly, cloud: cloudJobs, userId });
+            } else {
                 // If no local data, just load cloud data
-                return cloudJobs;
-            });
+                setTrackedJobs(cloudJobs);
+            }
         }
     }, []);
 

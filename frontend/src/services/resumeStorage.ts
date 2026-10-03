@@ -6,6 +6,7 @@
 // preview and the one agents are told to use. Active is stored locally and
 // mirrored to a small `_active` marker file in the user's cloud bucket so the
 // backend can tell agents which resume is current.
+import { dedupeByName } from "../utils/resumeDedup"
 import { supabase } from '../lib/supabase';
 
 // pdfjs is ~300KB and only runs when a PDF resume is actually read, so it is
@@ -136,9 +137,7 @@ function isRecord(v: unknown): v is ResumeRecord {
 }
 
 export async function getLocalResumes(): Promise<ResumeRecord[]> {
-    const rows = await idbAll();
-    const resumes = rows.filter(isRecord);
-    return resumes.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+    return dedupeByName((await idbAll()).filter(isRecord))
 }
 
 export async function getActiveResumeId(): Promise<string | null> {
@@ -179,14 +178,22 @@ export async function resumeToText(r: ResumeRecord): Promise<string | null> {
     }
     if (lower.endsWith('.pdf')) {
         const pdfjs = await loadPdfjs()
-        const doc = await pdfjs.getDocument({ data: new Uint8Array(await r.blob.arrayBuffer()) }).promise
-        const pages: string[] = []
-        for (let p = 1; p <= doc.numPages; p++) {
-            const page = await doc.getPage(p)
-            const content = await page.getTextContent()
-            pages.push(content.items.map(it => ('str' in it ? it.str : '')).join(' '))
+        // destroy() lives on the loading task, and it tears down the worker as
+        // well as the parsed pages.
+        const task = pdfjs.getDocument({ data: new Uint8Array(await r.blob.arrayBuffer()) })
+        const doc = await task.promise
+        try {
+            const pages: string[] = []
+            for (let p = 1; p <= doc.numPages; p++) {
+                const page = await doc.getPage(p)
+                const content = await page.getTextContent()
+                pages.push(content.items.map(it => ('str' in it ? it.str : '')).join(' '))
+            }
+            return pages.join('\n\n')
+        } finally {
+            // Without this every Copy holds a parsed document in the worker.
+            await task.destroy()
         }
-        return pages.join('\n\n')
     }
     return null
 }
@@ -360,7 +367,14 @@ export async function setActiveEverywhere(
 ): Promise<void> {
     await setActiveResumeId(record.id);
     if (supabase) {
-        await setCloudActive(userId, record.name);
-        await pushResumeToCloud(userId, record);
+        // Upload first: pointing the marker at an object that failed to upload
+        // sends the agent looking for a file that was never stored.
+        const pushed = await pushResumeToCloud(userId, record);
+        if (pushed.ok) await setCloudActive(userId, record.name);
     }
+}
+
+export async function clearCloudActive(userId: string): Promise<void> {
+    if (!supabase) return;
+    await supabase.storage.from(BUCKET).remove([resumePath(userId, ACTIVE_MARKER)]);
 }
