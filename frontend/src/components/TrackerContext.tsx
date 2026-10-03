@@ -101,15 +101,19 @@ function jobToDbRow(job: TrackedJob, userId: string) {
     };
 }
 
-type RowWriter = (sb: NonNullable<typeof supabase>, userId: string) => PromiseLike<{ error: { message?: string } | null }>;
-
 export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user } = useAuth();
 
     const [trackedJobs, setTrackedJobs] = useState<TrackedJob[]>(() => loadLocal<TrackedJob[]>(LS_JOBS, []));
     const [activityLog, setActivityLog] = useState<ActivityEvent[]>(() => loadLocal<ActivityEvent[]>(LS_ACTIVITY, []));
     const [syncing, setSyncing] = useState(false);
-    const [pendingMerge, setPendingMerge] = useState<{ local: TrackedJob[], cloud: TrackedJob[] } | null>(null);
+    const [pendingMerge, setPendingMerge] = useState<{ local: TrackedJob[], cloud: TrackedJob[], userId: string } | null>(null);
+
+    // fetchFromSupabase runs on a 15s poll and must not be rebuilt when the job
+    // list changes, or the poll effect would restart on every edit. A ref gives
+    // it the current list without making it a dependency.
+    const jobsRef = React.useRef(trackedJobs);
+    useEffect(() => { jobsRef.current = trackedJobs; }, [trackedJobs]);
 
     // ── Persist to localStorage whenever jobs change (guest fallback) ──────────
     useEffect(() => {
@@ -119,25 +123,6 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     useEffect(() => {
         localStorage.setItem(LS_ACTIVITY, JSON.stringify(activityLog));
     }, [activityLog]);
-
-    // Every tracker write is a single RLS-scoped request straight to Supabase —
-    // no backend hop. A failure is the user's problem to know about: the local
-    // copy survives, so say so instead of losing it silently on the next pull.
-    const syncRow = useCallback((label: string, write: RowWriter) => {
-        const sb = supabase;
-        const uid = user?.id;
-        if (!sb || !uid) return;
-        void write(sb, uid).then(({ error }) => {
-            if (!error) return;
-            console.error(`Supabase ${label} error:`, error);
-            notifications.show({
-                title: 'Saved on this device only',
-                message: "We couldn't reach your account. This change will sync when the connection is back.",
-                color: 'orange',
-                autoClose: 5000,
-            });
-        });
-    }, [user?.id]);
 
     // ── Fetch all jobs from Supabase when user logs in ─────────────────────────
     const fetchFromSupabase = useCallback(async (userId: string) => {
@@ -157,27 +142,27 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
             // Merge logic: Check if there are local-only jobs
             const cloudIds = new Set(cloudJobs.map(j => j.id));
-            setTrackedJobs(prev => {
-                const localOnly = prev.filter(j => !cloudIds.has(j.id));
-                if (localOnly.length > 0) {
-                    // Instead of automatic upload, ask the user
-                    setPendingMerge({ local: localOnly, cloud: cloudJobs });
-                    // Return prev for now while the modal is open
-                    return prev;
-                }
+            // Read the current list rather than filtering inside the updater:
+            // updaters must stay pure, and calling setPendingMerge from one
+            // fires that side effect twice under StrictMode.
+            const localOnly = jobsRef.current.filter(j => !cloudIds.has(j.id));
+            if (localOnly.length > 0) {
+                // Instead of automatic upload, ask the user
+                setPendingMerge({ local: localOnly, cloud: cloudJobs, userId });
+            } else {
                 // If no local data, just load cloud data
-                return cloudJobs;
-            });
+                setTrackedJobs(cloudJobs);
+            }
         }
     }, []);
 
     useEffect(() => {
         if (user?.id) {
             fetchFromSupabase(user.id);
+        } else {
+            // Clear pending merge if the user logs out during the prompt
+            setPendingMerge(null);
         }
-        // Drop the merge prompt whenever the signed-in user changes (including
-        // logging out) — the cloud half belongs to whoever it was raised for.
-        setPendingMerge(null);
     }, [user?.id, fetchFromSupabase]);
 
     // Poll for external changes (agent auto-apply, other devices) so the board
@@ -191,13 +176,16 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, [user?.id, pendingMerge, fetchFromSupabase]);
 
     const handleMerge = () => {
-        if (!pendingMerge) return;
-        const { local, cloud } = pendingMerge;
+        if (!pendingMerge || !supabase) return;
+        const { local, cloud, userId } = pendingMerge;
 
-        syncRow('merge', (sb, uid) =>
-            sb.from('tracked_jobs')
-                .upsert(local.map(j => jobToDbRow(j, uid)), { onConflict: 'user_id,fingerprint' })
-        );
+        // Upload local data to Supabase
+        supabase
+            .from('tracked_jobs')
+            .upsert(local.map(j => jobToDbRow(j, userId)), { onConflict: 'user_id,fingerprint' })
+            .then(({ error }) => {
+                if (error) console.error('Error uploading merged jobs to Supabase:', error);
+            });
 
         setTrackedJobs([...cloud, ...local]);
         setPendingMerge(null);
@@ -241,23 +229,28 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
         logActivity({ type: 'added', company: job.company, role: job.role, to: status });
 
-        syncRow('addJob', (sb, uid) =>
-            sb.from('tracked_jobs')
-                .upsert(jobToDbRow(newJob, uid), { onConflict: 'user_id,fingerprint' })
-        );
+        if (supabase && user?.id) {
+            supabase
+                .from('tracked_jobs')
+                .upsert(jobToDbRow(newJob, user.id), { onConflict: 'user_id,fingerprint' })
+                .then(({ error }) => { if (error) console.error('Supabase addJob error:', error); });
+        }
     };
 
     const updateJobStatus = (id: string, newStatus: JobStatus) => {
         setTrackedJobs(prev => prev.map(job => {
             if (job.id === id) {
                 logActivity({ type: 'status_change', company: job.company, role: job.role, from: job.status, to: newStatus });
-                syncRow('updateJobStatus', (sb, uid) =>
-                    sb.from('tracked_jobs')
+                const updated = { ...job, status: newStatus };
+                if (supabase && user?.id) {
+                    supabase
+                        .from('tracked_jobs')
                         .update({ status: newStatus })
-                        .eq('user_id', uid)
+                        .eq('user_id', user.id)
                         .eq('fingerprint', id)
-                );
-                return { ...job, status: newStatus };
+                        .then(({ error }) => { if (error) console.error('Supabase updateStatus error:', error); });
+                }
+                return updated;
             }
             return job;
         }));
@@ -270,12 +263,14 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     logActivity({ type: 'status_change', company: job.company, role: job.role, from: job.status, to: updatedFields.status });
                 }
                 const updated = { ...job, ...updatedFields };
-                syncRow('editJob', (sb, uid) =>
-                    sb.from('tracked_jobs')
-                        .update(jobToDbRow(updated, uid))
-                        .eq('user_id', uid)
+                if (supabase && user?.id) {
+                    supabase
+                        .from('tracked_jobs')
+                        .update(jobToDbRow(updated, user.id))
+                        .eq('user_id', user.id)
                         .eq('fingerprint', id)
-                );
+                        .then(({ error }) => { if (error) console.error('Supabase editJob error:', error); });
+                }
                 return updated;
             }
             return job;
@@ -289,12 +284,14 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         logActivity({ type: 'removed', company: job.company, role: job.role });
         setTrackedJobs(prev => prev.filter(j => j.id !== id));
 
-        syncRow('removeJob', (sb, uid) =>
-            sb.from('tracked_jobs')
+        if (supabase && user?.id) {
+            supabase
+                .from('tracked_jobs')
                 .delete()
-                .eq('user_id', uid)
+                .eq('user_id', user.id)
                 .eq('fingerprint', id)
-        );
+                .then(({ error }) => { if (error) console.error('Supabase removeJob error:', error); });
+        }
 
         const notificationId = `remove-${job.id}-${Date.now()}`;
         notifications.show({
@@ -313,10 +310,12 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
                                 return [...prev, job];
                             });
                             logActivity({ type: 'added', company: job.company, role: job.role, to: job.status });
-                            syncRow('restoreJob', (sb, uid) =>
-                                sb.from('tracked_jobs')
-                                    .upsert(jobToDbRow(job, uid), { onConflict: 'user_id,fingerprint' })
-                            );
+                            if (supabase && user?.id) {
+                                supabase
+                                    .from('tracked_jobs')
+                                    .upsert(jobToDbRow(job, user.id), { onConflict: 'user_id,fingerprint' })
+                                    .then(({ error }) => { if (error) console.error('Supabase restoreJob error:', error); });
+                            }
                             notifications.hide(notificationId);
                             notifications.show({
                                 title: 'Restored',

@@ -1,9 +1,7 @@
-import { findJob } from "./_jobs";
-import { toDatePosted } from "../src/utils/jobPosting";
-
 export const config = { runtime: "edge" };
 
 const SITE = "https://searchtern.ksaif.dev";
+const API = process.env.VITE_API_URL || "http://127.0.0.1:8000";
 const DEFAULT_TITLE = "SearchTern — Software Internship & New-Grad Job Tracker";
 const DEFAULT_DESC = "Find thousands of active software internships and new-grad jobs, then track your applications in one place.";
 
@@ -11,18 +9,23 @@ function esc(s: string) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+function postedDate(daysValue: string | number): string | undefined {
+    const days = parseFloat(String(daysValue));
+    if (isNaN(days)) return undefined;
+    return new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
+}
+
 function isRemote(location: string): boolean {
     return /remote|anywhere|telecommute/i.test(location);
 }
 
 async function jobMeta(id: string) {
-    // Read from the CDN-cached index, so a Google crawl never hits the backend.
-    let j
-    try {
-        j = await findJob(id)
-    } catch {
-        return null
-    }
+    const res = await fetch(`${API}/jobs/${id}`);
+    // 410 = the listing existed and was pulled. Distinct from 404 so the page
+    // can answer the same way instead of looking like a bad URL.
+    if (!res.ok) return res.status === 410 ? { gone: true } : null;
+    const data = await res.json();
+    const j = data?.result;
     if (!j) return null;
     const desc = `${j.role} in ${j.location || "remote/US"}. Apply directly through ${j.company}.`;
     const loc = j.location || "";
@@ -37,7 +40,7 @@ async function jobMeta(id: string) {
             "@type": "JobPosting",
             title: j.role,
             description: desc,
-            datePosted: toDatePosted(j.date),
+            datePosted: postedDate(j.date),
             hiringOrganization: { "@type": "Organization", name: j.company },
             jobLocation: {
                 "@type": "Place",
@@ -62,21 +65,29 @@ export default async function handler(req: Request) {
     let html = await spa.text();
 
     const meta = id ? await jobMeta(id) : null;
+    const gone = !!meta && "gone" in meta;
+    const live = !!meta && !gone;
 
-    const title = meta ? meta.title : DEFAULT_TITLE;
-    const desc = meta ? meta.description : DEFAULT_DESC;
-    const pageUrl = meta ? `${SITE}/jobs/${id}` : SITE;
+    // A job id that no longer exists is a real 404, not a 200 carrying the
+    // homepage title and a canonical pointing at / — that made crawlers index
+    // every dead posting as a duplicate of the homepage. 410 marks the ones we
+    // deliberately pulled.
+    const status = gone ? 410 : id && !meta ? 404 : 200;
+
+    const title = live ? meta.title : DEFAULT_TITLE;
+    const desc = live ? meta.description : DEFAULT_DESC;
+    const pageUrl = live ? `${SITE}/jobs/${id}` : SITE;
 
     html = html
         .replaceAll(DEFAULT_TITLE, esc(title))
         .replaceAll(DEFAULT_DESC, esc(desc))
         .replace(`content="${SITE}"`, `content="${pageUrl}"`);
 
-    if (meta) {
+    if (live) {
         const headTags = `<link rel="canonical" href="${SITE}/jobs/${id}" />\n<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>`;
         html = html.replace("</head>", `${headTags}\n</head>`);
     }
 
-    return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+    return new Response(html, { status, headers: { "content-type": "text/html; charset=utf-8" } });
 
 }

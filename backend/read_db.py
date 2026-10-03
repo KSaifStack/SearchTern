@@ -4,7 +4,6 @@ import psycopg2.extras
 import psycopg2.pool as pgpool
 import json
 import hashlib
-import re
 import secrets
 import os
 from threading import Lock
@@ -15,32 +14,15 @@ from dotenv import load_dotenv
 load_dotenv()
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# The whole visible table used to live in a resident Python list (~13k rows,
-# ~10MB) that was re-read from Postgres whenever the TTL lapsed, regardless of
-# request traffic. It lives in a file now (RECENT_SNAPSHOT_PATH, default
-# recent.jobs.json next to this module): a scrape that runs in this process
-# rewrites it, and the API serves it from an identity-keyed memo, parsed once
-# per file version rather than once per request. The TTL is only the "how stale
-# if the scraper dies and the file stops updating" fallback — normal freshness
-# is event-driven by the file's mtime.
-#
-# The file is also the artifact a CDN split can consume: publishing
-# recent.jobs.json as a static asset is what removes Supabase egress entirely,
-# and this change is the format-compatible precursor to that.
-_CACHE_TTL = 3600
-_snapshot_lock = Lock()
-_SNAPSHOT_PATH = os.environ.get(
-    "RECENT_SNAPSHOT_PATH",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "recent.jobs.json"),
-)
+_cache: list | None = None
+_cache_time: float = 0
+_CACHE_TTL = 3300  # 55 minutes (refresh before the hourly scrape)
+_cache_lock = Lock()
 _JOB_LIST_COLUMNS = "id, company, role, location, date, link, type, season, ats, last_seen_at"
-
-# In-process copy of the snapshot, keyed by the file's identity. Kept because
-# json.loads of the whole table runs on the order of a hundred milliseconds on
-# a 1-vCPU host; serving it from memory is what keeps /recent fast, and keying
-# it by mtime+size is how a rewrite is picked up on the next request.
-_memo_identity: str | None = None
-_memo_rows: list | None = None
+# date is a TEXT column holding days-ago, so a plain ORDER BY sorts it as text
+# ("10" before "2"). Cast so newest really is first. Every stored value is
+# numeric — scraper.sort_date() drops anything it cannot parse.
+_ORDER_BY_FRESHNESS = "ORDER BY date::numeric"
 
 _agent_tables_ready = False
 _agent_tables_checked_at = 0.0
@@ -82,21 +64,17 @@ class _PooledConn:
             self._returned = True
             _get_pool().putconn(self._conn)
 
-    def __getattr__(self, name):
-        return getattr(self._conn, name)
-
+    # Most call sites do `conn = get_conn()` ... `conn.close()` with nothing in
+    # between, so a query that raises leaks the pooled connection. The pool is
+    # capped at 8, and enough leaks take every DB endpoint down until restart.
     def __del__(self):
-        # A caller that raises before reaching its conn.close() leaked the slot
-        # permanently: the pool keys _used by id(conn), so once the psycopg2
-        # object is collected the key is dangling, getconn() eventually raises
-        # PoolError, and every DB-backed endpoint 500s until restart. Returning
-        # the slot on collection closes that for every call site, including ones
-        # added later. close() is idempotent, so explicit callers are unaffected.
         try:
             self.close()
         except Exception:
             pass
 
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
 
 def now():
     return datetime.now(timezone.utc)
@@ -105,101 +83,38 @@ def get_conn():
     return _PooledConn(_get_pool().getconn())
 
 
-def _stat():
-    """(identity, mtime) of the snapshot file, or None if it is missing or
-    older than the TTL. The identity — mtime_ns and size — changes whenever the
-    file is rewritten, which is what drives the cache invalidating itself."""
-    try:
-        st = os.stat(_SNAPSHOT_PATH)
-    except OSError:
-        return None
-    if time() - st.st_mtime > _CACHE_TTL:
-        return None
-    return f"{st.st_mtime_ns}-{st.st_size}", st.st_mtime
-
-
-def _snapshot_from_file():
-    """(identity, rows) read straight off the current file."""
-    with open(_SNAPSHOT_PATH) as f:
-        rows = json.load(f)["result"]
-    return _stat()[0], rows
-
-
-def write_snapshot():
-    """Rebuild the snapshot file from Postgres, streaming rows to disk.
-
-    A server-side cursor keeps this process flat — accumulating ~13k rows into
-    a list here is the memory profile the streaming scraper exists to avoid.
-    The temp path + os.replace makes the rewrite atomic, so a concurrent reader
-    never sees a half-written file. Returns (identity, rows)."""
-    conn = get_conn()
-    tmp = f"{_SNAPSHOT_PATH}.{os.getpid()}.tmp"
-    try:
-        try:
-            with conn.cursor(name="snapshot", cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.itersize = 2000
-                cur.execute(f"SELECT {_JOB_LIST_COLUMNS} FROM internships ORDER BY date")
-                with open(tmp, "w") as f:
-                    f.write('{"result": [')
-                    first = True
-                    for row in cur:
-                        if not first:
-                            f.write(",")
-                        first = False
-                        f.write(json.dumps(dict(row), default=str))
-                    f.write("]}")
-        except psycopg2.errors.UndefinedTable:
-            # Same contract as the old cache: no table yet is [], not a 500.
-            conn.rollback()
-            with open(tmp, "w") as f:
-                f.write('{"result": []}')
-        os.replace(tmp, _SNAPSHOT_PATH)
-    finally:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        conn.close()
-    return _snapshot_from_file()
-
-
-def snapshot():
-    """(generation, rows) for the whole visible table, taken from one read so a
-    caller can never pair a generation with a body that no longer matches it.
-    Serves the identity-keyed memo; parses or rebuilds only when the file
-    changed, vanished, or went stale."""
-    global _memo_identity, _memo_rows
-    st = _stat()
-    if st is not None and st[0] == _memo_identity and _memo_rows is not None:
-        return _memo_identity, _memo_rows
-    with _snapshot_lock:
-        st = _stat()
-        if st is not None and st[0] == _memo_identity and _memo_rows is not None:
-            return _memo_identity, _memo_rows
-        if st is not None:
-            identity, rows = _snapshot_from_file()
-        else:
-            identity, rows = write_snapshot()
-        _memo_identity, _memo_rows = identity, rows
-        return identity, rows
-
-
 def invalidate_cache():
-    """Drop the snapshot and memo so the next read rebuilds them from Postgres.
-    Called after writes (e.g. /update) when the scraper did not refresh the
-    file itself."""
-    global _memo_identity, _memo_rows
-    _memo_identity, _memo_rows = None, None
-    try:
-        os.unlink(_SNAPSHOT_PATH)
-    except OSError:
-        pass
+    global _cache, _cache_time
+    with _cache_lock:
+        _cache = None
+        _cache_time = 0
 
 
-# Get all internships ordered by date (snapshot-backed: the file the scraper
-# rewrites is the source now, not a resident list).
+# Get all internships ordered by date (cached in memory)
 def recent_internships():
-    return snapshot()[1]
+    global _cache, _cache_time
+    now = time()
+    with _cache_lock:
+        if _cache is not None and now - _cache_time < _CACHE_TTL:
+            return _cache
+    # Query outside the lock: holding it across a remote round trip serialised
+    # every reader behind the slowest one. Racing readers is harmless, last
+    # writer wins and they all see the same rows.
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"SELECT {_JOB_LIST_COLUMNS} FROM internships {_ORDER_BY_FRESHNESS}")
+            rows = cur.fetchall()
+    except psycopg2.errors.UndefinedTable:
+        conn.rollback()
+        rows = []
+    finally:
+        conn.close()
+    fresh = [dict(row) for row in rows]
+    with _cache_lock:
+        _cache = fresh
+        _cache_time = now
+    return fresh
 
 
 # Get a single internship by id (for the public job detail pages)
@@ -212,21 +127,32 @@ def get_internship(job_id):
     return dict(row) if row else None
 
 
-def job_fingerprint(company, role, location):
-    """Content-based fingerprint matching the frontend makeJobFingerprint().
+def job_pruned(job_id):
+    """True if this id used to be a live listing and was deliberately removed."""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM pruned_job_ids WHERE id = %s", (job_id,))
+            found = cur.fetchone() is not None
+    except psycopg2.errors.UndefinedTable:
+        # Table is created by the scraper; a fresh deploy can serve a 404 before
+        # the first run of the hour creates it.
+        conn.rollback()
+        found = False
+    conn.close()
+    return found
 
-    Stable across backend ID rotation so tracker rows key line up between the UI
-    and the agent proposals. It lives here, not in api.py, because the scraper
-    writes the same value into the indexed `fingerprint` column: two copies of
-    this normaliser would drift apart on the first tweak, and a drifted
-    fingerprint is a silent 404 on every tracked job, not a crash.
-    """
-    def norm(s):
-        s = (s or "").lower()
-        s = re.sub(r"[^a-z0-9\s]", "", s)
-        s = re.sub(r"\s+", " ", s).strip()
-        return s
-    return f"{norm(company)}|{norm(role)}|{norm(location)}"
+
+# When the scraper last wrote. Backed by idx_last_seen, so this is an index
+# lookup, not a scan. /health reports it because the scheduler's next_run_time
+# looks healthy even when the process has been dead for days.
+def last_scrape_at():
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT max(last_seen_at) FROM internships")
+        row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
 
 
 # Search by location
@@ -234,7 +160,7 @@ def search_location(x):
     conn = get_conn()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE location ILIKE %s ORDER BY date",
+            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE location ILIKE %s {_ORDER_BY_FRESHNESS}",
             (f"%{x}%",)
         )
         rows = cur.fetchall()
@@ -247,7 +173,7 @@ def find_keywords(x):
     conn = get_conn()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE role ILIKE %s ORDER BY date",
+            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE role ILIKE %s {_ORDER_BY_FRESHNESS}",
             (f"%{x}%",)
         )
         rows = cur.fetchall()
@@ -260,52 +186,12 @@ def search_company(x):
     conn = get_conn()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE company ILIKE %s ORDER BY date",
+            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE company ILIKE %s {_ORDER_BY_FRESHNESS}",
             (f"%{x}%",)
         )
         rows = cur.fetchall()
     conn.close()
     return [dict(row) for row in rows]
-
-
-# Row count for /count. This used to be len(recent_internships()), which pulled
-# the whole visible table — ~10MB — out of Postgres to return one integer.
-def count_internships():
-    conn = get_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT count(*) FROM internships")
-            row = cur.fetchone()
-    except psycopg2.errors.UndefinedTable:
-        # Same contract as recent_internships(): no table yet is 0, not a 500.
-        conn.rollback()
-        row = (0,)
-    finally:
-        conn.close()
-    return row[0] if row else 0
-
-
-# Resolve a job's live id from its content fingerprint. One indexed lookup.
-# This used to walk all ~13k rows of the resident table and fingerprint each one
-# in Python on every request, so a lookup could not be answered without the
-# 10MB whole-table cache being warm, and it was the reason a 0.1 vCPU host felt
-# slow even when idle.
-def find_internship_id(company, role, location):
-    want = job_fingerprint(company, role, location)
-    conn = get_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id FROM internships WHERE fingerprint = %s LIMIT 1",
-                (want,),
-            )
-            row = cur.fetchone()
-    except psycopg2.errors.UndefinedTable:
-        conn.rollback()
-        row = None
-    finally:
-        conn.close()
-    return row[0] if row else None
 
 
 # ── Agent approval bridge ─────────────────────────────────────────────────────

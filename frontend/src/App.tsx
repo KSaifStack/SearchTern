@@ -6,19 +6,20 @@ import Navbar from "./components/Navbar"
 import { TrackerProvider } from "./components/TrackerContext"
 import { AuthProvider } from "./components/AuthContext"
 import { AgentOverlay } from "./components/AgentOverlay"
+import ErrorBoundary from "./components/ErrorBoundary"
 import { usePageMeta } from "./utils/seo"
 import type { PageMeta } from "./utils/seo"
 
-// Split per route: react-pdf (Resume/Settings), dnd-kit (Tracker) and the
-// agent panel are dead weight on the job board, and the board is the landing
-// page. Costs one extra RTT on navigation, saves ~half the first-load bundle.
+// Route-level code splitting. Every page used to be pulled into the one entry
+// bundle, so opening /jobs paid to parse JobDetail, Tracker, Settings and the
+// PDF code before the list could paint.
 const Home = lazy(() => import("./pages/Home"))
 const Jobs = lazy(() => import("./pages/Jobs"))
 const JobDetail = lazy(() => import("./pages/JobDetail"))
 const Tracker = lazy(() => import("./pages/Tracker"))
 const Auth = lazy(() => import("./pages/Auth"))
-const Settings = lazy(() => import("./pages/Settings"))
 const Privacy = lazy(() => import("./pages/Privacy"))
+const Settings = lazy(() => import("./pages/Settings"))
 
 const SITE_ORG = {
     "@context": "https://schema.org",
@@ -41,7 +42,8 @@ function App() {
                     <div>
                         <Navbar />
                         <div className="app-content">
-                            <Suspense fallback={<p className="home-empty">Loading...</p>}>
+                            <ErrorBoundary>
+                            <Suspense fallback={null}>
                             <Routes>
                                 <Route
                                     path="/"
@@ -136,6 +138,7 @@ function App() {
                                 />
                             </Routes>
                             </Suspense>
+                            </ErrorBoundary>
                         </div>
                         <AgentOverlay />
                         <SpeedInsights />

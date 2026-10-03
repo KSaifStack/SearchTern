@@ -9,7 +9,6 @@ slowapi==0.1.10
 apscheduler==3.11.3
 python-dotenv==1.2.3
 psycopg2-binary==2.9.13
-ijson==3.5.1
 
 # Transitives that fail at import rather than at runtime, so pinning only the
 # direct deps above is not enough — fastapi 0.141.1 already resolves starlette

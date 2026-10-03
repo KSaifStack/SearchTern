@@ -1,18 +1,13 @@
-// Same-origin by default: vercel rewrites /backend/* to the API host in prod,
-// the vite dev proxy forwards it to 127.0.0.1:8000. Keeps the browser on one
-// hostname so users behind restrictive HTTP proxies can still reach the API.
-const BASE_URL = import.meta.env.VITE_API_URL || "/backend";
-
-// The search index. Served from the CDN (see api/index.ts) and sliced, so
-// browsing and searching never reach the backend.
-const INDEX_URL = "/jobs.json";
+const api_key = import.meta.env.VITE_API_KEY;// 127.0.0.1 not localhost: dev backend binds IPv4-only and the browser may
+// resolve "localhost" to ::1 first, which gets connection-refused.
+const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 // subset of a job row the backend returns for same-company lookups
 export interface Job {
     id: number
     company: string
     role: string
-    location: string
+    location?: string
     link: string
     date: number | string
     type?: string
@@ -21,30 +16,28 @@ export interface Job {
     description?: string | null
 }
 
-// One slice of the search index. The list is split so the browser can render
-// the first slice immediately and pull the rest in parallel — see
-// services/internshipmanager.ts. No backend request, no search round trip.
-export interface IndexSlice {
-  jobs: Job[]
-  total: number
-  parts: number
-  /** set when the slice could not be fetched, so callers can say so */
-  error?: string
+// pulls update Backend data via fastapi (ThinkPad)
+export async function pullUpdateBackend() {
+  const res = await fetch(`${BASE_URL}/update`, {
+    method: "POST",
+    headers: {
+      "X-API-Key": api_key,   // Same key as in .env
+    }
+  })
+  console.log(res.status)
+  const data = await res.json()
+  return data.result
 }
 
-export async function pullIndexSlice(part: number, parts: number): Promise<IndexSlice> {
+// pulls all recent listings via FastAPI backend
+export async function pullRecent(){
   try {
-    const res = await fetch(`${INDEX_URL}?part=${part}&parts=${parts}`);
-    if (!res.ok) return { jobs: [], total: 0, parts: 1, error: `HTTP ${res.status}` };
+    const res = await fetch(`${BASE_URL}/recent`);
     const data = await res.json();
-    return {
-      jobs: data.result || [],
-      total: typeof data.count === 'number' ? data.count : 0,
-      parts: typeof data.parts === 'number' ? data.parts : parts,
-    };
+    return data.result || [];
   } catch (e) {
-    console.error(`Error fetching job index slice ${part}:`, e);
-    return { jobs: [], total: 0, parts: 1, error: e instanceof Error ? e.message : 'network error' };
+    console.error("Error fetching recent listings from backend:", e);
+    return [];
   }
 }
 
@@ -61,7 +54,7 @@ export async function pullJob(id: number | string){
   }
 }
 
-// listing count for the counter badge — a 15-byte response, not an index slice
+// live listing count for the counter badge
 export async function pullCount(){
   try {
     const res = await fetch(`${BASE_URL}/count`);
@@ -88,6 +81,31 @@ export async function pullLookup(company: string, role: string, location: string
   }
 }
 
+// pulls internships based off location via FastAPI backend
+export async function pullLocation(searchterm:String){
+  try {
+    const res = await fetch(`${BASE_URL}/location?searchterm=${encodeURIComponent(searchterm.toString())}`);
+    const data = await res.json();
+    return data.result || [];
+  } catch (e) {
+    console.error("Error fetching location search from backend:", e);
+    return [];
+  }
+}
+
+// pulls internships based off keyword via FastAPI backend
+export async function pullKeyword(searchterm:String){
+  try {
+    const res = await fetch(`${BASE_URL}/keywords?searchterm=${encodeURIComponent(searchterm.toString())}`);
+    const data = await res.json();
+    return data.result || [];
+  } catch (e) {
+    console.error("Error fetching keyword search from backend:", e);
+    return [];
+  }
+}
+
+// pulls all open roles at a company (job detail "more from this company" panel)
 // pulls all open roles at a company (job detail "more from this company" panel)
 export async function pullCompany(name: string): Promise<Job[]> {
   try {

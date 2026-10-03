@@ -9,8 +9,4 @@ __pycache__/
 *.pyc
 *.db
 
-# Runtime snapshot artifact: regenerated on every in-process scrape, so baking
-# a stale 10MB copy into the image only adds deploy-time bloat.
-recent.jobs.json
-
 test*.py
