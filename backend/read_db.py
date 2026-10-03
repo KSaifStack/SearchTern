@@ -19,6 +19,10 @@ _cache_time: float = 0
 _CACHE_TTL = 3300  # 55 minutes (refresh before the hourly scrape)
 _cache_lock = Lock()
 _JOB_LIST_COLUMNS = "id, company, role, location, date, link, type, season, ats, last_seen_at"
+# date is a TEXT column holding days-ago, so a plain ORDER BY sorts it as text
+# ("10" before "2"). Cast so newest really is first. Every stored value is
+# numeric — scraper.sort_date() drops anything it cannot parse.
+_ORDER_BY_FRESHNESS = "ORDER BY date::numeric"
 
 _agent_tables_ready = False
 _agent_tables_checked_at = 0.0
@@ -60,6 +64,15 @@ class _PooledConn:
             self._returned = True
             _get_pool().putconn(self._conn)
 
+    # Most call sites do `conn = get_conn()` ... `conn.close()` with nothing in
+    # between, so a query that raises leaks the pooled connection. The pool is
+    # capped at 8, and enough leaks take every DB endpoint down until restart.
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
     def __getattr__(self, name):
         return getattr(self._conn, name)
 
@@ -84,21 +97,24 @@ def recent_internships():
     with _cache_lock:
         if _cache is not None and now - _cache_time < _CACHE_TTL:
             return _cache
-        conn = get_conn()
-        try:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(f"SELECT {_JOB_LIST_COLUMNS} FROM internships ORDER BY date")
-                rows = cur.fetchall()
-        except psycopg2.errors.UndefinedTable:
-            conn.rollback()
-            _cache = []
-            _cache_time = now
-            return _cache
-        finally:
-            conn.close()
-        _cache = [dict(row) for row in rows]
+    # Query outside the lock: holding it across a remote round trip serialised
+    # every reader behind the slowest one. Racing readers is harmless, last
+    # writer wins and they all see the same rows.
+    conn = get_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"SELECT {_JOB_LIST_COLUMNS} FROM internships {_ORDER_BY_FRESHNESS}")
+            rows = cur.fetchall()
+    except psycopg2.errors.UndefinedTable:
+        conn.rollback()
+        rows = []
+    finally:
+        conn.close()
+    fresh = [dict(row) for row in rows]
+    with _cache_lock:
+        _cache = fresh
         _cache_time = now
-        return _cache
+    return fresh
 
 
 # Get a single internship by id (for the public job detail pages)
@@ -144,7 +160,7 @@ def search_location(x):
     conn = get_conn()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE location ILIKE %s ORDER BY date",
+            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE location ILIKE %s {_ORDER_BY_FRESHNESS}",
             (f"%{x}%",)
         )
         rows = cur.fetchall()
@@ -157,7 +173,7 @@ def find_keywords(x):
     conn = get_conn()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE role ILIKE %s ORDER BY date",
+            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE role ILIKE %s {_ORDER_BY_FRESHNESS}",
             (f"%{x}%",)
         )
         rows = cur.fetchall()
@@ -170,7 +186,7 @@ def search_company(x):
     conn = get_conn()
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE company ILIKE %s ORDER BY date",
+            f"SELECT {_JOB_LIST_COLUMNS} FROM internships WHERE company ILIKE %s {_ORDER_BY_FRESHNESS}",
             (f"%{x}%",)
         )
         rows = cur.fetchall()

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { useElementSize } from "@mantine/hooks"
 import { Modal } from "@mantine/core"
 import { notifications } from "@mantine/notifications"
@@ -31,6 +31,7 @@ import {
     removeResumeFromCloud,
     syncResumeWithCloud,
     setActiveEverywhere,
+    clearCloudActive,
     cloudAvailable,
     isValidResumeFile,
     uniqueResumeName,
@@ -83,16 +84,17 @@ function Resume({ onCountChange }: { onCountChange?: (count: number) => void }) 
     const activeResume = resumes.find(r => r.id === activeId) ?? resumes[0] ?? null
     const current = activeResume?.name ?? ""
 
-    const resumesRef = useRef(resumes)
-    useEffect(() => { resumesRef.current = resumes }, [resumes])
-
     useEffect(() => { onCountChange?.(resumes.length) }, [resumes, onCountChange])
 
     const loadAll = useCallback(async () => {
+        // Read local first. syncResumeWithCloud merges against what it is given,
+        // and it used to be handed a ref that was still empty on mount, so every
+        // cloud file looked new and got pulled in again under a fresh id.
+        let local = await getLocalResumes()
         if (userId) {
-            await syncResumeWithCloud(userId, resumesRef.current)
+            await syncResumeWithCloud(userId, local)
+            local = await getLocalResumes()
         }
-        const local = await getLocalResumes()
         const saved = await getActiveResumeId()
         const picked = saved && local.some(r => r.id === saved)
             ? saved
@@ -163,7 +165,14 @@ function Resume({ onCountChange }: { onCountChange?: (count: number) => void }) 
         const remaining = resumes.filter(r => r.id !== record.id)
         setResumes(remaining)
         if (activeId === record.id) {
-            setActiveId(remaining[0]?.id ?? null)
+            const next = remaining[0] ?? null
+            setActiveId(next?.id ?? null)
+            // Leaving the cloud marker pointing at the file we just deleted makes
+            // the agent fetch a missing object until the next Settings visit.
+            if (userId && cloudAvailable()) {
+                if (next) await setActiveEverywhere(userId, next)
+                else await clearCloudActive(userId)
+            }
         }
         notifications.show({ title: 'Resume Removed', message: record.name, color: 'blue', icon: <CheckCircle size={18} /> })
     }, [resumes, activeId, userId])
@@ -364,6 +373,11 @@ function Resume({ onCountChange }: { onCountChange?: (count: number) => void }) 
 
                     {activeResume && canPreview && isPdf(current) && previewUrl ? (
                         <div ref={pdfWrapRef} className="resume-pdf-wrap">
+                            {/* Document suspends while pdf.js parses. Without a
+                                boundary here the promise resolves against the route
+                                Suspense (fallback null) and both the loading and error
+                                props below never render. */}
+                            <Suspense fallback={<p className="settings-muted resume-pdf-status">Loading PDF…</p>}>
                             <Document
                                 file={previewUrl}
                                 onLoadSuccess={async (doc) => {
@@ -392,6 +406,7 @@ function Resume({ onCountChange }: { onCountChange?: (count: number) => void }) 
                                     <p className="settings-muted resume-pdf-status">Preparing preview…</p>
                                 )}
                             </Document>
+                            </Suspense>
                         </div>
                     ) : activeResume && canPreview && previewUrl ? (
                         <iframe

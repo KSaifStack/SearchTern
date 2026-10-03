@@ -6,6 +6,7 @@ import Navbar from "./components/Navbar"
 import { TrackerProvider } from "./components/TrackerContext"
 import { AuthProvider } from "./components/AuthContext"
 import { AgentOverlay } from "./components/AgentOverlay"
+import ErrorBoundary from "./components/ErrorBoundary"
 import { usePageMeta } from "./utils/seo"
 import type { PageMeta } from "./utils/seo"
 
@@ -41,6 +42,7 @@ function App() {
                     <div>
                         <Navbar />
                         <div className="app-content">
+                            <ErrorBoundary>
                             <Suspense fallback={null}>
                             <Routes>
                                 <Route
@@ -136,6 +138,7 @@ function App() {
                                 />
                             </Routes>
                             </Suspense>
+                            </ErrorBoundary>
                         </div>
                         <AgentOverlay />
                         <SpeedInsights />
