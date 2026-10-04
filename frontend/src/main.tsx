@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import { ThemeProvider, useTheme } from './components/ThemeContext'
+import { AuthProvider } from './components/AuthContext'
 import '@mantine/core/styles.css'
 import '@mantine/notifications/styles.css'
 import './index.css'
@@ -38,7 +39,9 @@ function Root() {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <ThemeProvider>
-    <Root />
-  </ThemeProvider>,
+  <AuthProvider>
+    <ThemeProvider>
+      <Root />
+    </ThemeProvider>
+  </AuthProvider>,
 )

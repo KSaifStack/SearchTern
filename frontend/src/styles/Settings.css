@@ -491,6 +491,13 @@
 
 .settings-agent-tab:hover {
     color: var(--text-dark);
+    background-color: transparent;
+    transform: none;
+    box-shadow: none;
+}
+
+.settings-agent-tab.active:hover {
+    color: var(--accent-color);
 }
 
 .settings-agent-tab.active {
@@ -552,6 +559,9 @@
 
 .settings-revoked-toggle:hover {
     color: var(--text-dark);
+    background-color: transparent;
+    transform: none;
+    box-shadow: none;
 }
 
 /* ── Activity pills ──────────────────────────────────────── */
@@ -564,7 +574,7 @@
 .settings-activity-pill {
     background: var(--menu-hover-bg);
     border: 1px solid var(--border-medium);
-    color: var(--text-muted);
+    color: var(--text-slate);
     font-size: 12px;
     font-weight: 600;
     border-radius: 20px;

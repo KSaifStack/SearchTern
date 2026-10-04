@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react"
 import "../styles/navbar.css"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "./AuthContext"
-import { User, CaretDown, SignOut, SignIn, UserPlus, Info, GearSix } from "@phosphor-icons/react"
+import { CaretDown, SignOut, SignIn, UserPlus, Info, GearSix } from "@phosphor-icons/react"
 import { notifications } from "@mantine/notifications"
 
 function Navbar() {
@@ -98,27 +98,21 @@ function Navbar() {
             </ul>
 
             <div className="nav-auth" ref={dropdownRef}>
-                <button
-                    className="nav-profile-trigger"
-                    aria-label="Account menu"
-                    onClick={() => setProfileOpen(!profileOpen)}
-                >
-                    {user ? (
-                        <div className="nav-avatar" title={displayEmail}>
-                            {avatarLetter}
-                        </div>
-                    ) : (
-                        <div className="nav-avatar-placeholder">
-                            <User weight="bold" />
-                        </div>
-                    )}
-                    <CaretDown weight="bold" className={`nav-caret ${profileOpen ? 'open' : ''}`} />
-                </button>
+                {user ? (
+                    <>
+                        <button
+                            className="nav-profile-trigger"
+                            aria-label="Account menu"
+                            onClick={() => setProfileOpen(!profileOpen)}
+                        >
+                            <div className="nav-avatar" title={displayEmail}>
+                                {avatarLetter}
+                            </div>
+                            <CaretDown weight="bold" className={`nav-caret ${profileOpen ? 'open' : ''}`} />
+                        </button>
 
-                {profileOpen && (
-                    <div className="nav-profile-menu">
-                        {user ? (
-                            <>
+                        {profileOpen && (
+                            <div className="nav-profile-menu">
                                 <div className="nav-profile-header">
                                     {displayName && (
                                         <span className="nav-profile-name">{displayName}</span>
@@ -147,32 +141,13 @@ function Navbar() {
                                     <SignOut weight="bold" />
                                     <span>Log Out</span>
                                 </button>
-                            </>
-                        ) : (
-                            <>
-                                <Link to="/settings" className="nav-profile-item" onClick={() => { setProfileOpen(false); setMenuOpen(false); }}>
-                                    <GearSix weight="bold" />
-                                    <span>Settings</span>
-                                </Link>
-                                <div className="nav-profile-divider" />
-                                <button
-                                    className="nav-profile-item"
-                                    onClick={() => { navigate('/auth'); setProfileOpen(false); setMenuOpen(false); }}
-                                >
-                                    <SignIn weight="bold" />
-                                    <span>Log In</span>
-                                </button>
-                                <div className="nav-profile-divider" />
-                                <button
-                                    className="nav-profile-item"
-                                    onClick={() => { navigate('/auth?tab=signup'); setProfileOpen(false); setMenuOpen(false); }}
-                                >
-                                    <UserPlus weight="bold" />
-                                    <span>Sign Up</span>
-                                </button>
-                            </>
+                            </div>
                         )}
-                    </div>
+                    </>
+                ) : (
+                    <button className="nav-auth-btn" onClick={() => navigate('/auth')}>
+                        Sign up / Log in
+                    </button>
                 )}
             </div>
         </nav>

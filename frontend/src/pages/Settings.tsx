@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { Link } from "react-router-dom"
+import { Link, Navigate } from "react-router-dom"
 import { Switch } from "@mantine/core"
 import { notifications } from "@mantine/notifications"
 import {
@@ -58,7 +58,7 @@ function describeActivity(p: AgentProposal): string {
 }
 
 function Settings() {
-    const { user, signOut } = useAuth()
+    const { user, signOut, loading } = useAuth()
     const { theme, toggleTheme } = useTheme()
 
     const userId = user?.id ?? ""
@@ -181,6 +181,10 @@ const [agentError, setAgentError] = useState<string | null>(null)
             () => notifications.show({ title: 'Copy failed', message: 'Clipboard access was blocked by the browser.', color: 'red', icon: <WarningCircle size={18} /> }),
         )
     }, [])
+
+    // Account-scoped page. Waits for the session to resolve before deciding, so
+    // a signed-in user on a hard refresh isn't bounced to /auth.
+    if (!loading && !user) return <Navigate to="/auth" replace />
 
     return (
         <div className="standard-layout">
