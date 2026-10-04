@@ -3,8 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { SpeedInsights } from "@vercel/speed-insights/react"
 import { Analytics } from "@vercel/analytics/react"
 import Navbar from "./components/Navbar"
+import ThemeNudge from "./components/ThemeNudge"
 import { TrackerProvider } from "./components/TrackerContext"
-import { AuthProvider } from "./components/AuthContext"
 import { AgentOverlay } from "./components/AgentOverlay"
 import ErrorBoundary from "./components/ErrorBoundary"
 import { usePageMeta } from "./utils/seo"
@@ -37,10 +37,10 @@ function RouteMeta({ meta }: { meta: PageMeta }) {
 function App() {
     return (
         <BrowserRouter>
-            <AuthProvider>
-                <TrackerProvider>
+            <TrackerProvider>
                     <div>
                         <Navbar />
+                        <ThemeNudge />
                         <div className="app-content">
                             <ErrorBoundary>
                             <Suspense fallback={null}>
@@ -145,7 +145,6 @@ function App() {
                         <Analytics />
                     </div>
                 </TrackerProvider>
-            </AuthProvider>
         </BrowserRouter>
     )
 }

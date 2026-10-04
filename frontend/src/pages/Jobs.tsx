@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { Table, Pagination, Popover, Text, Select, Badge } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth, fetchSources } from "../api/internships"
-import { BookmarkSimpleIcon, ArrowsDownUp, FunnelSimple, GlobeSimple, Buildings, Clock, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { BookmarkSimpleIcon, FunnelSimple, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
@@ -30,6 +30,35 @@ const RECENCY_OPTIONS = [
   { days: 30, label: 'Past 30 days' },
 ]
 
+const SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'company-az', label: 'Company A-Z' },
+  { value: 'company-za', label: 'Company Z-A' },
+]
+
+const ROLE_OPTIONS = [
+  { value: '', label: 'All Roles' },
+  { value: 'swe', label: 'Software Engineering' },
+  { value: 'data', label: 'Data / ML' },
+  { value: 'cyber', label: 'Cybersecurity' },
+  { value: 'devops', label: 'DevOps / Cloud' },
+  { value: 'hardware', label: 'Hardware / Embedded' },
+  { value: 'product', label: 'Product Management' },
+]
+
+// ponytail: naive substring match on the title — "Engineer" swallows roles that
+// belong in another bucket, and short keywords like "ml" over-match. Good enough
+// to cut a list down; replace with a per-role keyword column if it gets annoying.
+const ROLE_KEYWORDS: Record<string, string[]> = {
+  swe: ['software', 'engineer', 'sde', 'developer', 'full stack', 'fullstack', 'front end', 'frontend', 'back end', 'backend', 'web dev', 'mobile', 'ios', 'android'],
+  data: ['data', 'machine learning', 'ml', 'artificial intelligence', 'analytics', 'scientist', 'nlp', 'llm', 'deep learning'],
+  cyber: ['security', 'cyber', 'appsec', 'infosec', 'penetration', 'threat', 'forensic'],
+  devops: ['devops', 'sre', 'site reliability', 'cloud', 'infrastructure', 'platform', 'kubernetes', 'aws', 'azure', 'gcp'],
+  hardware: ['hardware', 'embedded', 'firmware', 'electrical', 'ece', 'asic', 'vlsi', 'robotics', 'semiconductor', 'chip'],
+  product: ['product'],
+}
+
 function daysAgo(date: string | number): number {
   const parsed = parseFloat(String(date))
   return isNaN(parsed) ? 999 : parsed
@@ -55,11 +84,11 @@ function Jobs() {
   const debounceRef = useRef<number | undefined>(undefined)
   const [searchText, setSearchText] = useState('')
   const [sortOrder, setSortOrder] = useState('newest')
+  const [roleFilter, setRoleFilter] = useState('')
   const [typeFilters, setTypeFilters] = useState({ internship: true, newgrad: true })
   const [sortOpen, setSortOpen] = useState(false)
-  const [typeOpen, setTypeOpen] = useState(false)
-  const [locOpen, setLocOpen] = useState(false)
-  const [companyOpen, setCompanyOpen] = useState(false)
+  const [roleOpen, setRoleOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [countryFilter, setCountryFilter] = useState('')
   const [stateFilter, setStateFilter] = useState('')
   const [faangOnly, setFaangOnly] = useState(false)
@@ -74,7 +103,6 @@ function Jobs() {
       return false
     }
   })
-  const [freshnessOpen, setFreshnessOpen] = useState(false)
 
   const perPage = 15;
 
@@ -151,6 +179,13 @@ function Jobs() {
     }
     if (countryFilter) jobs = jobs.filter(j => parsedLocations.get(j.id)?.countries.includes(countryFilter))
     if (stateFilter) jobs = jobs.filter(j => parsedLocations.get(j.id)?.states.includes(stateFilter))
+    if (roleFilter) {
+      const keywords = ROLE_KEYWORDS[roleFilter] || []
+      jobs = jobs.filter(j => {
+        const title = (j.role || '').toLowerCase()
+        return keywords.some(k => title.includes(k))
+      })
+    }
     if (!typeFilters.internship) jobs = jobs.filter(j => j.type === 'newgrad')
     if (!typeFilters.newgrad) jobs = jobs.filter(j => j.type !== 'newgrad')
     if (faangOnly || employeeBucket) {
@@ -176,10 +211,35 @@ function Jobs() {
       const bNum = isNaN(bParsed) ? 999 : bParsed
       return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
-  }, [allJobs, searchText, sortOrder, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, employeeBucket, hideStale, recencyDays])
+  }, [allJobs, searchText, sortOrder, roleFilter, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, employeeBucket, hideStale, recencyDays])
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
+
+  const activeFilterCount =
+    (recencyDays > 0 ? 1 : 0) +
+    (hideStale ? 1 : 0) +
+    (typeFilters.internship && typeFilters.newgrad ? 0 : 1) +
+    (countryFilter ? 1 : 0) +
+    (stateFilter ? 1 : 0) +
+    (faangOnly ? 1 : 0) +
+    (employeeBucket ? 1 : 0)
+
+  function clearFilters() {
+    setRecencyDays(0)
+    setHideStale(false)
+    setTypeFilters({ internship: true, newgrad: true })
+    setCountryFilter('')
+    setStateFilter('')
+    setFaangOnly(false)
+    setEmployeeBucket('')
+    try {
+      localStorage.setItem('searchtern-hide-stale', '0')
+    } catch {
+      // Preference just won't survive the session.
+    }
+    setPage(1)
+  }
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
@@ -310,171 +370,167 @@ function Jobs() {
             <Popover opened={sortOpen} onChange={setSortOpen} width={180} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
                 <button className="sort_btn" onClick={() => setSortOpen(o => !o)}>
-                  <ArrowsDownUp size={17} weight="bold" />
+                  <span aria-hidden="true">⇅</span>
+                  {SORT_OPTIONS.find(o => o.value === sortOrder)?.label ?? 'Newest'}
                 </button>
               </Popover.Target>
               <Popover.Dropdown>
-                <div style={{ padding: '4px 0', fontSize: '13px' }}>
-                  {['newest', 'oldest', 'company-az', 'company-za'].map(opt => (
-                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
+                <div className="filter-option-list">
+                  {SORT_OPTIONS.map(opt => (
+                    <label key={opt.value} className="filter-option">
                       <input
                         type="radio"
                         name="sort"
-                        checked={sortOrder === opt}
-                        onChange={() => { setSortOrder(opt); setSortOpen(false) }}
-                        style={{ accentColor: 'var(--primary-green)' }}
-                      />
-                      {opt === 'newest' ? 'Newest' : opt === 'oldest' ? 'Oldest' : opt === 'company-az' ? 'Company (A-Z)' : 'Company (Z-A)'}
-                    </label>
-                  ))}
-                </div>
-              </Popover.Dropdown>
-            </Popover>
-            <Popover opened={freshnessOpen} onChange={setFreshnessOpen} width={190} position="bottom-end" withArrow shadow="md">
-              <Popover.Target>
-                <button className="sort_btn" onClick={() => setFreshnessOpen(o => !o)} title="Recency filter">
-                  <Clock size={17} weight="bold" />
-                </button>
-              </Popover.Target>
-              <Popover.Dropdown>
-                <div style={{ padding: '4px 0', fontSize: '13px' }}>
-                  {RECENCY_OPTIONS.map(opt => (
-                    <label key={opt.days} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
-                      <input
-                        type="radio"
-                        name="recency"
-                        checked={recencyDays === opt.days}
-                        onChange={() => { setRecencyDays(opt.days); setPage(1) }}
-                        style={{ accentColor: 'var(--primary-green)' }}
+                        checked={sortOrder === opt.value}
+                        onChange={() => { setSortOrder(opt.value); setSortOpen(false) }}
                       />
                       {opt.label}
                     </label>
                   ))}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0 0', cursor: 'pointer', borderTop: '1px solid var(--border-color, rgba(128,128,128,0.2))', marginTop: 4 }}>
-                    <input
-                      type="checkbox"
-                      checked={hideStale}
-                      onChange={() => {
-                        try {
-                          localStorage.setItem('searchtern-hide-stale', hideStale ? '0' : '1')
-                        } catch {
-                          // Preference just won't survive the session.
-                        }
-                        setHideStale(!hideStale)
-                        setPage(1)
-                      }}
-                      style={{ accentColor: 'var(--primary-green)' }}
-                    />
-                    Hide likely-filled ({STALE_DAYS}+ days)
-                  </label>
                 </div>
               </Popover.Dropdown>
             </Popover>
-            <Popover opened={typeOpen} onChange={setTypeOpen} width={160} position="bottom-end" withArrow shadow="md">
+
+            <Popover opened={roleOpen} onChange={setRoleOpen} width={200} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
-                <button className="sort_btn" onClick={() => setTypeOpen(o => !o)}>
-                  <FunnelSimple size={17} weight="bold" />
+                <button className="sort_btn" onClick={() => setRoleOpen(o => !o)} title="Role filter">
+                  Role <span aria-hidden="true">▾</span>
                 </button>
               </Popover.Target>
               <Popover.Dropdown>
-                <div style={{ padding: '4px 0', fontSize: '13px' }}>
-                  {[
-                    { key: 'internship' as const, label: 'Internship' },
-                    { key: 'newgrad' as const, label: 'New Grad' },
-                  ].map(t => (
-                    <label key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
+                <div className="filter-option-list">
+                  {ROLE_OPTIONS.map(opt => (
+                    <label key={opt.value} className="filter-option">
                       <input
-                        type="checkbox"
-                        checked={typeFilters[t.key]}
-                        onChange={() => setTypeFilters(prev => ({ ...prev, [t.key]: !prev[t.key] }))}
-                        style={{ accentColor: 'var(--primary-green)' }}
+                        type="radio"
+                        name="role"
+                        checked={roleFilter === opt.value}
+                        onChange={() => { setRoleFilter(opt.value); setRoleOpen(false); setPage(1) }}
                       />
-                      {t.label}
+                      {opt.label}
                     </label>
                   ))}
                 </div>
               </Popover.Dropdown>
             </Popover>
-            <Popover opened={locOpen} onChange={setLocOpen} width={250} position="bottom-end" withArrow shadow="md">
+
+            <Popover opened={filtersOpen} onChange={setFiltersOpen} width={300} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
-                <button className="sort_btn" onClick={() => setLocOpen(o => !o)} title="Country / state filter">
-                  <GlobeSimple size={17} weight="bold" />
+                <button className="sort_btn" onClick={() => setFiltersOpen(o => !o)}>
+                  <FunnelSimple size={16} weight="bold" />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <Badge size="xs" variant="filled" color="teal" className="filters-count">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
                 </button>
               </Popover.Target>
               <Popover.Dropdown>
-                <div style={{ padding: '4px 0', fontSize: '13px' }}>
-                  <Select
-                    label="Country"
-                    placeholder="All countries"
-                    size="xs"
-                    searchable
-                    clearable
-                    data={countryOptions.map(o => ({ value: o.name, label: `${o.name} (${o.count})` }))}
-                    value={countryFilter || null}
-                    onChange={val => { setCountryFilter(val || ''); setStateFilter(''); setPage(1) }}
-                    maxDropdownHeight={220}
-                    mb={10}
-                  />
-                  {countryFilter === 'United States' && (
+                <div className="filters-panel">
+                  <div className="filters-section">
+                    <span className="filters-section-label">Date posted</span>
+                    <div className="filter-option-list">
+                      {RECENCY_OPTIONS.map(opt => (
+                        <label key={opt.days} className="filter-option">
+                          <input
+                            type="radio"
+                            name="recency"
+                            checked={recencyDays === opt.days}
+                            onChange={() => { setRecencyDays(opt.days); setPage(1) }}
+                          />
+                          {opt.label}
+                        </label>
+                      ))}
+                      <label className="filter-option">
+                        <input
+                          type="checkbox"
+                          checked={hideStale}
+                          onChange={() => {
+                            try {
+                              localStorage.setItem('searchtern-hide-stale', hideStale ? '0' : '1')
+                            } catch {
+                              // Preference just won't survive the session.
+                            }
+                            setHideStale(!hideStale)
+                            setPage(1)
+                          }}
+                        />
+                        Hide likely-filled ({STALE_DAYS}+ days)
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="filters-section">
+                    <span className="filters-section-label">Type</span>
+                    {[
+                      { key: 'internship' as const, label: 'Internship' },
+                      { key: 'newgrad' as const, label: 'New Grad' },
+                    ].map(t => (
+                      <label key={t.key} className="filter-option">
+                        <input
+                          type="checkbox"
+                          checked={typeFilters[t.key]}
+                          onChange={() => {
+                            setTypeFilters(prev => ({ ...prev, [t.key]: !prev[t.key] }))
+                            setPage(1)
+                          }}
+                        />
+                        {t.label}
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="filters-section">
+                    <span className="filters-section-label">Location</span>
                     <Select
-                      label="State"
-                      placeholder="All states"
+                      placeholder="All countries"
                       size="xs"
                       searchable
                       clearable
-                      data={stateOptions.map(s => ({ value: s, label: `${US_STATES[s] || s} (${s})` }))}
-                      value={stateFilter || null}
-                      onChange={val => { setStateFilter(val || ''); setPage(1) }}
+                      data={countryOptions.map(o => ({ value: o.name, label: `${o.name} (${o.count})` }))}
+                      value={countryFilter || null}
+                      onChange={val => { setCountryFilter(val || ''); setStateFilter(''); setPage(1) }}
                       maxDropdownHeight={220}
-                      mb={10}
                     />
-                  )}
-                  {(countryFilter || stateFilter) && (
-                    <button
-                      className="btn-clear"
-                      onClick={() => { setCountryFilter(''); setStateFilter(''); setPage(1) }}
-                    >
-                      Clear location filter
-                    </button>
-                  )}
-                </div>
-              </Popover.Dropdown>
-            </Popover>
-            <Popover opened={companyOpen} onChange={setCompanyOpen} width={230} position="bottom-end" withArrow shadow="md">
-              <Popover.Target>
-                <button className="sort_btn" onClick={() => setCompanyOpen(o => !o)} title="FAANG / company size filter">
-                  <Buildings size={17} weight="bold" />
-                </button>
-              </Popover.Target>
-              <Popover.Dropdown>
-                <div style={{ padding: '4px 0', fontSize: '13px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={faangOnly}
-                      onChange={() => { setFaangOnly(!faangOnly); setPage(1) }}
-                      style={{ accentColor: 'var(--primary-green)' }}
+                    {countryFilter === 'United States' && (
+                      <Select
+                        placeholder="All states"
+                        size="xs"
+                        searchable
+                        clearable
+                        data={stateOptions.map(s => ({ value: s, label: `${US_STATES[s] || s} (${s})` }))}
+                        value={stateFilter || null}
+                        onChange={val => { setStateFilter(val || ''); setPage(1) }}
+                        maxDropdownHeight={220}
+                      />
+                    )}
+                  </div>
+
+                  <div className="filters-section">
+                    <span className="filters-section-label">Company</span>
+                    <label className="filter-option">
+                      <input
+                        type="checkbox"
+                        checked={faangOnly}
+                        onChange={() => { setFaangOnly(!faangOnly); setPage(1) }}
+                      />
+                      FAANG+ only
+                    </label>
+                    <Select
+                      placeholder="Any size"
+                      size="xs"
+                      clearable
+                      data={EMPLOYEE_BUCKETS.map(b => ({ value: b.label, label: b.label }))}
+                      value={employeeBucket || null}
+                      onChange={val => { setEmployeeBucket(val || ''); setPage(1) }}
+                      maxDropdownHeight={220}
                     />
-                    FAANG+ only
-                  </label>
-                  <Select
-                    label="Company size"
-                    placeholder="Any size"
-                    size="xs"
-                    clearable
-                    data={EMPLOYEE_BUCKETS.map(b => ({ value: b.label, label: b.label }))}
-                    value={employeeBucket || null}
-                    onChange={val => { setEmployeeBucket(val || ''); setPage(1) }}
-                    maxDropdownHeight={220}
-                    mt={8}
-                    mb={10}
-                  />
-                  {(faangOnly || employeeBucket) && (
-                    <button
-                      className="btn-clear"
-                      onClick={() => { setFaangOnly(false); setEmployeeBucket(''); setPage(1) }}
-                    >
-                      Clear company filter
+                  </div>
+
+                  {activeFilterCount > 0 && (
+                    <button className="btn-clear" onClick={clearFilters}>
+                      Clear all filters
                     </button>
                   )}
                 </div>

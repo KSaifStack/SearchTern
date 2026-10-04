@@ -67,18 +67,23 @@ nav {
     flex-shrink: 0;
 }
 
-/* Placeholder avatar when logged out */
-.nav-avatar-placeholder {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: var(--badge-bg);
-    color: var(--text-slate);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    flex-shrink: 0;
+/* Signed-out call to action, replaces the profile icon */
+.nav-auth-btn {
+    background: var(--button-color);
+    color: #fff;
+    border: none;
+    box-shadow: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.nav-auth-btn:hover {
+    background: var(--button-hover-color);
 }
 
 .nav-caret {
