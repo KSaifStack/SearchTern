@@ -29,10 +29,17 @@
   <script>
     // Set data-theme before first paint. ThemeProvider applies it from an
     // effect, which runs after the browser has already painted light, so every
-    // dark-mode load would flash white without this. Mirrors storedPreference()
-    // in ThemeContext — keep the storage key in sync.
+    // dark-mode load would flash white without this.
+    //
+    // Both keys are required, and the marker is the point: the session hasn't
+    // resolved yet, so this script can't tell a signed-in visitor's choice from
+    // a leftover key written before the theme was gated. Anything written before
+    // that gate lacks the marker and is ignored, so guests don't get painted dark
+    // for the frames before ThemeProvider pins them to light.
+    // Mirrors storedPreference() in ThemeContext — keep both keys in sync.
     try {
-      if (localStorage.getItem('searchtern_theme') === 'dark') {
+      if (localStorage.getItem('searchtern_theme_authed') === '1' &&
+          localStorage.getItem('searchtern_theme') === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
       }
     } catch (e) { /* private mode, storage disabled */ }
