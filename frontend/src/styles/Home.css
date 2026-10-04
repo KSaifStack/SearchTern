@@ -264,6 +264,16 @@
     font-weight: 500;
 }
 
+/* One line, always: the links are short enough that wrapping only ever
+   happens if flex is allowed to, which just reads as a layout bug. */
+.home-footer-links {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+}
+
 @media (max-width: 640px) {
   .stat-bar { flex-direction: column; padding: 16px; gap: 20px; }
   .stat-divider { display: none; } /* hide vertical dividers */
