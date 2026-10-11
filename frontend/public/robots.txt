@@ -5,4 +5,4 @@ Disallow: /settings
 Disallow: /tracker
 Disallow: /resume
 
-Sitemap: https://searchtern.ksaif.dev/sitemap.xml
+Sitemap: https://searchtern.net/sitemap.xml

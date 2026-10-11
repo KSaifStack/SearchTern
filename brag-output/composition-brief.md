@@ -28,7 +28,7 @@ Create a short launch-style brag video for SearchTern — a find-and-track inter
 - Interpretation: 5 scenes, comfortable 3-5s holds. Short hook lines slam in fast but hold ≥0.8s. Playful energy, warm green/off-white palette. Keep all text Lexend.
 - Angle: The 2026 job hunt is tabs + spreadsheets + notebooks. SearchTern is the one system that replaces them — the feed finds the role, the board tracks it.
 - Hook (first 2-3 seconds): `47 tabs open.` / `12 spreadsheets.` / `3 notebooks.` / `And I still missed the deadline.`
-- Outro / punchline: `SearchTern.` / `Thousands of internships. Zero chaos.` / `searchtern.ksaif.dev`
+- Outro / punchline: `SearchTern.` / `Thousands of internships. Zero chaos.` / `searchtern.net`
 - Avoid:
   - Generic SaaS language ("streamline your workflow")
   - Abstract filler visuals, gradients-as-decoration

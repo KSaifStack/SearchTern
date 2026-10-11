@@ -17,7 +17,7 @@ info:
     the tracker directly.
   version: 1.0.0
 servers:
-  - url: https://api.searchtern.ksaif.dev
+  - url: https://api.searchtern.net
 
 paths:
   /agent/search:

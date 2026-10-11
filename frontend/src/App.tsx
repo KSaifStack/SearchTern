@@ -25,8 +25,8 @@ const SITE_ORG = {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "SearchTern",
-    url: "https://searchtern.ksaif.dev",
-    logo: "https://searchtern.ksaif.dev/favicon.png",
+    url: "https://searchtern.net",
+    logo: "https://searchtern.net/favicon.png",
 }
 
 function RouteMeta({ meta }: { meta: PageMeta }) {
@@ -57,7 +57,7 @@ function App() {
                                                     "@context": "https://schema.org",
                                                     "@type": "WebSite",
                                                     name: "SearchTern",
-                                                    url: "https://searchtern.ksaif.dev",
+                                                    url: "https://searchtern.net",
                                                 }],
                                             }} />
                                             <Home />

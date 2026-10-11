@@ -1,6 +1,6 @@
 # SearchTern
 
-**Find and track internships without the chaos.** → [searchtern.ksaif.dev](https://searchtern.ksaif.dev)
+**Find and track internships without the chaos.** → [searchtern.net](https://searchtern.net)
 
 ![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)

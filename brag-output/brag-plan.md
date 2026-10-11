@@ -17,7 +17,7 @@ Each line slams in fast and holds. Relatable gut-punch, then the reveal reframes
 - **The stats:** Tracker stat bar — Applied, Reply rate %, Offers, Rejected — with the ring chart filling; the numbers are the reward for using the system.
 
 ## Outro / punchline
-`SearchTern.` / `Thousands of internships. Zero chaos.` / `searchtern.ksaif.dev`
+`SearchTern.` / `Thousands of internships. Zero chaos.` / `searchtern.net`
 Logo + URL land on the strongest musical hit.
 
 ## User flow worth showing
@@ -45,7 +45,7 @@ Centerpiece scenes are the working app, not the landing page.
 - Strongest visual element: the green-accented Kanban columns and the RingProgress circle
 
 ## Share copy (draft)
-The 47-tab job hunt is over. SearchTern pulls thousands of internships every hour and tracks your whole pipeline in one drag-and-drop Kanban. searchtern.ksaif.dev
+The 47-tab job hunt is over. SearchTern pulls thousands of internships every hour and tracks your whole pipeline in one drag-and-drop Kanban. searchtern.net
 
 ## Audio direction
 - Role: warm upbeat bed + clean interaction accents
@@ -84,7 +84,7 @@ Audio-coupled idea: click on grab, soft drop each time it changes column, bell o
 Transition mood: hard cut → Scene 5.
 
 ### Scene 5 — The Outro — 3.5s (17.0—20.5)
-`SearchTern.` wordmark large in green on the warm bg. Second line: `Thousands of internships. Zero chaos.` URL `searchtern.ksaif.dev` in muted slate below. Logo slams at ~20.02s (strong cue); music fades under the URL.
+`SearchTern.` wordmark large in green on the warm bg. Second line: `Thousands of internships. Zero chaos.` URL `searchtern.net` in muted slate below. Logo slams at ~20.02s (strong cue); music fades under the URL.
 Sequential/interaction: none.
 Audio intent: payoff and close — one clean impact on the wordmark, URL appears as music fades.
 Transition mood: fade to end.
