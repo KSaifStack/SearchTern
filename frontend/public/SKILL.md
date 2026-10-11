@@ -24,7 +24,7 @@ Restart the agent after installing. The key itself is still generated in SearchT
 
 The user generates a per-user agent key in SearchTern → **Settings → AI Agents**. It starts with `st_` and is shown exactly once at creation.
 
-- API base URL: `https://api.searchtern.ksaif.dev`
+- API base URL: `https://api.searchtern.net`
 - Auth header on every request: `Authorization: Bearer st_...`
 - Local dev backend: `http://localhost:8000`
 

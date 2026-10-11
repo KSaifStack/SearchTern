@@ -1,6 +1,6 @@
 export const config = { runtime: "edge" };
 
-const SITE = "https://searchtern.ksaif.dev";
+const SITE = "https://searchtern.net";
 const API = process.env.VITE_API_URL || "http://127.0.0.1:8000";
 const DEFAULT_TITLE = "SearchTern — Software Internship & New-Grad Job Tracker";
 const DEFAULT_DESC = "Find thousands of active software internships and new-grad jobs, then track your applications in one place.";

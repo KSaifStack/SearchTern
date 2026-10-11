@@ -281,7 +281,7 @@ def pull_recent(request: Request, response: Response):
 # Sitemap, rebuilt per request from the in-memory listing cache. It used to be a
 # build artifact, which froze it at deploy time: after one day's scraping a third
 # of its URLs were deleted jobs and half the live feed had no URL at all.
-_SITE = "https://searchtern.ksaif.dev"
+_SITE = "https://searchtern.net"
 _STATIC_SITEMAP_URLS = (
     (f"{_SITE}/", "1.0"),
     (f"{_SITE}/jobs", "0.9"),

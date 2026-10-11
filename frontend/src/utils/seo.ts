@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 
-export const SITE_URL = "https://searchtern.ksaif.dev"
+export const SITE_URL = "https://searchtern.net"
 
 export interface PageMeta {
     title: string

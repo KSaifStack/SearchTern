@@ -146,8 +146,8 @@ class SitemapTests(unittest.TestCase):
         jobs = [{"id": 111}, {"id": 222}, {"id": 333}]
         with patch.object(read_db, "recent_internships", return_value=jobs):
             body = TestClient(api.app).get("/sitemap.xml").text
-        self.assertIn("<loc>https://searchtern.ksaif.dev/</loc>", body)
-        self.assertIn("<loc>https://searchtern.ksaif.dev/jobs</loc>", body)
+        self.assertIn("<loc>https://searchtern.net/</loc>", body)
+        self.assertIn("<loc>https://searchtern.net/jobs</loc>", body)
         ids = re.findall(r"/jobs/(\d+)</loc>", body)
         self.assertEqual(sorted(ids, key=int), ["111", "222", "333"])
 
