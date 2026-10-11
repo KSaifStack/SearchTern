@@ -169,10 +169,19 @@ export const TrackerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // stays in sync without a hard reload. Skip while a merge prompt is open.
     useEffect(() => {
         if (!user?.id || pendingMerge) return;
+        // ponytail: was 15s unconditionally. Slow + hidden-gated, plus an
+        // immediate refresh on wake so cross-device/agent edits show up.
         const id = window.setInterval(() => {
-            fetchFromSupabase(user.id);
-        }, 15000);
-        return () => window.clearInterval(id);
+            if (!document.hidden) fetchFromSupabase(user.id);
+        }, 60000);
+        const onWake = () => { if (!document.hidden) fetchFromSupabase(user.id); };
+        window.addEventListener("focus", onWake);
+        document.addEventListener("visibilitychange", onWake);
+        return () => {
+            window.clearInterval(id);
+            window.removeEventListener("focus", onWake);
+            document.removeEventListener("visibilitychange", onWake);
+        };
     }, [user?.id, pendingMerge, fetchFromSupabase]);
 
     const handleMerge = () => {

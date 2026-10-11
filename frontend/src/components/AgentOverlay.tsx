@@ -57,9 +57,18 @@ export function AgentOverlay() {
 
     useEffect(() => {
         refresh();
-        timerRef.current = window.setInterval(refresh, 8000);
+        // ponytail: was 8s unconditionally. Now slow + hidden-gated, with an
+        // immediate refresh when the tab regains focus so the badge isn't stale.
+        timerRef.current = window.setInterval(() => {
+            if (!document.hidden) refresh();
+        }, 30000);
+        const onWake = () => { if (!document.hidden) refresh(); };
+        window.addEventListener("focus", onWake);
+        document.addEventListener("visibilitychange", onWake);
         return () => {
             if (timerRef.current) window.clearInterval(timerRef.current);
+            window.removeEventListener("focus", onWake);
+            document.removeEventListener("visibilitychange", onWake);
         };
     }, [refresh]);
 
