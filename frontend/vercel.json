@@ -1,4 +1,18 @@
 {
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "searchtern.ksaif.dev" }],
+      "destination": "https://searchtern.net/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.searchtern.net" }],
+      "destination": "https://searchtern.net/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/jobs", "destination": "/index.html" },
     { "source": "/jobs/:id", "destination": "/api/og?id=:id" },
