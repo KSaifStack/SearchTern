@@ -1,15 +1,15 @@
 {
   "redirects": [
     {
-      "source": "/:path*",
+      "source": "/(.*)",
       "has": [{ "type": "host", "value": "searchtern.ksaif.dev" }],
-      "destination": "https://searchtern.net/:path*",
+      "destination": "https://searchtern.net/$1",
       "permanent": true
     },
     {
-      "source": "/:path*",
+      "source": "/(.*)",
       "has": [{ "type": "host", "value": "www.searchtern.net" }],
-      "destination": "https://searchtern.net/:path*",
+      "destination": "https://searchtern.net/$1",
       "permanent": true
     }
   ],
