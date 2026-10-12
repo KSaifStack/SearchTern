@@ -15,6 +15,13 @@ function postedDate(daysValue: string | number): string | undefined {
     return new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
 }
 
+// ponytail: no real expiry is stored anywhere. Google wants a future
+// validThrough, so use a rolling 90-day window; swap for the scraped expiry if
+// one is ever added.
+function validThrough(): string {
+    return new Date(Date.now() + 90 * 86400e3).toISOString().slice(0, 10);
+}
+
 function isRemote(location: string): boolean {
     return /remote|anywhere|telecommute/i.test(location);
 }
@@ -41,6 +48,8 @@ async function jobMeta(id: string) {
             title: j.role,
             description: desc,
             datePosted: postedDate(j.date),
+            validThrough: validThrough(),
+            employmentType: j.type === "internship" ? "INTERN" : j.type === "newgrad" ? "FULL_TIME" : undefined,
             hiringOrganization: { "@type": "Organization", name: j.company },
             jobLocation: {
                 "@type": "Place",
