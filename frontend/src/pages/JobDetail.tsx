@@ -31,6 +31,12 @@ function postedDate(dateValue: string | number): string | undefined {
     return isNaN(iso.getTime()) ? undefined : iso.toISOString().slice(0, 10)
 }
 
+// ponytail: no real expiry is stored; rolling 90-day window so validThrough is
+// always in the future, matching og.ts.
+function validThrough(): string {
+    return new Date(Date.now() + 90 * 86400e3).toISOString().slice(0, 10)
+}
+
 function metaDescription(job: Job): string {
     return (job.description ?? "").replace(/\s+/g, " ").trim().slice(0, 155) || `${job.role} in ${job.location || 'remote/US'}. Apply directly through ${job.company}.`
 }
@@ -158,6 +164,7 @@ function JobDetail() {
             directApply: true,
             employmentType: job.type === 'newgrad' ? "FULL_TIME" : job.type === 'internship' ? "INTERN" : undefined,
             datePosted: postedDate(job.date),
+            validThrough: validThrough(),
         } as Record<string, unknown>,
     } : {
         title: loading ? "Job Listing | SearchTern" : "Job Not Found | SearchTern",
