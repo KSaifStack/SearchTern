@@ -274,17 +274,6 @@
     gap: 16px;
 }
 
-/* The Feedback trigger is a button so it can open the overlay, but it has to
-   read as a footer link rather than inherit the global button style. */
-button.home-footer-link {
-    background: none;
-    border: none;
-    padding: 0;
-    margin: 0;
-    font-size: 14px;
-    cursor: pointer;
-}
-
 button.home-footer-link:hover {
     background: none;
     transform: none;
