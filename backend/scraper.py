@@ -59,7 +59,10 @@ MARKDOWN_SOURCES = [
     },
 ]
 
-SEARCHTERN_LISTINGS_URL = "https://raw.githubusercontent.com/KSaifStack/SearchTern-Listings/main/pages/listings.json"
+# The full listings copy carries the per-listing `category` (the "group" shown
+# in the app) and includes every role type, not just the CS/tech subset that
+# pages/listings.json is filtered down to.
+SEARCHTERN_LISTINGS_URL = "https://raw.githubusercontent.com/KSaifStack/SearchTern-Listings/main/pages/searchtern.json"
 
 SEARCHTERN_SOURCE = {
     "name": "SearchTern-Listings",
@@ -399,6 +402,7 @@ def scrape_searchtern_listings(url):
             "season":   "searchtern",
             "ats":      ats_of(link),
             "description": clean_text(str(description)) if description else None,
+            "category": clean_text(str(job.get("category", ""))),
         })
 
     if not jobs:
@@ -444,14 +448,19 @@ def _update_database():
     if not all_jobs:
         raise RuntimeError("No listings scraped")
 
-    seen = set()
+    seen = {}
     deduped = []
     for job in all_jobs:
         key = (job["company"].lower(), job["role"].lower(), job["location"].lower())
-        if key in seen:
+        existing = seen.get(key)
+        if existing is not None:
+            # Same role from a CS-only feed and the full SearchTern feed: keep
+            # the first row but borrow the category so it doesn't get lost.
+            if job.get("category") and not existing.get("category"):
+                existing["category"] = job["category"]
             continue
-        seen.add(key)
         job["date"] = sort_date(job["date"])
+        seen[key] = job
         deduped.append(job)
 
     print(f"Total after dedup: {len(deduped)}")
@@ -510,6 +519,7 @@ def _update_database():
                 season TEXT,
                 ats TEXT,
                 description TEXT,
+                category TEXT,
                 last_seen_at TIMESTAMPTZ DEFAULT NOW(),
                 CONSTRAINT internships_unique_job UNIQUE (company, role, location, link)
             )
@@ -519,6 +529,7 @@ def _update_database():
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS season TEXT")
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS ats TEXT")
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS description TEXT")
+        cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS category TEXT")
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT NOW()")
 
         cursor.execute("""
@@ -576,7 +587,7 @@ def _update_database():
         )
 
         upsert_query = """
-            INSERT INTO internships (company, role, location, date, link, type, season, ats, description, last_seen_at)
+            INSERT INTO internships (company, role, location, date, link, type, season, ats, description, category, last_seen_at)
             VALUES %s
             ON CONFLICT (company, role, location, link)
             DO UPDATE SET
@@ -585,13 +596,14 @@ def _update_database():
                 season = EXCLUDED.season,
                 ats = EXCLUDED.ats,
                 description = EXCLUDED.description,
+                category = EXCLUDED.category,
                 last_seen_at = EXCLUDED.last_seen_at
         """
         execute_values(
             cursor,
             upsert_query,
             (
-                (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], job.get("ats", ""), job.get("description"), current_run_time)
+                (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], job.get("ats", ""), job.get("description"), job.get("category"), current_run_time)
                 for job in in_range
             ),
             page_size=1000,

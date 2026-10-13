@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Text, Divider, RingProgress } from '@mantine/core';
+import { Text, Divider, RingProgress, Modal } from '@mantine/core';
 import { getRecent } from '../services/internshipmanager';
 import { useTracker } from '../components/TrackerContext';
 import type { ActivityEvent } from '../components/TrackerContext';
 import { trimLocations } from '../utils/locationFilter';
+import Feedback from '../components/Feedback';
 import '../styles/Home.css';
 
 interface Job {
@@ -38,6 +39,7 @@ function activityDescription(event: ActivityEvent): string {
 function Home() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
     const { trackedJobs, activityLog } = useTracker();
 
     useEffect(() => {
@@ -209,8 +211,21 @@ function Home() {
                     <Link to="/privacy" className="home-footer-link">
                         Privacy Policy
                     </Link>
+                    <button type="button" className="home-footer-link" onClick={() => setFeedbackOpen(true)}>
+                        Feedback
+                    </button>
                 </div>
             </footer>
+
+            <Modal
+                opened={feedbackOpen}
+                onClose={() => setFeedbackOpen(false)}
+                title="Share Feedback"
+                size="sm"
+                centered
+            >
+                <Feedback />
+            </Modal>
         </main>
     );
 }

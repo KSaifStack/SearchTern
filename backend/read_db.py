@@ -18,7 +18,7 @@ _cache: list | None = None
 _cache_time: float = 0
 _CACHE_TTL = 3300  # 55 minutes (refresh before the hourly scrape)
 _cache_lock = Lock()
-_JOB_LIST_COLUMNS = "id, company, role, location, date, link, type, season, ats, last_seen_at"
+_JOB_LIST_COLUMNS = "id, company, role, location, date, link, type, season, ats, category, last_seen_at"
 # date is a TEXT column holding days-ago, so a plain ORDER BY sorts it as text
 # ("10" before "2"). Cast so newest really is first. Every stored value is
 # numeric — scraper.sort_date() drops anything it cannot parse.
@@ -30,6 +30,12 @@ _AGENT_TABLES_RECHECK_S = 600
 
 _pool: pgpool.ThreadedConnectionPool | None = None
 _pool_init_lock = Lock()
+
+# The scrape path owns the schema (scraper.py). A DB read before the first
+# scrape would otherwise hit UndefinedColumn on `category`, so ensure the
+# column once here too — every reader routes through get_conn().
+_job_columns_ready = False
+_job_columns_lock = Lock()
 
 def _get_pool():
     global _pool
@@ -79,8 +85,28 @@ class _PooledConn:
 def now():
     return datetime.now(timezone.utc)
 
+def _ensure_job_columns(conn):
+    global _job_columns_ready
+    if _job_columns_ready:
+        return
+    with _job_columns_lock:
+        if _job_columns_ready:
+            return
+        try:
+            with conn.cursor() as cur:
+                cur.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS category TEXT")
+                conn.commit()
+            _job_columns_ready = True
+        except Exception:
+            # Missing table just means no scrape has run yet; leave the flag
+            # unset so we retry after the scrape creates it.
+            conn.rollback()
+
+
 def get_conn():
-    return _PooledConn(_get_pool().getconn())
+    conn = _PooledConn(_get_pool().getconn())
+    _ensure_job_columns(conn)
+    return conn
 
 
 def invalidate_cache():

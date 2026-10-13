@@ -29,15 +29,19 @@ export async function pullUpdateBackend() {
   return data.result
 }
 
-// pulls all recent listings via FastAPI backend
-export async function pullRecent(){
+// pulls all recent listings via FastAPI backend. Sends the last known ETag so
+// the backend can answer 304 when nothing changed since the previous fetch.
+export async function pullRecent(ifNoneMatch?: string | null){
   try {
-    const res = await fetch(`${BASE_URL}/recent`);
+    const res = await fetch(`${BASE_URL}/recent`, {
+      headers: ifNoneMatch ? { 'If-None-Match': ifNoneMatch } : {},
+    });
+    if (res.status === 304) return { status: 304, data: [], etag: null };
     const data = await res.json();
-    return data.result || [];
+    return { status: res.status, data: data.result || [], etag: res.headers.get('etag') };
   } catch (e) {
     console.error("Error fetching recent listings from backend:", e);
-    return [];
+    return { status: 0, data: [], etag: null };
   }
 }
 
