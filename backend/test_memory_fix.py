@@ -125,6 +125,33 @@ class MemoryFixTests(unittest.TestCase):
         self.assertEqual(calls, [])
 
 
+class SearchTernFeedTests(unittest.TestCase):
+    def test_feed_uses_full_listings_copy_and_keeps_category(self):
+        # The full listings copy carries the per-listing group/category the app
+        # shows; the CS-filtered pages/listings.json does not.
+        self.assertTrue(scraper.SEARCHTERN_LISTINGS_URL.endswith("/pages/searchtern.json"))
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return [{
+                    "company": "Acme",
+                    "role": "Business Analytics Intern",
+                    "location": "New York, NY",
+                    "date": "2026-10-01",
+                    "link": "https://example.com/jobs/1",
+                    "job_type": "internship",
+                    "category": "Business/Analytics",
+                }]
+
+        with patch.object(scraper.requests, "get", return_value=FakeResponse()):
+            jobs = scraper.scrape_searchtern_listings(scraper.SEARCHTERN_LISTINGS_URL)
+
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["category"], "Business/Analytics")
+
+
 class PrunedJobTests(unittest.TestCase):
     def test_pulled_listing_answers_410_and_unknown_id_answers_404(self):
         client = TestClient(api.app, raise_server_exceptions=False)

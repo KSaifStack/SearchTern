@@ -14,6 +14,7 @@ interface Job{
 
 let cached: Job[] | null = null
 let cachedAt = 0
+let etag: string | null = null
 
 function isCurrentHour(ts: number): boolean {
     const hourStart = new Date()
@@ -25,12 +26,18 @@ export async function getRecent() {
     if (cached && isCurrentHour(cachedAt)) {
         return { success: true, data: cached } as const
     }
-    const result = await pullRecent()
-    if (result && result.length > 0) {
-        cached = result
+    const result = await pullRecent(etag)
+    if (result.status === 304 && cached) {
+        // Unchanged since last fetch — keep what we have, just refresh the clock.
         cachedAt = Date.now()
+        return { success: true, data: cached } as const
     }
-    return { success: Boolean(result), data: result || [] } as const
+    if (result.data && result.data.length > 0) {
+        cached = result.data
+        cachedAt = Date.now()
+        etag = result.etag
+    }
+    return { success: result.status === 304 || Boolean(result.data), data: result.data || cached || [] } as const
 }
 
 export async function searchByLocation(searchterm: string){
@@ -56,6 +63,7 @@ export async function getDatabase() {
 export function clearCache() {
     cached = null
     cachedAt = 0
+    etag = null
 }
 
 export function getSecondsUntilNextHour(): number {

@@ -147,6 +147,30 @@ body {
 
 }
 
+/* Slim scrollbars (Firefox + WebKit) so the page reads tighter. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-medium) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-medium);
+    border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
 /* Header */
 header {
     background-color: var(--header-bg);

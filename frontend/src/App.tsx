@@ -4,6 +4,7 @@ import { SpeedInsights } from "@vercel/speed-insights/react"
 import { Analytics } from "@vercel/analytics/react"
 import Navbar from "./components/Navbar"
 import ThemeNudge from "./components/ThemeNudge"
+import ChangesNotice from "./components/ChangesNotice"
 import { TrackerProvider } from "./components/TrackerContext"
 import { AgentOverlay } from "./components/AgentOverlay"
 import ErrorBoundary from "./components/ErrorBoundary"
@@ -41,6 +42,7 @@ function App() {
                     <div>
                         <Navbar />
                         <ThemeNudge />
+                        <ChangesNotice />
                         <div className="app-content">
                             <ErrorBoundary>
                             <Suspense fallback={null}>

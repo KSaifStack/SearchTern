@@ -10,6 +10,7 @@ import { makeJobFingerprint } from "../utils/jobFingerprint"
 import { parseLocation, US_STATES, trimLocations } from "../utils/locationFilter"
 import type { ParsedLocation } from "../utils/locationFilter"
 import { matchCompanyMeta, EMPLOYEE_BUCKETS, inEmployeeBucket } from "../utils/companyMeta"
+import { CompanyFavicon } from "../components/CompanyFavicon"
 
 interface Job {
   id: number
@@ -20,6 +21,7 @@ interface Job {
   link: string
   type?: string
   season?: string
+  category?: string
 }
 
 const STALE_DAYS = 21
@@ -37,27 +39,7 @@ const SORT_OPTIONS = [
   { value: 'company-za', label: 'Company Z-A' },
 ]
 
-const ROLE_OPTIONS = [
-  { value: '', label: 'All Roles' },
-  { value: 'swe', label: 'Software Engineering' },
-  { value: 'data', label: 'Data / ML' },
-  { value: 'cyber', label: 'Cybersecurity' },
-  { value: 'devops', label: 'DevOps / Cloud' },
-  { value: 'hardware', label: 'Hardware / Embedded' },
-  { value: 'product', label: 'Product Management' },
-]
 
-// ponytail: naive substring match on the title — "Engineer" swallows roles that
-// belong in another bucket, and short keywords like "ml" over-match. Good enough
-// to cut a list down; replace with a per-role keyword column if it gets annoying.
-const ROLE_KEYWORDS: Record<string, string[]> = {
-  swe: ['software', 'engineer', 'sde', 'developer', 'full stack', 'fullstack', 'front end', 'frontend', 'back end', 'backend', 'web dev', 'mobile', 'ios', 'android'],
-  data: ['data', 'machine learning', 'ml', 'artificial intelligence', 'analytics', 'scientist', 'nlp', 'llm', 'deep learning'],
-  cyber: ['security', 'cyber', 'appsec', 'infosec', 'penetration', 'threat', 'forensic'],
-  devops: ['devops', 'sre', 'site reliability', 'cloud', 'infrastructure', 'platform', 'kubernetes', 'aws', 'azure', 'gcp'],
-  hardware: ['hardware', 'embedded', 'firmware', 'electrical', 'ece', 'asic', 'vlsi', 'robotics', 'semiconductor', 'chip'],
-  product: ['product'],
-}
 
 function daysAgo(date: string | number): number {
   const parsed = parseFloat(String(date))
@@ -84,7 +66,7 @@ function Jobs() {
   const debounceRef = useRef<number | undefined>(undefined)
   const [searchText, setSearchText] = useState('')
   const [sortOrder, setSortOrder] = useState('newest')
-  const [roleFilter, setRoleFilter] = useState('')
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([])
   const [typeFilters, setTypeFilters] = useState({ internship: true, newgrad: true })
   const [sortOpen, setSortOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
@@ -163,6 +145,17 @@ function Jobs() {
       .map(([abbr]) => abbr)
   }, [parsedLocations, countryFilter])
 
+  const categoryOptions = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const j of allJobs) {
+      const c = (j.category || '').trim()
+      if (c) counts[c] = (counts[c] || 0) + 1
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name]) => name)
+  }, [allJobs])
+
   const filtered = useMemo(() => {
     let jobs = allJobs.filter(j => j && j.company)
     jobs = jobs.filter(j => {
@@ -179,13 +172,7 @@ function Jobs() {
     }
     if (countryFilter) jobs = jobs.filter(j => parsedLocations.get(j.id)?.countries.includes(countryFilter))
     if (stateFilter) jobs = jobs.filter(j => parsedLocations.get(j.id)?.states.includes(stateFilter))
-    if (roleFilter) {
-      const keywords = ROLE_KEYWORDS[roleFilter] || []
-      jobs = jobs.filter(j => {
-        const title = (j.role || '').toLowerCase()
-        return keywords.some(k => title.includes(k))
-      })
-    }
+    if (categoryFilters.length) jobs = jobs.filter(j => j.category && categoryFilters.includes(j.category))
     if (!typeFilters.internship) jobs = jobs.filter(j => j.type === 'newgrad')
     if (!typeFilters.newgrad) jobs = jobs.filter(j => j.type !== 'newgrad')
     if (faangOnly || employeeBucket) {
@@ -211,7 +198,7 @@ function Jobs() {
       const bNum = isNaN(bParsed) ? 999 : bParsed
       return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
-  }, [allJobs, searchText, sortOrder, roleFilter, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, employeeBucket, hideStale, recencyDays])
+  }, [allJobs, searchText, sortOrder, categoryFilters, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, employeeBucket, hideStale, recencyDays])
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
@@ -393,23 +380,32 @@ function Jobs() {
 
             <Popover opened={roleOpen} onChange={setRoleOpen} width={200} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
-                <button className="sort_btn" onClick={() => setRoleOpen(o => !o)} title="Role filter">
-                  Role <span aria-hidden="true">▾</span>
+                <button className="sort_btn" onClick={() => setRoleOpen(o => !o)} title="Filter by role category">
+                  Roles
+                  {categoryFilters.length > 0 && (
+                    <Badge size="xs" variant="filled" color="teal" className="filters-count">
+                      {categoryFilters.length}
+                    </Badge>
+                  )}
+                  <span aria-hidden="true">▾</span>
                 </button>
               </Popover.Target>
               <Popover.Dropdown>
                 <div className="filter-option-list">
-                  {ROLE_OPTIONS.map(opt => (
-                    <label key={opt.value} className="filter-option">
-                      <input
-                        type="radio"
-                        name="role"
-                        checked={roleFilter === opt.value}
-                        onChange={() => { setRoleFilter(opt.value); setRoleOpen(false); setPage(1) }}
-                      />
-                      {opt.label}
-                    </label>
-                  ))}
+                  {categoryOptions.map(name => {
+                    const checked = categoryFilters.includes(name)
+                    return (
+                      <label key={name} className="filter-option">
+                        <input
+                          type="checkbox"
+                          name="role"
+                          checked={checked}
+                          onChange={() => { setCategoryFilters(checked ? categoryFilters.filter(x => x !== name) : [...categoryFilters, name]); setPage(1) }}
+                        />
+                        {name}
+                      </label>
+                    )
+                  })}
                 </div>
               </Popover.Dropdown>
             </Popover>
@@ -492,6 +488,7 @@ function Jobs() {
                       value={countryFilter || null}
                       onChange={val => { setCountryFilter(val || ''); setStateFilter(''); setPage(1) }}
                       maxDropdownHeight={220}
+                      comboboxProps={{ withinPortal: false }}
                     />
                     {countryFilter === 'United States' && (
                       <Select
@@ -503,6 +500,7 @@ function Jobs() {
                         value={stateFilter || null}
                         onChange={val => { setStateFilter(val || ''); setPage(1) }}
                         maxDropdownHeight={220}
+                        comboboxProps={{ withinPortal: false }}
                       />
                     )}
                   </div>
@@ -525,6 +523,7 @@ function Jobs() {
                       value={employeeBucket || null}
                       onChange={val => { setEmployeeBucket(val || ''); setPage(1) }}
                       maxDropdownHeight={220}
+                      comboboxProps={{ withinPortal: false }}
                     />
                   </div>
 
@@ -572,12 +571,7 @@ function Jobs() {
                       />
                       <div>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <img
-                            src={`https://www.google.com/s2/favicons?domain=${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com&sz=32`}
-                            style={{ width: '16px', height: '16px', borderRadius: '2px' }}
-                            onError={(e) => e.currentTarget.style.display = 'none'}
-                            alt=""
-                          />
+                          <CompanyFavicon company={job.company} />
                           {job.company}
                         </span>
                         {(stale || repost) && (

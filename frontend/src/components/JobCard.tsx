@@ -6,6 +6,7 @@ import { notifications } from '@mantine/notifications';
 import { ShareNetwork } from '@phosphor-icons/react';
 import type { JobStatus, TrackedJob } from './TrackerContext';
 import { pullLookup } from '../api/internships';
+import { CompanyFavicon } from './CompanyFavicon';
 
 const PER_PAGE = 5;
 
@@ -18,7 +19,6 @@ export const STATUS_COLORS: Record<JobStatus, string> = {
 };
 
 export const JobCard = ({ job, onClick }: { job: TrackedJob, onClick?: () => void }) => {
-    const companyDomain = `${job.company.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}.com`;
     const addedLabel = (() => {
         if (job.dateApplied) {
             return new Date(job.dateApplied).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -68,12 +68,7 @@ export const JobCard = ({ job, onClick }: { job: TrackedJob, onClick?: () => voi
     return (
         <div className={`tracker-card card-status-${job.status.toLowerCase()}`} onClick={onClick}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <img
-                    src={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=32`}
-                    style={{ width: '16px', height: '16px', borderRadius: '2px' }}
-                    onError={(e) => e.currentTarget.style.display = 'none'}
-                    alt=""
-                />
+                <CompanyFavicon company={job.company} />
                 {titleContent}
                 <button
                     onClick={handleShare}
