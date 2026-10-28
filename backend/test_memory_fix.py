@@ -143,6 +143,7 @@ class SearchTernFeedTests(unittest.TestCase):
                     "link": "https://example.com/jobs/1",
                     "job_type": "internship",
                     "category": "Business/Analytics",
+                    "visa_sponsor": "true",
                 }]
 
         with patch.object(scraper.requests, "get", return_value=FakeResponse()):
@@ -150,6 +151,44 @@ class SearchTernFeedTests(unittest.TestCase):
 
         self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs[0]["category"], "Business/Analytics")
+        self.assertTrue(jobs[0]["visa_sponsor"])
+
+    def test_feed_strips_ats_ids_from_company_and_drops_unnamed_rows(self):
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return [
+                    {
+                        "company": "Tufamerica Inc 4ed3d875 4a83 4fe7 B67c 943d70dc170d",
+                        "role": "Graphic Design Intern",
+                        "location": "New York, NY",
+                        "date": "2026-10-01",
+                        "link": "https://jobs.gusto.com/postings/1",
+                        "job_type": "internship",
+                    },
+                    {
+                        "company": "Ad821003 1acc 4960 A85b 9945dae07487 19000101",
+                        "role": "IT Intern",
+                        "location": "Tampa, FL",
+                        "date": "2026-10-01",
+                        "link": "https://workforcenow.adp.com/job/2",
+                        "job_type": "internship",
+                    },
+                    {
+                        "company": "3M",
+                        "role": "Software Intern",
+                        "location": "Austin, TX",
+                        "date": "2026-10-01",
+                        "link": "https://example.com/jobs/3",
+                        "job_type": "internship",
+                    },
+                ]
+
+        with patch.object(scraper.requests, "get", return_value=FakeResponse()):
+            jobs = scraper.scrape_searchtern_listings(scraper.SEARCHTERN_LISTINGS_URL)
+
+        self.assertEqual([job["company"] for job in jobs], ["Tufamerica Inc", "3M"])
 
 
 class PrunedJobTests(unittest.TestCase):

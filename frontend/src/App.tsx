@@ -10,11 +10,13 @@ import { AgentOverlay } from "./components/AgentOverlay"
 import ErrorBoundary from "./components/ErrorBoundary"
 import { usePageMeta } from "./utils/seo"
 import type { PageMeta } from "./utils/seo"
+import { useAuth } from "./components/AuthContext"
 
 // Route-level code splitting. Every page used to be pulled into the one entry
 // bundle, so opening /jobs paid to parse JobDetail, Tracker, Settings and the
 // PDF code before the list could paint.
 const Home = lazy(() => import("./pages/Home"))
+const Landing = lazy(() => import("./pages/Landing"))
 const Jobs = lazy(() => import("./pages/Jobs"))
 const JobDetail = lazy(() => import("./pages/JobDetail"))
 const Tracker = lazy(() => import("./pages/Tracker"))
@@ -35,6 +37,39 @@ function RouteMeta({ meta }: { meta: PageMeta }) {
     return null
 }
 
+function HomeRoute() {
+    const { user, loading } = useAuth()
+    if (loading) return <div className="page-loading">Loading...</div>
+    if (user) {
+        return (
+            <>
+                <RouteMeta meta={{
+                    title: "Dashboard | SearchTern",
+                    description: "Your SearchTern dashboard and recommended opportunities.",
+                    path: "/",
+                }} />
+                <main className="standard-layout"><Home /></main>
+            </>
+        )
+    }
+    return (
+        <>
+            <RouteMeta meta={{
+                title: "SearchTern — Free, Open-Source Internship & New-Grad Tracker",
+                description: "SearchTern pulls internships and new-grad roles directly from company ATS systems and adds H-1B sponsorship data where available. Free, open source, and built to track every application.",
+                path: "/",
+                jsonLd: [SITE_ORG, {
+                    "@context": "https://schema.org",
+                    "@type": "WebSite",
+                    name: "SearchTern",
+                    url: "https://searchtern.net",
+                }],
+            }} />
+            <Landing />
+        </>
+    )
+}
+
 function App() {
     return (
         <BrowserRouter>
@@ -47,25 +82,7 @@ function App() {
                             <ErrorBoundary>
                             <Suspense fallback={null}>
                             <Routes>
-                                <Route
-                                    path="/"
-                                    element={
-                                        <>
-                                            <RouteMeta meta={{
-                                                title: "SearchTern",
-                                                description: "Find thousands of active software internships and new-grad jobs, then track your applications in one place.",
-                                                path: "/",
-                                                jsonLd: [SITE_ORG, {
-                                                    "@context": "https://schema.org",
-                                                    "@type": "WebSite",
-                                                    name: "SearchTern",
-                                                    url: "https://searchtern.net",
-                                                }],
-                                            }} />
-                                            <Home />
-                                        </>
-                                    }
-                                />
+                                <Route path="/" element={<HomeRoute />} />
                                 <Route
                                     path="/jobs"
                                     element={
