@@ -210,6 +210,7 @@ function JobDetail() {
                 />
                 <Text fw={800} size="lg" c="var(--text-dark)">{job.company}</Text>
                 {meta?.faang && <Badge color="green" variant="light" size="sm">FAANG+</Badge>}
+                {job.visa_sponsor && <Badge color="teal" variant="light" size="sm">H-1B sponsor</Badge>}
             </div>
             <Text fw={700} size="2.2rem" c="var(--text-dark)" lh={1.2} style={{ marginBottom: 8 }}>{job.role}</Text>
 

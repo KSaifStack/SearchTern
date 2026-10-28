@@ -93,6 +93,31 @@ def clean_text(text):
     return re.sub(r"\s+", " ", text).strip()
 
 
+_UUID_RE = re.compile(
+    r"(?i)(?<![0-9a-f])[0-9a-f]{8}(?:[-\s]?[0-9a-f]{4}){3}[-\s]?[0-9a-f]{12}(?![0-9a-f])"
+)
+_HEX_ID_RE = re.compile(r"(?i)[0-9a-f]{4,12}")
+_LONG_ID_RE = re.compile(r"\b\d{6,}\b")
+
+
+def clean_company(company) -> str:
+    """Drop scraper IDs that leak into company names from ATS feeds."""
+    name = _UUID_RE.sub(" ", clean_text(str(company or "")))
+
+    # Some feeds truncate the trailing UUID group, e.g.
+    # "The Bay Church Db67e457 8c9f 44bf 8798 30d9f9a7a".
+    tokens = name.split()
+    start = len(tokens)
+    while start > 0 and _HEX_ID_RE.fullmatch(tokens[start - 1]):
+        start -= 1
+    tail = tokens[start:]
+    if len(tail) >= 2 and any(len(token) >= 8 for token in tail):
+        name = " ".join(tokens[:start])
+
+    name = _LONG_ID_RE.sub(" ", name)
+    return re.sub(r"\s+", " ", name).strip(" -|")
+
+
 MONTHS = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
     "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
@@ -266,11 +291,14 @@ def scrape_simplify_readme(url, job_type, season):
             cells = row.find_all("td")
             if not cells:
                 continue
-            company = clean_text(cells[0].get_text(strip=True))
-            if company == "":
+            raw_company = clean_text(cells[0].get_text(strip=True))
+            company = clean_company(raw_company)
+            if raw_company == "":
                 company = last_company
-            else:
+            elif company:
                 last_company = company
+            if not company:
+                continue
 
             jobs.append({
                 "company":  company,
@@ -320,11 +348,11 @@ def scrape_markdown_readme(url, job_type, season):
             continue
 
         # Company — strip HTML tags and emoji flags
-        raw_company = re.sub(r"<[^>]+>", "", cells[0]).strip()
-        company = clean_text(raw_company)
-        if not company or company == "" :
+        raw_company = clean_text(re.sub(r"<[^>]+>", "", cells[0]).strip())
+        company = clean_company(raw_company)
+        if not raw_company:
             company = last_company
-        else:
+        elif company:
             last_company = company
 
         # Role — strip HTML and sponsorship emoji
@@ -385,6 +413,9 @@ def scrape_searchtern_listings(url):
     listings = response.json()
     jobs = []
     for job in listings:
+        company = clean_company(job.get("company", ""))
+        if not company:
+            continue
         jt = job.get("job_type", "internship")
         if jt in ("new_grad", "new-grad"):
             jt = "newgrad"
@@ -393,7 +424,7 @@ def scrape_searchtern_listings(url):
             continue
         description = job.get("description")
         jobs.append({
-            "company":  clean_text(str(job.get("company", ""))),
+            "company":  company,
             "role":     clean_text(str(job.get("role", ""))),
             "location": clean_text(str(job.get("location", ""))),
             "date":     str(job.get("date", "")).strip(),
@@ -403,6 +434,7 @@ def scrape_searchtern_listings(url):
             "ats":      ats_of(link),
             "description": clean_text(str(description)) if description else None,
             "category": clean_text(str(job.get("category", ""))),
+            "visa_sponsor": str(job.get("visa_sponsor", "")).strip().lower() == "true",
         })
 
     if not jobs:
@@ -458,6 +490,8 @@ def _update_database():
             # the first row but borrow the category so it doesn't get lost.
             if job.get("category") and not existing.get("category"):
                 existing["category"] = job["category"]
+            if job.get("visa_sponsor"):
+                existing["visa_sponsor"] = True
             continue
         job["date"] = sort_date(job["date"])
         seen[key] = job
@@ -520,6 +554,7 @@ def _update_database():
                 ats TEXT,
                 description TEXT,
                 category TEXT,
+                visa_sponsor BOOLEAN DEFAULT FALSE,
                 last_seen_at TIMESTAMPTZ DEFAULT NOW(),
                 CONSTRAINT internships_unique_job UNIQUE (company, role, location, link)
             )
@@ -530,6 +565,7 @@ def _update_database():
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS ats TEXT")
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS description TEXT")
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS category TEXT")
+        cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS visa_sponsor BOOLEAN DEFAULT FALSE")
         cursor.execute("ALTER TABLE internships ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ DEFAULT NOW()")
 
         cursor.execute("""
@@ -587,7 +623,7 @@ def _update_database():
         )
 
         upsert_query = """
-            INSERT INTO internships (company, role, location, date, link, type, season, ats, description, category, last_seen_at)
+            INSERT INTO internships (company, role, location, date, link, type, season, ats, description, category, visa_sponsor, last_seen_at)
             VALUES %s
             ON CONFLICT (company, role, location, link)
             DO UPDATE SET
@@ -597,13 +633,14 @@ def _update_database():
                 ats = EXCLUDED.ats,
                 description = EXCLUDED.description,
                 category = EXCLUDED.category,
+                visa_sponsor = EXCLUDED.visa_sponsor,
                 last_seen_at = EXCLUDED.last_seen_at
         """
         execute_values(
             cursor,
             upsert_query,
             (
-                (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], job.get("ats", ""), job.get("description"), job.get("category"), current_run_time)
+                (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], job.get("ats", ""), job.get("description"), job.get("category"), bool(job.get("visa_sponsor")), current_run_time)
                 for job in in_range
             ),
             page_size=1000,

@@ -22,6 +22,7 @@ interface Job {
   type?: string
   season?: string
   category?: string
+  visa_sponsor?: boolean
 }
 
 const STALE_DAYS = 21
@@ -74,6 +75,7 @@ function Jobs() {
   const [countryFilter, setCountryFilter] = useState('')
   const [stateFilter, setStateFilter] = useState('')
   const [faangOnly, setFaangOnly] = useState(false)
+  const [visaSponsorOnly, setVisaSponsorOnly] = useState(false)
   const [employeeBucket, setEmployeeBucket] = useState<string>('')
   const [recencyDays, setRecencyDays] = useState(0)
   const [hideStale, setHideStale] = useState(() => {
@@ -175,6 +177,7 @@ function Jobs() {
     if (categoryFilters.length) jobs = jobs.filter(j => j.category && categoryFilters.includes(j.category))
     if (!typeFilters.internship) jobs = jobs.filter(j => j.type === 'newgrad')
     if (!typeFilters.newgrad) jobs = jobs.filter(j => j.type !== 'newgrad')
+    if (visaSponsorOnly) jobs = jobs.filter(j => j.visa_sponsor)
     if (faangOnly || employeeBucket) {
       jobs = jobs.filter(j => {
         const meta = matchCompanyMeta(j.company)
@@ -198,7 +201,7 @@ function Jobs() {
       const bNum = isNaN(bParsed) ? 999 : bParsed
       return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
-  }, [allJobs, searchText, sortOrder, categoryFilters, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, employeeBucket, hideStale, recencyDays])
+  }, [allJobs, searchText, sortOrder, categoryFilters, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, visaSponsorOnly, employeeBucket, hideStale, recencyDays])
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
@@ -210,6 +213,7 @@ function Jobs() {
     (countryFilter ? 1 : 0) +
     (stateFilter ? 1 : 0) +
     (faangOnly ? 1 : 0) +
+    (visaSponsorOnly ? 1 : 0) +
     (employeeBucket ? 1 : 0)
 
   function clearFilters() {
@@ -219,6 +223,7 @@ function Jobs() {
     setCountryFilter('')
     setStateFilter('')
     setFaangOnly(false)
+    setVisaSponsorOnly(false)
     setEmployeeBucket('')
     try {
       localStorage.setItem('searchtern-hide-stale', '0')
@@ -515,6 +520,14 @@ function Jobs() {
                       />
                       FAANG+ only
                     </label>
+                    <label className="filter-option">
+                      <input
+                        type="checkbox"
+                        checked={visaSponsorOnly}
+                        onChange={() => { setVisaSponsorOnly(!visaSponsorOnly); setPage(1) }}
+                      />
+                      H-1B sponsor history
+                    </label>
                     <Select
                       placeholder="Any size"
                       size="xs"
@@ -574,10 +587,11 @@ function Jobs() {
                           <CompanyFavicon company={job.company} />
                           {job.company}
                         </span>
-                        {(stale || repost) && (
+                        {(stale || repost || job.visa_sponsor) && (
                           <span style={{ display: 'flex', gap: 4, marginTop: 2 }}>
                             {stale && <Badge size="xs" variant="light" color="gray">Likely filled</Badge>}
                             {repost && <Badge size="xs" variant="light" color="yellow">Reposted</Badge>}
+                            {job.visa_sponsor && <Badge size="xs" variant="light" color="teal">H-1B sponsor</Badge>}
                           </span>
                         )}
                       </div>

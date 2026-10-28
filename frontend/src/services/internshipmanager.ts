@@ -9,7 +9,8 @@ interface Job{
     date: string,
     link: string,
     type?: string,
-    season?: string
+    season?: string,
+    visa_sponsor?: boolean
 }
 
 let cached: Job[] | null = null

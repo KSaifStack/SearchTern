@@ -14,6 +14,7 @@ export interface Job {
     season?: string
     ats?: string | null
     description?: string | null
+    visa_sponsor?: boolean
 }
 
 // pulls update Backend data via fastapi (ThinkPad)
