@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, Fragment } from "react"
+import { Link } from "react-router-dom"
 import { Table, Pagination, Popover, Text, Select, Badge } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { checkHealth, fetchSources } from "../api/internships"
-import { BookmarkSimpleIcon, FunnelSimple, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { checkHealth, fetchSources, pullJob } from "../api/internships"
+import { BookmarkSimpleIcon, FunnelSimple, CaretLeft, CaretRight, CaretDown, ArrowSquareOut } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
@@ -11,6 +12,7 @@ import { parseLocation, US_STATES, trimLocations } from "../utils/locationFilter
 import type { ParsedLocation } from "../utils/locationFilter"
 import { matchCompanyMeta, EMPLOYEE_BUCKETS, inEmployeeBucket } from "../utils/companyMeta"
 import { CompanyFavicon } from "../components/CompanyFavicon"
+import { parseJobDescription } from "../utils/jobDescription"
 
 interface Job {
   id: number
@@ -52,6 +54,10 @@ function isStale(j: Job): boolean {
 function jobKey(c: string, r: string, l: string): string {
   return [c, r, l].map(s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim()).join('|')
 }
+function clampPreview(text: string, max = 320): string {
+  const s = text.replace(/\s+/g, ' ').trim()
+  return s.length <= max ? s : s.slice(0, max).replace(/\s+\S*$/, '') + '…'
+}
 
 function Jobs() {
   const [allJobs, setAllJobs] = useState<Job[]>([])
@@ -89,6 +95,28 @@ function Jobs() {
   })
 
   const perPage = 15;
+
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [detailCache, setDetailCache] = useState<Record<number, { description: string | null; status: 'loading' | 'ready' | 'error' }>>({})
+
+  function toggleExpand(job: Job) {
+    if (expandedId === job.id) {
+      setExpandedId(null)
+      return
+    }
+    setExpandedId(job.id)
+    if (!detailCache[job.id]) {
+      setDetailCache(prev => ({ ...prev, [job.id]: { description: null, status: 'loading' } }))
+      pullJob(job.id).then(res => {
+        setDetailCache(prev => ({
+          ...prev,
+          [job.id]: res
+            ? { description: res.description ?? null, status: 'ready' }
+            : { description: null, status: 'error' }
+        }))
+      })
+    }
+  }
 
   useEffect(() => {
     getRecent().then(res => {
@@ -572,38 +600,95 @@ function Jobs() {
               paginated.map(job => {
                 const stale = isStale(job)
                 const repost = (freshness.get(jobKey(job.company, job.role, job.location)) || 0) > 1
+                const expanded = expandedId === job.id
+                const detail = detailCache[job.id]
                 return (
-                  <Table.Tr key={job.id} style={{ opacity: stale ? 0.55 : 1 }}>
-                    <Table.Td className="company-cell" data-label="Company">
-                      <BookmarkSimpleIcon
-                        size={25}
-                        className="bookmark-icon"
-                        weight={isJobTracked(job.company, job.role, job.location) ? "fill" : "regular"}
-                        color={isJobTracked(job.company, job.role, job.location) ? "var(--accent-color)" : "currentColor"}
-                        onClick={() => toggleSave(job)}
-                      />
-                      <div>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <CompanyFavicon company={job.company} />
-                          {job.company}
-                        </span>
-                        {(stale || repost || job.visa_sponsor) && (
-                          <span style={{ display: 'flex', gap: 4, marginTop: 2 }}>
-                            {stale && <Badge size="xs" variant="light" color="gray">Likely filled</Badge>}
-                            {repost && <Badge size="xs" variant="light" color="yellow">Reposted</Badge>}
-                            {job.visa_sponsor && <Badge size="xs" variant="light" color="teal">H-1B sponsor</Badge>}
+                  <Fragment key={job.id}>
+                    <Table.Tr
+                      className="job-row"
+                      style={{ opacity: stale ? 0.55 : 1 }}
+                      onClick={() => toggleExpand(job)}
+                      aria-expanded={expanded}
+                    >
+                      <Table.Td className="company-cell" data-label="Company">
+                        <BookmarkSimpleIcon
+                          size={25}
+                          className="bookmark-icon"
+                          weight={isJobTracked(job.company, job.role, job.location) ? "fill" : "regular"}
+                          color={isJobTracked(job.company, job.role, job.location) ? "var(--accent-color)" : "currentColor"}
+                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); toggleSave(job) }}
+                        />
+                        <div>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <CompanyFavicon company={job.company} />
+                            {job.company}
                           </span>
-                        )}
-                      </div>
-                    </Table.Td>
-                    <Table.Td data-label="Role">
-                      <a href={job.link} target="_blank" rel="noreferrer" className="apply-link">
-                        {job.role}
-                      </a>
-                    </Table.Td>
-                    <Table.Td data-label="Location">{trimLocations(job.location)}</Table.Td>
-                    <Table.Td data-label="Date">{formatRelativeDate(job.date)}</Table.Td>
-                  </Table.Tr>
+                          {(stale || repost || job.visa_sponsor) && (
+                            <span style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                              {stale && <Badge size="xs" variant="light" color="gray">Likely filled</Badge>}
+                              {repost && <Badge size="xs" variant="light" color="yellow">Reposted</Badge>}
+                              {job.visa_sponsor && <Badge size="xs" variant="light" color="teal">H-1B sponsor</Badge>}
+                            </span>
+                          )}
+                        </div>
+                      </Table.Td>
+                      <Table.Td data-label="Role">
+                        <span className="apply-link">{job.role}</span>
+                      </Table.Td>
+                      <Table.Td data-label="Location">{trimLocations(job.location)}</Table.Td>
+                      <Table.Td data-label="Date">
+                        <span className="job-row-date">
+                          {formatRelativeDate(job.date)}
+                          <CaretDown size={12} weight="bold" className={`job-row-caret${expanded ? ' job-row-caret-open' : ''}`} />
+                        </span>
+                      </Table.Td>
+                    </Table.Tr>
+                    {expanded && (
+                      <Table.Tr className="job-detail-row">
+                        <Table.Td colSpan={4} className="job-detail-cell">
+                          <div className="inline-job-detail">
+                            <div className="inline-job-detail-header">
+                              <span className="inline-job-detail-title">Quick glance</span>
+                              <a
+                                href={job.link}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-job-detail-apply"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                Apply <ArrowSquareOut size={14} weight="bold" />
+                              </a>
+                            </div>
+                            {!detail || detail.status === 'loading' ? (
+                              <p className="inline-job-detail-body inline-job-detail-muted">Loading details...</p>
+                            ) : detail.status === 'error' || !detail.description ? (
+                              <p className="inline-job-detail-body inline-job-detail-muted">No description provided for this listing — check the full listing for details.</p>
+                            ) : (() => {
+                              const sections = parseJobDescription(detail.description)
+                              if (sections.length === 0) {
+                                return <p className="inline-job-detail-body">{clampPreview(detail.description)}</p>
+                              }
+                              return (
+                                <div className="inline-job-detail-sections">
+                                  {sections.map(section => (
+                                    <div key={section.label} className="inline-job-detail-section">
+                                      <span className="inline-job-detail-section-label">{section.label}</span>
+                                      <ul className="inline-job-detail-list">
+                                        {section.items.map((item, i) => <li key={i}>{item}</li>)}
+                                      </ul>
+                                    </div>
+                                  ))}
+                                </div>
+                              )
+                            })()}
+                            <Link to={`/jobs/${job.id}`} className="inline-job-detail-link" onClick={e => e.stopPropagation()}>
+                              View full listing →
+                            </Link>
+                          </div>
+                        </Table.Td>
+                      </Table.Tr>
+                    )}
+                  </Fragment>
                 )
               })
             )}
