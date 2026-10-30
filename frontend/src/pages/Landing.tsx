@@ -11,6 +11,7 @@ type FeedJob = {
   role: string;
   location?: string;
   date?: string;
+  visa_sponsor?: boolean;
 };
 
 function Landing() {
@@ -95,14 +96,17 @@ function Landing() {
                   </div>
                   <div className="landing-feed-list">
                     {(feedJobs.length > 0 ? feedJobs.slice(0, 4) : [
-                      { company: "Google", role: "Software Engineering Intern", location: "Mountain View, CA" },
-                      { company: "Meta", role: "Software Engineering Intern", location: "Menlo Park, CA" },
-                      { company: "Microsoft", role: "New Grad SWE", location: "Redmond, WA" },
-                      { company: "Amazon", role: "Software Development Engineer Intern", location: "Seattle, WA" },
+                      { company: "Google", role: "Software Engineering Intern", location: "Mountain View, CA", visa_sponsor: true },
+                      { company: "Meta", role: "Software Engineering Intern", location: "Menlo Park, CA", visa_sponsor: true },
+                      { company: "Microsoft", role: "New Grad SWE", location: "Redmond, WA", visa_sponsor: true },
+                      { company: "Amazon", role: "Software Development Engineer Intern", location: "Seattle, WA", visa_sponsor: true },
                     ]).map((job: FeedJob, idx: number) => (
                       <article className="landing-feed-item" key={idx}>
                         <div className="landing-feed-item-main">
-                          <div className="landing-feed-company">{job.company}</div>
+                          <div className="landing-feed-company">
+                            {job.company}
+                            {job.visa_sponsor && <span className="landing-feed-badge" title="Has sponsored H-1B visas">H-1B</span>}
+                          </div>
                           <div className="landing-feed-role">{job.role}</div>
                           <div className="landing-feed-meta">{job.location || "Various locations"}</div>
                         </div>
