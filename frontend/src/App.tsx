@@ -55,7 +55,7 @@ function HomeRoute() {
     return (
         <>
             <RouteMeta meta={{
-                title: "SearchTern — Free, Open-Source Internship & New-Grad Tracker",
+                title: "SearchTern | Open-Source Internship & New-Grad Tracker",
                 description: "SearchTern pulls internships and new-grad roles directly from company ATS systems and adds H-1B sponsorship data where available. Free, open source, and built to track every application.",
                 path: "/",
                 jsonLd: [SITE_ORG, {
