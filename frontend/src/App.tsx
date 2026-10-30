@@ -48,7 +48,7 @@ function HomeRoute() {
                     description: "Your SearchTern dashboard and recommended opportunities.",
                     path: "/",
                 }} />
-                <main className="standard-layout"><Home /></main>
+                <Home />
             </>
         )
     }
