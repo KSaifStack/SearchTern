@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "../styles/landing.css";
-import { pullCount } from "../api/internships";
+import { pullCount, pullJob } from "../api/internships";
 import { getRecent } from "../services/internshipmanager";
 
 const FAANG = new Set(["Google", "Meta", "Apple", "Amazon", "Microsoft", "Netflix"]);
 
 type FeedJob = {
+  id?: number;
   company: string;
   role: string;
   location?: string;
@@ -19,9 +20,10 @@ function Landing() {
   const [feedJobs, setFeedJobs] = useState<FeedJob[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     pullCount()
       .then((count) => {
-        if (typeof count === "number") {
+        if (!cancelled && typeof count === "number") {
           setListingCount(count);
         }
       })
@@ -30,21 +32,35 @@ function Landing() {
       });
     getRecent()
       .then((res) => {
-        if (res.success && Array.isArray(res.data)) {
-          const faang = res.data
-            .filter((j: FeedJob) => FAANG.has(j.company))
-            .sort((a: FeedJob, b: FeedJob) => {
-              const ad = a.date ? new Date(a.date).getTime() : 0;
-              const bd = b.date ? new Date(b.date).getTime() : 0;
-              return bd - ad;
-            })
-            .slice(0, 5);
-          setFeedJobs(faang);
+        if (!res.success || !Array.isArray(res.data)) return;
+        const faang = res.data
+          .filter((j: FeedJob) => FAANG.has(j.company))
+          .sort((a: FeedJob, b: FeedJob) => {
+            const ad = a.date ? new Date(a.date).getTime() : 0;
+            const bd = b.date ? new Date(b.date).getTime() : 0;
+            return bd - ad;
+          })
+          .slice(0, 5);
+        if (cancelled) return;
+        setFeedJobs(faang);
+        // Older /recent deployments omit visa_sponsor, so fetch it from the
+        // detail endpoint only for the handful of cards on screen.
+        if (faang.some((j) => j.visa_sponsor === undefined)) {
+          Promise.all(faang.map(async (j) => {
+            if (j.visa_sponsor !== undefined || j.id === undefined) return j;
+            const detail = await pullJob(j.id);
+            return { ...j, visa_sponsor: detail?.visa_sponsor === true };
+          })).then((enriched) => {
+            if (!cancelled) setFeedJobs(enriched);
+          }).catch(() => {
+            // ignore
+          });
         }
       })
       .catch(() => {
         // ignore
       });
+    return () => { cancelled = true; };
   }, []);
 
   const scrollToDemo = (e: React.MouseEvent<HTMLAnchorElement>) => {
