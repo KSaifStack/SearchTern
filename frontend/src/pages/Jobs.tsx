@@ -96,21 +96,24 @@ function Jobs() {
 
   const perPage = 15;
 
-  const [expandedId, setExpandedId] = useState<number | null>(null)
-  const [detailCache, setDetailCache] = useState<Record<number, { description: string | null; status: 'loading' | 'ready' | 'error' }>>({})
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  const [detailCache, setDetailCache] = useState<Record<string, { description: string | null; status: 'loading' | 'ready' | 'error' }>>({})
 
+  // Backend ids rotate every scrape, so cache/expand state is keyed by the
+  // stable content fingerprint and only uses the id for the one-off fetch.
   function toggleExpand(job: Job) {
-    if (expandedId === job.id) {
-      setExpandedId(null)
+    const key = makeJobFingerprint(job.company, job.role, job.location)
+    if (expandedKey === key) {
+      setExpandedKey(null)
       return
     }
-    setExpandedId(job.id)
-    if (!detailCache[job.id]) {
-      setDetailCache(prev => ({ ...prev, [job.id]: { description: null, status: 'loading' } }))
+    setExpandedKey(key)
+    if (!detailCache[key]) {
+      setDetailCache(prev => ({ ...prev, [key]: { description: null, status: 'loading' } }))
       pullJob(job.id).then(res => {
         setDetailCache(prev => ({
           ...prev,
-          [job.id]: res
+          [key]: res
             ? { description: res.description ?? null, status: 'ready' }
             : { description: null, status: 'error' }
         }))
@@ -600,14 +603,22 @@ function Jobs() {
               paginated.map(job => {
                 const stale = isStale(job)
                 const repost = (freshness.get(jobKey(job.company, job.role, job.location)) || 0) > 1
-                const expanded = expandedId === job.id
-                const detail = detailCache[job.id]
+                const rowKey = makeJobFingerprint(job.company, job.role, job.location)
+                const expanded = expandedKey === rowKey
+                const detail = detailCache[rowKey]
                 return (
                   <Fragment key={job.id}>
                     <Table.Tr
                       className="job-row"
                       style={{ opacity: stale ? 0.55 : 1 }}
                       onClick={() => toggleExpand(job)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          toggleExpand(job)
+                        }
+                      }}
+                      tabIndex={0}
                       aria-expanded={expanded}
                     >
                       <Table.Td className="company-cell" data-label="Company">
@@ -616,7 +627,7 @@ function Jobs() {
                           className="bookmark-icon"
                           weight={isJobTracked(job.company, job.role, job.location) ? "fill" : "regular"}
                           color={isJobTracked(job.company, job.role, job.location) ? "var(--accent-color)" : "currentColor"}
-                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); toggleSave(job) }}
+                          onClick={(e) => { e.stopPropagation(); toggleSave(job) }}
                         />
                         <div>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
