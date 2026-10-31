@@ -8,7 +8,7 @@ echo.
 taskkill /f /im uvicorn.exe >nul 2>&1
 
 :: Start backend (installs deps first if needed)
-start "SearchTern Backend" cmd /k "cd /d %~dp0backend && pip install -r requirements.txt && python -m uvicorn api:app --reload"
+start "SearchTern Backend" cmd /k "cd /d %~dp0backend && py -m pip install -r requirements.txt && py -m uvicorn api:app --reload"
 
 :: Start frontend (installs deps first if needed)
 start "SearchTern Frontend" cmd /k "cd /d %~dp0frontend && npm install && npm run dev"

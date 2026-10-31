@@ -253,6 +253,125 @@
   color: var(--accent-color);
 }
 
+.job-row {
+  cursor: pointer;
+}
+
+.job-row:hover {
+  background-color: var(--table-row-hover, rgba(128, 128, 128, 0.06));
+}
+
+.job-row-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.job-row-caret {
+  color: var(--text-light);
+  transition: transform 0.15s ease;
+}
+
+.job-row-caret-open {
+  transform: rotate(180deg);
+}
+
+.job-detail-row {
+  cursor: default;
+}
+
+.job-detail-cell {
+  background-color: var(--table-detail-bg, rgba(128, 128, 128, 0.04));
+}
+
+.inline-job-detail {
+  padding: 14px 6px;
+}
+
+.inline-job-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.inline-job-detail-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-dark);
+}
+
+.inline-job-detail-apply {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--button-color);
+  color: #fff;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.inline-job-detail-apply:hover {
+  opacity: 0.9;
+}
+
+.inline-job-detail-body {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin: 0 0 10px;
+}
+
+.inline-job-detail-muted {
+  font-style: italic;
+}
+
+.inline-job-detail-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.inline-job-detail-section-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--primary-green);
+  margin-bottom: 4px;
+}
+
+.inline-job-detail-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.inline-job-detail-list li {
+  margin-bottom: 4px;
+}
+
+.inline-job-detail-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.inline-job-detail-link:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 640px) {
   .jobs-status-row {
     justify-content: space-between;
@@ -317,5 +436,19 @@
   }
 
   /* Hide Date column (less critical on mobile) */
-  .mantine-Table-td:last-child { display: none; }
+  .mantine-Table-td:last-child:not(.job-detail-cell) { display: none; }
+
+  .job-detail-row {
+    border: none;
+    margin: -8px 0 12px;
+    padding: 0;
+  }
+
+  .job-detail-cell {
+    padding: 0 12px 12px !important;
+  }
+
+  .job-detail-cell::before {
+    content: none;
+  }
 }

@@ -93,6 +93,30 @@ def clean_text(text):
     return re.sub(r"\s+", " ", text).strip()
 
 
+_BULLET_CHARS_RE = re.compile(r"[\u2022\u25aa\u25cf\u2023\u25e6\u00b7\u2219]")
+
+
+def clean_description(text):
+    """Like clean_text, but keeps line breaks and bullet structure instead of
+    collapsing everything to one run-on line \u2014 the frontend's inline preview
+    relies on paragraph/bullet boundaries to split descriptions into sections."""
+    if not text:
+        return None
+    text = text.replace("\u21b3", "")
+    text = re.sub(r"\*+|`+|~+", "", text)
+    text = _BULLET_CHARS_RE.sub("\n- ", text)
+    # Normalize smart punctuation before the ASCII strip below drops it \u2014
+    # otherwise "you're"/"don't" silently lose their apostrophe entirely.
+    text = (text.replace("\u2018", "'").replace("\u2019", "'")
+                .replace("\u201c", '"').replace("\u201d", '"')
+                .replace("\u2013", "-").replace("\u2014", "-"))
+    text = re.sub(r'[^\x00-\x7F\n]+', "", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"[ \t]*\n[ \t]*", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip() or None
+
+
 _UUID_RE = re.compile(
     r"(?i)(?<![0-9a-f])[0-9a-f]{8}(?:[-\s]?[0-9a-f]{4}){3}[-\s]?[0-9a-f]{12}(?![0-9a-f])"
 )
@@ -432,7 +456,7 @@ def scrape_searchtern_listings(url):
             "type":     jt if jt in ("internship", "newgrad") else "internship",
             "season":   "searchtern",
             "ats":      ats_of(link),
-            "description": clean_text(str(description)) if description else None,
+            "description": clean_description(str(description)) if description else None,
             "category": clean_text(str(job.get("category", ""))),
             "visa_sponsor": str(job.get("visa_sponsor", "")).strip().lower() == "true",
         })
