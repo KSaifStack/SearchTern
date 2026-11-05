@@ -236,6 +236,8 @@ function Jobs() {
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
+  const visaSponsorDataMissing = !loading && allJobs.length > 0 &&
+    !allJobs.every(job => typeof job.visa_sponsor === 'boolean')
 
   const activeFilterCount =
     (recencyDays > 0 ? 1 : 0) +
@@ -555,10 +557,16 @@ function Jobs() {
                       <input
                         type="checkbox"
                         checked={visaSponsorOnly}
+                        disabled={visaSponsorDataMissing}
                         onChange={() => { setVisaSponsorOnly(!visaSponsorOnly); setPage(1) }}
                       />
                       H-1B sponsor history
                     </label>
+                    {visaSponsorDataMissing && (
+                      <span role="status" style={{ display: 'block', margin: '4px 0 8px', color: 'var(--text-muted)', fontSize: 12 }}>
+                        Sponsorship data is missing from the listings API, so this filter is temporarily unavailable.
+                      </span>
+                    )}
                     <Select
                       placeholder="Any size"
                       size="xs"
