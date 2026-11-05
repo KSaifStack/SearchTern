@@ -106,9 +106,20 @@ class MemoryFixTests(unittest.TestCase):
                 scraper._update_database()
         self.assertTrue(connection.closed)
 
-    def test_list_projection_omits_descriptions(self):
+    def test_list_projection_includes_sponsorship_metadata(self):
         self.assertNotIn("description", read_db._JOB_LIST_COLUMNS)
         self.assertIn("company", read_db._JOB_LIST_COLUMNS)
+        self.assertIn("visa_sponsor", read_db._JOB_LIST_COLUMNS)
+
+    def test_recent_endpoint_preserves_sponsorship_flag(self):
+        client = TestClient(api.app, raise_server_exceptions=False)
+        with patch.object(read_db, "recent_internships", return_value=[
+            {"id": 123, "company": "Example", "visa_sponsor": True}
+        ]):
+            response = client.get("/recent")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(response.json()["result"][0]["visa_sponsor"], True)
 
     def test_startup_does_not_scrape(self):
         calls = []
