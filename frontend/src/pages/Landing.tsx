@@ -1,75 +1,119 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { RingProgress, Table, Text } from "@mantine/core";
+import { BookmarkSimpleIcon, FunnelSimple } from "@phosphor-icons/react";
+import { pullCount } from "../api/internships";
+import { CompanyFavicon } from "../components/CompanyFavicon";
+import { JobCard, STATUS_COLORS } from "../components/JobCard";
+import type { JobStatus, TrackedJob } from "../components/TrackerContext";
+import "../styles/Table.css";
+import "../styles/Tracker.css";
 import "../styles/landing.css";
-import { pullCount, pullJob } from "../api/internships";
-import { getRecent } from "../services/internshipmanager";
 
-const FAANG = new Set(["Google", "Meta", "Apple", "Amazon", "Microsoft", "Netflix"]);
+// Wordmark slugs from the gilbarbara/logos set, served over jsDelivr. All are
+// companies flagged FAANG+ in utils/companyMeta.ts, which is what the Jobs page
+// FAANG+ filter uses.
+const LOGO_CDN = "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos";
+const FAANG_PLUS_LOGOS = [
+  { name: "Google", slug: "google" },
+  { name: "Microsoft", slug: "microsoft" },
+  { name: "Apple", slug: "apple" },
+  { name: "Meta", slug: "meta" },
+  { name: "Netflix", slug: "netflix" },
+  { name: "Nvidia", slug: "nvidia" },
+  { name: "AWS", slug: "aws" },
+  { name: "IBM", slug: "ibm" },
+  { name: "Salesforce", slug: "salesforce" },
+  { name: "Spotify", slug: "spotify" },
+  { name: "Stripe", slug: "stripe" },
+  { name: "Airbnb", slug: "airbnb" },
+  { name: "OpenAI", slug: "openai" },
+];
 
-type FeedJob = {
-  id?: number;
-  company: string;
-  role: string;
-  location?: string;
-  date?: string;
-  visa_sponsor?: boolean;
+const isoDaysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+
+// Sample rows for the preview, built with the same TrackedJob shape the real
+// board renders. Dates are relative so the cards read like a live tracker.
+const SAMPLE_TRACKED: Record<JobStatus, TrackedJob[]> = {
+  Saved: [
+    { id: "s1", company: "Google", role: "Software Engineer Intern", location: "Mountain View, CA", status: "Saved", dateAdded: isoDaysAgo(2) },
+    { id: "s2", company: "Stripe", role: "Backend Engineer Intern", location: "San Francisco, CA", status: "Saved", dateAdded: isoDaysAgo(3) },
+    { id: "s3", company: "IBM", role: "Data Analyst Intern", location: "Remote", status: "Saved", dateAdded: isoDaysAgo(5) },
+  ],
+  Applied: [
+    { id: "a1", company: "Microsoft", role: "Software Engineer Intern", location: "Redmond, WA", status: "Applied", dateAdded: isoDaysAgo(9), dateApplied: isoDaysAgo(6) },
+    { id: "a2", company: "Airbnb", role: "Product Design Intern", location: "San Francisco, CA", status: "Applied", dateAdded: isoDaysAgo(12), dateApplied: isoDaysAgo(8) },
+  ],
+  Interview: [
+    { id: "i1", company: "Spotify", role: "Frontend Engineer", location: "New York, NY", status: "Interview", dateAdded: isoDaysAgo(16), dateApplied: isoDaysAgo(14) },
+  ],
+  Offer: [],
+  Rejected: [],
 };
 
+const SAMPLE_BOARD_ORDER: JobStatus[] = ["Saved", "Applied", "Interview", "Offer", "Rejected"];
+
+// Rows for the Jobs preview — same columns the live table renders.
+const SAMPLE_LISTINGS = [
+  { company: "Google", role: "Software Engineer Intern", location: "Mountain View, CA", date: "Today", saved: true },
+  { company: "Microsoft", role: "Software Engineer Intern", location: "Redmond, WA", date: "Yesterday", saved: false },
+  { company: "Spotify", role: "Frontend Engineer", location: "New York, NY", date: "2 days ago", saved: false },
+];
+
+const DEMO_PRODUCTS = [
+  {
+    id: "jobs",
+    label: "Job Search",
+    features: [
+      { title: "Browse roles", body: "Explore internship and new-grad listings in one searchable board.", kind: "browse" },
+      { title: "Filter your search", body: "Narrow roles by location, category, company, and more.", kind: "filters" },
+      { title: "Save a role", body: "Keep interesting listings in your application tracker.", kind: "save" },
+      { title: "Fresh listings", body: "Listings refresh hourly from company career systems.", kind: "fresh" },
+    ],
+  },
+  {
+    id: "tracker",
+    label: "Application Tracker",
+    features: [
+      { title: "Kanban board", body: "Move applications through Saved, Applied, Interview, Offer, and Rejected.", kind: "board" },
+      { title: "Keep details together", body: "Store each role's link, location, dates, and notes in one place.", kind: "details" },
+      { title: "See your progress", body: "Review application totals, offers, and reply rate at a glance.", kind: "progress" },
+      { title: "Counts per stage", body: "Each column shows how many applications sit in that stage.", kind: "counts" },
+    ],
+  },
+] as const;
+
+type DemoProductId = (typeof DEMO_PRODUCTS)[number]["id"];
+
 function Landing() {
+  const [activeProductId, setActiveProductId] = useState<DemoProductId>("jobs");
+  const [activeFeatureIndex, setActiveFeatureIndex] = useState(0);
   const [listingCount, setListingCount] = useState<number | null>(null);
-  const [feedJobs, setFeedJobs] = useState<FeedJob[]>([]);
+  const activeProduct = DEMO_PRODUCTS.find((product) => product.id === activeProductId)!;
+  const activeFeature = activeProduct.features[activeFeatureIndex];
 
   useEffect(() => {
     let cancelled = false;
-    pullCount()
-      .then((count) => {
-        if (!cancelled && typeof count === "number") {
-          setListingCount(count);
-        }
-      })
-      .catch(() => {
-        // ignore
-      });
-    getRecent()
-      .then((res) => {
-        if (!res.success || !Array.isArray(res.data)) return;
-        const faang = res.data
-          .filter((j: FeedJob) => FAANG.has(j.company))
-          .sort((a: FeedJob, b: FeedJob) => {
-            const ad = a.date ? new Date(a.date).getTime() : 0;
-            const bd = b.date ? new Date(b.date).getTime() : 0;
-            return bd - ad;
-          })
-          .slice(0, 5);
-        if (cancelled) return;
-        setFeedJobs(faang);
-        // Older /recent deployments omit visa_sponsor, so fetch it from the
-        // detail endpoint only for the handful of cards on screen.
-        if (faang.some((j) => j.visa_sponsor === undefined)) {
-          Promise.all(faang.map(async (j) => {
-            if (j.visa_sponsor !== undefined || j.id === undefined) return j;
-            const detail = await pullJob(j.id);
-            return { ...j, visa_sponsor: detail?.visa_sponsor === true };
-          })).then((enriched) => {
-            if (!cancelled) setFeedJobs(enriched);
-          }).catch(() => {
-            // ignore
-          });
-        }
-      })
-      .catch(() => {
-        // ignore
-      });
-    return () => { cancelled = true; };
+    pullCount().then((count) => {
+      if (!cancelled) setListingCount(count);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const scrollToDemo = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    const el = document.getElementById("demo");
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
+  const totalTracked = SAMPLE_BOARD_ORDER.reduce((sum, status) => sum + SAMPLE_TRACKED[status].length, 0);
+  const totalApplied = totalTracked - SAMPLE_TRACKED.Saved.length;
+  const responses = SAMPLE_TRACKED.Interview.length + SAMPLE_TRACKED.Offer.length + SAMPLE_TRACKED.Rejected.length;
+  const replyRate = totalApplied > 0 ? Math.round((responses / totalApplied) * 100) : 0;
+
+  const ringData = totalTracked > 0
+    ? SAMPLE_BOARD_ORDER.map((status) => ({
+        value: (SAMPLE_TRACKED[status].length / totalTracked) * 100,
+        color: STATUS_COLORS[status],
+        tooltip: `${status}: ${SAMPLE_TRACKED[status].length}`,
+      })).filter((segment) => segment.value > 0)
+    : [{ value: 100, color: "#f1f3f5", tooltip: "No data yet" }];
 
   return (
     <main className="landing">
@@ -77,60 +121,245 @@ function Landing() {
         <div className="landing-container">
           <div className="landing-hero-grid">
             <div className="landing-hero-content">
-              <p className="landing-usage-text">
-                <strong>1,000+ monthly visitors</strong>
-              </p>
               <h1 className="landing-title">
-                Your next opportunity shouldn't take <span className="landing-accent">47</span> tabs to find.
+                Find internships. <span className="landing-accent">Track every application.</span>
               </h1>
               <p className="landing-subtitle">
-                Roles pulled directly from <span className="landing-accent">45+</span> company ATS systems, with no repost feeds. Free and <a href="https://github.com/KSaifStack/SearchTern" target="_blank" rel="noopener noreferrer" className="landing-link-accent">open source</a>, refreshed hourly. Browse, filter, save, and track every application in one place.
+                Search and filter internships and new-grad roles from <span className="landing-accent">45+</span> company ATS systems. Save roles and track applications in one free, open-source workspace, refreshed hourly.
               </p>
               <div className="landing-cta-group">
                 <Link to="/jobs" className="landing-cta landing-cta-primary">
                   Browse Jobs
                 </Link>
-                <a href="#demo" onClick={scrollToDemo} className="landing-cta landing-cta-secondary">
-                  See how it works
-                </a>
               </div>
             </div>
-            <div className="landing-hero-visual" aria-hidden="true">
-              <div className="landing-mac">
-                <div className="landing-mac-header">
-                  <div className="landing-mac-dots">
-                    <span className="landing-mac-dot red" />
-                    <span className="landing-mac-dot yellow" />
-                    <span className="landing-mac-dot green" />
+            <div className="landing-video">
+              <video
+                className="landing-video-player"
+                src="/demo.webm"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                aria-label="SearchTern product walkthrough video"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-showcase" aria-label="Explore SearchTern features">
+        <div className="landing-container">
+          <div className="landing-demo-tabs" role="tablist" aria-label="SearchTern products">
+            {DEMO_PRODUCTS.map((product) => (
+              <button
+                key={product.id}
+                type="button"
+                role="tab"
+                aria-selected={activeProductId === product.id}
+                className={`landing-demo-tab${activeProductId === product.id ? " is-active" : ""}`}
+                onClick={() => {
+                  setActiveProductId(product.id);
+                  setActiveFeatureIndex(0);
+                }}
+              >
+                {product.label}
+              </button>
+            ))}
+          </div>
+
+          <div className={`landing-showcase-frame landing-showcase-frame-${activeProductId}`}>
+            <div
+              className={`landing-preview landing-preview-${activeProductId} landing-preview-focus-${activeFeature.kind}`}
+              aria-label={activeProductId === "jobs" ? "Sample of the SearchTern job board" : "Sample of the SearchTern application tracker"}
+              aria-hidden="true"
+            >
+              {activeProductId === "jobs" ? (
+                <section className="feature landing-preview-jobs" inert>
+                  <input
+                    className="search-input"
+                    placeholder="Search by company, role, or location..."
+                    readOnly
+                    tabIndex={-1}
+                  />
+
+                  <div className="results-header">
+                    {listingCount !== null && (
+                      <p className="result-count desktop-result-count">
+                        {listingCount.toLocaleString()} listings found
+                      </p>
+                    )}
+                    <div className="results-controls">
+                      <button className="sort_btn" type="button" tabIndex={-1}>
+                        <span aria-hidden="true">⇅</span> Newest
+                      </button>
+                      <button className="sort_btn" type="button" tabIndex={-1}>
+                        Roles <span aria-hidden="true">▾</span>
+                      </button>
+                      <button className="sort_btn" type="button" tabIndex={-1}>
+                        <FunnelSimple size={16} weight="bold" /> Filters
+                      </button>
+                    </div>
                   </div>
-                  <div className="landing-mac-title">searchtern.net/jobs</div>
-                </div>
-                <div className="landing-feed-card">
-                  <div className="landing-feed-header">
-                    <span className="landing-feed-title">Internships</span>
-                    <span className="landing-feed-count">{listingCount !== null ? `${listingCount.toLocaleString()} results` : "Live results"}</span>
-                  </div>
-                  <div className="landing-feed-list">
-                    {(feedJobs.length > 0 ? feedJobs.slice(0, 4) : [
-                      { company: "Google", role: "Software Engineering Intern", location: "Mountain View, CA", visa_sponsor: true },
-                      { company: "Meta", role: "Software Engineering Intern", location: "Menlo Park, CA", visa_sponsor: true },
-                      { company: "Microsoft", role: "New Grad SWE", location: "Redmond, WA", visa_sponsor: true },
-                      { company: "Amazon", role: "Software Development Engineer Intern", location: "Seattle, WA", visa_sponsor: true },
-                    ]).map((job: FeedJob, idx: number) => (
-                      <article className="landing-feed-item" key={idx}>
-                        <div className="landing-feed-item-main">
-                          <div className="landing-feed-company">
-                            {job.company}
-                            {job.visa_sponsor && <span className="landing-feed-badge" title="Has sponsored H-1B visas">H-1B</span>}
+
+                  <Table striped highlightOnHover mt="md">
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Company</Table.Th>
+                        <Table.Th>Role</Table.Th>
+                        <Table.Th>Location</Table.Th>
+                        <Table.Th>Date</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {SAMPLE_LISTINGS.map((listing) => (
+                        <Table.Tr className="job-row" key={`${listing.company}-${listing.role}`}>
+                          <Table.Td className="company-cell" data-label="Company">
+                            <BookmarkSimpleIcon
+                              size={25}
+                              className="bookmark-icon"
+                              weight={listing.saved ? "fill" : "regular"}
+                              color={listing.saved ? "var(--accent-color)" : "currentColor"}
+                            />
+                            <div>
+                              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <CompanyFavicon company={listing.company} />
+                                {listing.company}
+                              </span>
+                            </div>
+                          </Table.Td>
+                          <Table.Td data-label="Role">
+                            <span className="apply-link">{listing.role}</span>
+                          </Table.Td>
+                          <Table.Td data-label="Location">{listing.location}</Table.Td>
+                          <Table.Td data-label="Date">
+                            <span className="job-row-date">{listing.date}</span>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </section>
+              ) : (
+                <section className="feature landing-preview-tracker" inert>
+                  <div className="tracker-stats landing-preview-tracker-stats">
+                    <div className="tracker-stats-numbers">
+                      <div>
+                        <Text c="dimmed" size="xs" fw={700}>Applied</Text>
+                        <Text fw={700} size="xl">{totalApplied}</Text>
+                      </div>
+                      <div>
+                        <Text c="dimmed" size="xs" fw={700}>Reply Rate</Text>
+                        <Text fw={700} size="xl">{replyRate}%</Text>
+                      </div>
+                      <div>
+                        <Text c="dimmed" size="xs" fw={700}>Offers</Text>
+                        <Text fw={700} size="xl" c="green">{SAMPLE_TRACKED.Offer.length}</Text>
+                      </div>
+                      <div>
+                        <Text c="dimmed" size="xs" fw={700}>Rejected</Text>
+                        <Text fw={700} size="xl" c="red">{SAMPLE_TRACKED.Rejected.length}</Text>
+                      </div>
+                    </div>
+
+                    <div className="tracker-ring">
+                      <RingProgress
+                        size={110}
+                        thickness={12}
+                        roundCaps
+                        rootColor="#f1f3f5"
+                        sections={ringData}
+                        label={
+                          <div style={{ textAlign: "center", marginTop: "-4px" }}>
+                            <Text fw={800} size="xl" lh={1}>{totalTracked}</Text>
+                            <Text c="dimmed" size="xs" fw={700} mt={2}>Total</Text>
                           </div>
-                          <div className="landing-feed-role">{job.role}</div>
-                          <div className="landing-feed-meta">{job.location || "Various locations"}</div>
-                        </div>
-                        <button className="landing-feed-apply" tabIndex={-1}>Apply</button>
-                      </article>
-                    ))}
+                        }
+                      />
+                      <div className="landing-preview-ring-legend">
+                        {ringData.filter((segment) => segment.tooltip !== "No data yet").map((segment) => (
+                          <div key={segment.tooltip} className="landing-preview-ring-legend-item">
+                            <span style={{ backgroundColor: segment.color }} />
+                            <Text size="xs" c="dimmed" fw={600}>{segment.tooltip}</Text>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
+
+                  <div className="tracker-board-scroll">
+                    <div className="tracker-board">
+                      {SAMPLE_BOARD_ORDER.map((status) => (
+                        <div key={status} className={`tracker-column-wrapper${status === "Saved" ? " active" : ""}`}>
+                          <div className="tracker-column">
+                            <div className="column-header">
+                              <span style={{ color: STATUS_COLORS[status] }}>{status}</span>
+                              <span
+                                className="column-count"
+                                style={{ backgroundColor: `${STATUS_COLORS[status]}22`, color: STATUS_COLORS[status] }}
+                              >
+                                {SAMPLE_TRACKED[status].length}
+                              </span>
+                            </div>
+
+                            {SAMPLE_TRACKED[status].map((job) => (
+                              <JobCard key={job.id} job={job} />
+                            ))}
+
+                            {SAMPLE_TRACKED[status].length === 0 && (
+                              <div className="landing-preview-tracker-empty">
+                                {status === "Saved" ? "Drop jobs here to track later" : "No applications here"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              )}
+            </div>
+          </div>
+
+          <div className="landing-demo-features" role="tabpanel" aria-label={`${activeProduct.label} features`}>
+            {activeProduct.features.map((feature, index) => (
+              <button
+                type="button"
+                className={`landing-demo-feature${activeFeatureIndex === index ? " is-active" : ""}`}
+                key={feature.title}
+                aria-pressed={activeFeatureIndex === index}
+                onClick={() => setActiveFeatureIndex(index)}
+              >
+                <span className="landing-demo-feature-title">{feature.title}</span>
+                <span className="landing-demo-feature-body">{feature.body}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-trust-band" aria-label="SearchTern facts">
+        <div className="landing-container">
+          <h2 className="landing-trust-title">
+            Join <strong>20,000+</strong> students who've used SearchTern to manage their job search and find jobs at <strong>1000s</strong> of companies
+          </h2>
+          <div className="landing-company-sources">
+            <div className="landing-company-marquee" aria-label="FAANG+ companies">
+              <div className="landing-company-track">
+                {[0, 1].map((copy) => (
+                  <ul className="landing-company-group" key={copy} aria-hidden={copy === 1}>
+                    {FAANG_PLUS_LOGOS.map(({ name, slug }) => (
+                      <li key={slug}>
+                        <img
+                          src={`${LOGO_CDN}/${slug}.svg`}
+                          alt={copy === 0 ? name : ""}
+                          loading="lazy"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                ))}
               </div>
             </div>
           </div>
@@ -160,147 +389,6 @@ function Landing() {
                 </a>
                 .
               </p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section id="demo" className="landing-walkthrough">
-        <div className="landing-container">
-          <div className="landing-section-header">
-            <h2>From discovery to offer, all in one place.</h2>
-            <p>Find opportunities, organize your search, and keep track of every application all without the chaos.</p>
-          </div>
-
-          <div className="landing-walkthrough-steps">
-            <article className="landing-walkthrough-step">
-              <div className="landing-walkthrough-text">
-                <div className="landing-walkthrough-step-num">1</div>
-                <h3>Discover opportunities</h3>
-                <p>Browse roles pulled directly from company ATS systems and narrow by role, location, recency, and filters that cut stale listings.</p>
-              </div>
-              <div className="landing-walkthrough-visual">
-                <div className="landing-walkthrough-card">
-                  <div className="landing-walkthrough-card-header">
-                    <span>SearchTern · Jobs</span>
-                  </div>
-                  <div className="landing-walkthrough-card-body">
-                    <div className="landing-walkthrough-job">
-                      <div>
-                        <div className="landing-walkthrough-job-title">Software Engineering Intern</div>
-                        <div className="landing-walkthrough-job-meta">Google · Mountain View, CA</div>
-                      </div>
-                      <span className="landing-walkthrough-pill">View listing</span>
-                    </div>
-                    <div className="landing-walkthrough-job">
-                      <div>
-                        <div className="landing-walkthrough-job-title">Software Engineering Intern</div>
-                        <div className="landing-walkthrough-job-meta">Meta · Menlo Park, CA</div>
-                      </div>
-                      <span className="landing-walkthrough-pill">View listing</span>
-                    </div>
-                    <div className="landing-walkthrough-job">
-                      <div>
-                        <div className="landing-walkthrough-job-title">New Grad SWE</div>
-                        <div className="landing-walkthrough-job-meta">Microsoft · Redmond, WA</div>
-                      </div>
-                      <span className="landing-walkthrough-pill">View listing</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article className="landing-walkthrough-step landing-walkthrough-step-reverse">
-              <div className="landing-walkthrough-text">
-                <div className="landing-walkthrough-step-num">2</div>
-                <h3>Save jobs you're interested in</h3>
-                <p>Save promising roles so you can return to them without losing track of opportunities across browser tabs.</p>
-              </div>
-              <div className="landing-walkthrough-visual">
-                <div className="landing-walkthrough-card">
-                  <div className="landing-walkthrough-card-header">
-                    <span>Saved</span>
-                  </div>
-                  <div className="landing-walkthrough-card-body">
-                    <div className="landing-walkthrough-job">
-                      <div>
-                        <div className="landing-walkthrough-job-title">Software Engineering Intern</div>
-                        <div className="landing-walkthrough-job-meta">Stripe · San Francisco, CA</div>
-                      </div>
-                      <span className="landing-walkthrough-pill landing-walkthrough-pill-muted">Saved</span>
-                    </div>
-                    <div className="landing-walkthrough-job">
-                      <div>
-                        <div className="landing-walkthrough-job-title">Software Engineering Intern</div>
-                        <div className="landing-walkthrough-job-meta">Google · Mountain View, CA</div>
-                      </div>
-                      <span className="landing-walkthrough-pill landing-walkthrough-pill-muted">Saved</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article className="landing-walkthrough-step">
-              <div className="landing-walkthrough-text">
-                <div className="landing-walkthrough-step-num">3</div>
-                <h3>Track every application</h3>
-                <p>Organize opportunities through the existing stages: <strong>Saved → Applied → Interview → Offer → Rejected</strong>. Keep your pipeline clear in one tracker.</p>
-              </div>
-              <div className="landing-walkthrough-visual">
-                <div className="landing-walkthrough-card">
-                  <div className="landing-walkthrough-card-header">
-                    <span>Applications Tracker</span>
-                  </div>
-                  <div className="landing-walkthrough-card-body landing-walkthrough-card-body-stages">
-                    <div className="landing-walkthrough-stage">
-                      <span>Saved</span>
-                      <span className="landing-walkthrough-stage-count">2</span>
-                    </div>
-                    <div className="landing-walkthrough-stage">
-                      <span>Applied</span>
-                      <span className="landing-walkthrough-stage-count">3</span>
-                    </div>
-                    <div className="landing-walkthrough-stage">
-                      <span>Interview</span>
-                      <span className="landing-walkthrough-stage-count">1</span>
-                    </div>
-                    <div className="landing-walkthrough-stage">
-                      <span>Offer</span>
-                      <span className="landing-walkthrough-stage-count">0</span>
-                    </div>
-                    <div className="landing-walkthrough-stage">
-                      <span>Rejected</span>
-                      <span className="landing-walkthrough-stage-count">0</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article className="landing-walkthrough-step landing-walkthrough-step-reverse">
-              <div className="landing-walkthrough-text">
-                <div className="landing-walkthrough-step-num">4</div>
-                <h3>Approve every change</h3>
-                <p>Connect an AI agent and it can propose tracker updates, not make them. You review each proposal and approve what actually changes in your tracker.</p>
-              </div>
-              <div className="landing-walkthrough-visual">
-                <div className="landing-walkthrough-card">
-                  <div className="landing-walkthrough-card-header">
-                    <span>Agent proposal</span>
-                  </div>
-                  <div className="landing-walkthrough-card-body">
-                    <div className="landing-walkthrough-control">
-                      <div className="landing-walkthrough-control-row">
-                        <span>Move Google to Applied</span>
-                        <span className="landing-walkthrough-pill">Pending review</span>
-                      </div>
-                      <p className="landing-walkthrough-control-note">Nothing changes until you approve it</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </article>
           </div>
         </div>

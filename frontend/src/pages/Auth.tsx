@@ -117,7 +117,7 @@ function Auth() {
                     <div className="auth-panel-features">
                         <div className="auth-feature-item">
                             <span className="auth-feature-icon"><MagnifyingGlassIcon weight="bold" /></span>
-                            <span>Search 2000+ internships</span>
+                            <span>Search 20,000+ internships</span>
                         </div>
                         <div className="auth-feature-item">
                             <span className="auth-feature-icon"><KanbanIcon weight="bold" /></span>

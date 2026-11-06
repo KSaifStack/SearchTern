@@ -106,15 +106,18 @@ class MemoryFixTests(unittest.TestCase):
                 scraper._update_database()
         self.assertTrue(connection.closed)
 
-    def test_list_projection_includes_sponsorship_metadata(self):
-        self.assertNotIn("description", read_db._JOB_LIST_COLUMNS)
-        self.assertIn("company", read_db._JOB_LIST_COLUMNS)
+    def test_list_projection_reports_overview_without_shipping_description(self):
+        # The feed needs to know whether a listing has an overview, but must not
+        # carry the description text: it is projected only as a boolean flag.
+        self.assertIn("has_overview", read_db._JOB_LIST_COLUMNS)
         self.assertIn("visa_sponsor", read_db._JOB_LIST_COLUMNS)
+        self.assertIn("company", read_db._JOB_LIST_COLUMNS)
+        self.assertNotRegex(read_db._JOB_LIST_COLUMNS, r"(?:^|,)s*descriptions*(?:,|$)")
 
     def test_recent_endpoint_preserves_sponsorship_flag(self):
         client = TestClient(api.app, raise_server_exceptions=False)
         with patch.object(read_db, "recent_internships", return_value=[
-            {"id": 123, "company": "Example", "visa_sponsor": True}
+            {"id": 123, "company": "Example", "visa_sponsor": True, "has_overview": True}
         ]):
             response = client.get("/recent")
 
