@@ -254,7 +254,7 @@
 }
 
 .job-row {
-  cursor: pointer;
+  cursor: default;
 }
 
 .job-row:hover {
@@ -265,6 +265,44 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* A real button now that the row no longer toggles — the global button rule
+   would otherwise paint it green with a hover lift. */
+.job-row-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 4px;
+  min-width: 32px;
+  min-height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.job-row-expand:hover {
+  background: var(--hover-bg);
+  color: var(--text-dark);
+  transform: none;
+  box-shadow: none;
+}
+
+.job-row-expand:focus-visible {
+  outline: 2px solid var(--primary-green);
+  outline-offset: 2px;
+}
+
+.filter-note {
+  display: block;
+  margin: 4px 0 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .job-row-caret {
@@ -435,8 +473,8 @@
     margin-bottom: 2px;
   }
 
-  /* Hide Date column (less critical on mobile) */
-  .mantine-Table-td:last-child:not(.job-detail-cell) { display: none; }
+  /* The Date column stays visible on mobile: it carries the overview toggle,
+     so hiding it would take the only expansion control with it. */
 
   .job-detail-row {
     border: none;

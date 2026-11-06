@@ -1,8 +1,9 @@
 import { lazy, Suspense } from "react"
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { SpeedInsights } from "@vercel/speed-insights/react"
 import { Analytics } from "@vercel/analytics/react"
 import Navbar from "./components/Navbar"
+import SiteFooter from "./components/SiteFooter"
 import ThemeNudge from "./components/ThemeNudge"
 import ChangesNotice from "./components/ChangesNotice"
 import { TrackerProvider } from "./components/TrackerContext"
@@ -68,6 +69,13 @@ function HomeRoute() {
             <Landing />
         </>
     )
+}
+
+function RouteFooter() {
+    // Home and Landing already end with their own footer.
+    const { pathname } = useLocation()
+    if (pathname === "/") return null
+    return <SiteFooter />
 }
 
 function App() {
@@ -159,6 +167,7 @@ function App() {
                             </Suspense>
                             </ErrorBoundary>
                         </div>
+                        <RouteFooter />
                         <AgentOverlay />
                         <SpeedInsights />
                         <Analytics />

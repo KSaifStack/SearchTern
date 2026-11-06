@@ -18,7 +18,12 @@ _cache: list | None = None
 _cache_time: float = 0
 _CACHE_TTL = 3300  # 55 minutes (refresh before the hourly scrape)
 _cache_lock = Lock()
-_JOB_LIST_COLUMNS = "id, company, role, location, date, link, type, season, ats, category, visa_sponsor, last_seen_at"
+# has_overview lets the feed decide whether an expansion control is worth
+# showing without shipping the description text itself (rows average a few KB).
+_JOB_LIST_COLUMNS = (
+    "id, company, role, location, date, link, type, season, ats, category, visa_sponsor, last_seen_at, "
+    "(description IS NOT NULL AND btrim(description) <> '') AS has_overview"
+)
 # date is a TEXT column holding days-ago, so a plain ORDER BY sorts it as text
 # ("10" before "2"). Cast so newest really is first. Every stored value is
 # numeric — scraper.sort_date() drops anything it cannot parse.

@@ -25,6 +25,7 @@ interface Job {
   season?: string
   category?: string
   visa_sponsor?: boolean
+  has_overview?: boolean
 }
 
 const STALE_DAYS = 21
@@ -178,6 +179,14 @@ function Jobs() {
       .map(([abbr]) => abbr)
   }, [parsedLocations, countryFilter])
 
+  // Older API builds don't ship visa_sponsor at all, and filtering on the
+  // missing field silently returns zero rows for every query. The active flag
+  // is derived rather than reset in an effect, so the checkbox and the results
+  // agree within the same render and nothing cascades.
+  const visaSponsorDataMissing = !loading && allJobs.length > 0 &&
+    !allJobs.some(job => typeof job.visa_sponsor === 'boolean')
+  const visaSponsorActive = visaSponsorOnly && !visaSponsorDataMissing
+
   const categoryOptions = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const j of allJobs) {
@@ -208,7 +217,8 @@ function Jobs() {
     if (categoryFilters.length) jobs = jobs.filter(j => j.category && categoryFilters.includes(j.category))
     if (!typeFilters.internship) jobs = jobs.filter(j => j.type === 'newgrad')
     if (!typeFilters.newgrad) jobs = jobs.filter(j => j.type !== 'newgrad')
-    if (visaSponsorOnly) jobs = jobs.filter(j => j.visa_sponsor)
+    // === true, not truthy: a stringified "false" must never match.
+    if (visaSponsorActive) jobs = jobs.filter(j => j.visa_sponsor === true)
     if (faangOnly || employeeBucket) {
       jobs = jobs.filter(j => {
         const meta = matchCompanyMeta(j.company)
@@ -232,7 +242,7 @@ function Jobs() {
       const bNum = isNaN(bParsed) ? 999 : bParsed
       return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
-  }, [allJobs, searchText, sortOrder, categoryFilters, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, visaSponsorOnly, employeeBucket, hideStale, recencyDays])
+  }, [allJobs, searchText, sortOrder, categoryFilters, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, visaSponsorActive, employeeBucket, hideStale, recencyDays])
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
@@ -244,7 +254,7 @@ function Jobs() {
     (countryFilter ? 1 : 0) +
     (stateFilter ? 1 : 0) +
     (faangOnly ? 1 : 0) +
-    (visaSponsorOnly ? 1 : 0) +
+    (visaSponsorActive ? 1 : 0) +
     (employeeBucket ? 1 : 0)
 
   function clearFilters() {
@@ -267,6 +277,7 @@ function Jobs() {
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
   }, [totalPages, page])
+
 
   const onSearchChange = (val: string) => {
     setSearch(val)
@@ -554,11 +565,17 @@ function Jobs() {
                     <label className="filter-option">
                       <input
                         type="checkbox"
-                        checked={visaSponsorOnly}
+                        checked={visaSponsorActive}
+                        disabled={visaSponsorDataMissing}
                         onChange={() => { setVisaSponsorOnly(!visaSponsorOnly); setPage(1) }}
                       />
                       H-1B sponsor history
                     </label>
+                    {visaSponsorDataMissing && (
+                      <span role="status" className="filter-note">
+                        Sponsorship data isn't in this listings feed, so this filter is unavailable right now.
+                      </span>
+                    )}
                     <Select
                       placeholder="Any size"
                       size="xs"
@@ -606,20 +623,15 @@ function Jobs() {
                 const rowKey = makeJobFingerprint(job.company, job.role, job.location)
                 const expanded = expandedKey === rowKey
                 const detail = detailCache[rowKey]
+                // Strictly gated: only a listing whose feed row reports an
+                // overview gets a control. Without the flag (an older API) the
+                // arrow stays hidden rather than opening an empty dropdown.
+                const canExpand = job.has_overview === true
                 return (
                   <Fragment key={job.id}>
                     <Table.Tr
                       className="job-row"
                       style={{ opacity: stale ? 0.55 : 1 }}
-                      onClick={() => toggleExpand(job)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          toggleExpand(job)
-                        }
-                      }}
-                      tabIndex={0}
-                      aria-expanded={expanded}
                     >
                       <Table.Td className="company-cell" data-label="Company">
                         <BookmarkSimpleIcon
@@ -634,28 +646,48 @@ function Jobs() {
                             <CompanyFavicon company={job.company} />
                             {job.company}
                           </span>
-                          {(stale || repost || job.visa_sponsor) && (
+                          {(stale || repost || job.visa_sponsor === true) && (
                             <span style={{ display: 'flex', gap: 4, marginTop: 2 }}>
                               {stale && <Badge size="xs" variant="light" color="gray">Likely filled</Badge>}
                               {repost && <Badge size="xs" variant="light" color="yellow">Reposted</Badge>}
-                              {job.visa_sponsor && <Badge size="xs" variant="light" color="teal">H-1B sponsor</Badge>}
+                              {job.visa_sponsor === true && <Badge size="xs" variant="light" color="teal">H-1B sponsor</Badge>}
                             </span>
                           )}
                         </div>
                       </Table.Td>
                       <Table.Td data-label="Role">
-                        <span className="apply-link">{job.role}</span>
+                        <a
+                          href={job.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="apply-link"
+                          title={`Apply at ${job.company} — opens the employer's site`}
+                        >
+                          {job.role}
+                        </a>
                       </Table.Td>
                       <Table.Td data-label="Location">{trimLocations(job.location)}</Table.Td>
                       <Table.Td data-label="Date">
                         <span className="job-row-date">
                           {formatRelativeDate(job.date)}
-                          <CaretDown size={12} weight="bold" className={`job-row-caret${expanded ? ' job-row-caret-open' : ''}`} />
+                          {canExpand && (
+                            <button
+                              type="button"
+                              className="job-row-expand"
+                              onClick={() => toggleExpand(job)}
+                              aria-expanded={expanded}
+                              aria-controls={`job-overview-${job.id}`}
+                              aria-label={expanded ? `Hide overview for ${job.role}` : `Show overview for ${job.role}`}
+                              title={expanded ? 'Hide overview' : 'Show overview'}
+                            >
+                              <CaretDown size={14} weight="bold" className={`job-row-caret${expanded ? ' job-row-caret-open' : ''}`} />
+                            </button>
+                          )}
                         </span>
                       </Table.Td>
                     </Table.Tr>
                     {expanded && (
-                      <Table.Tr className="job-detail-row">
+                      <Table.Tr className="job-detail-row" id={`job-overview-${job.id}`}>
                         <Table.Td colSpan={4} className="job-detail-cell">
                           <div className="inline-job-detail">
                             <div className="inline-job-detail-header">

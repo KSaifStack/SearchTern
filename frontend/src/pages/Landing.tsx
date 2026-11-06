@@ -133,9 +133,17 @@ function Landing() {
                 </Link>
               </div>
             </div>
-            <div className="landing-video-placeholder" role="img" aria-label="Placeholder for the SearchTern product walkthrough video">
-              <span>Product walkthrough video</span>
-              <small>Video coming soon</small>
+            <div className="landing-video">
+              <video
+                className="landing-video-player"
+                src="/demo.webm"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                aria-label="SearchTern product walkthrough video"
+              />
             </div>
           </div>
         </div>
@@ -156,9 +164,6 @@ function Landing() {
                   setActiveFeatureIndex(0);
                 }}
               >
-                <span className={`landing-demo-tab-icon landing-demo-tab-icon-${product.id}`} aria-hidden="true">
-                  {product.id === "jobs" ? "⌕" : "▦"}
-                </span>
                 {product.label}
               </button>
             ))}
@@ -337,7 +342,7 @@ function Landing() {
       <section className="landing-trust-band" aria-label="SearchTern facts">
         <div className="landing-container">
           <h2 className="landing-trust-title">
-            Join <strong>20,000+</strong> students who've used SearchTern to manage their job search and land jobs at <strong>1000s</strong> of companies
+            Join <strong>20,000+</strong> students who've used SearchTern to manage their job search and find jobs at <strong>1000s</strong> of companies
           </h2>
           <div className="landing-company-sources">
             <div className="landing-company-marquee" aria-label="FAANG+ companies">
