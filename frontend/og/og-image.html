@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>SearchTern social preview (1200x630)</title>
+  <!--
+    Source for frontend/public/og-image.png.
+
+    Render at exactly 1200x630, matching `<meta property="og:image:width|height">`
+    in index.html and utils/seo.ts:
+
+      chrome --headless=new --hide-scrollbars --window-size=1200,630 \
+             --screenshot=frontend/public/og-image.png \
+             file:///<abs path>/frontend/og/og-image.html
+
+    The right-hand panel is not a drawing: it links the app's own stylesheets
+    (index.css for the tokens, Table.css for the board) and reuses the real
+    markup from pages/Jobs.tsx — .search-input, .results-header, .result-count,
+    .sort_btn, .job-row, .company-cell, .apply-link, .job-row-date,
+    .job-row-expand — plus the Phosphor icons, the Mantine light-teal badge
+    (#e6fcf5 / #0ca678) a sponsored row renders, and the 15-per-page pagination.
+
+    The four rows are real listings from /recent (Palantir, Microsoft, Amazon,
+    Stripe), with favicons from the Google endpoint CompanyFavicon falls back
+    to and links pointing at each employer's own posting.
+  -->
+  <link rel="stylesheet" href="../src/index.css" />
+  <link rel="stylesheet" href="../src/styles/Table.css" />
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap");
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+      background: #23684a;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      font-family: Lexend, "Segoe UI", system-ui, -apple-system, sans-serif;
+      text-rendering: geometricPrecision;
+    }
+
+    /* Same green family as --accent-color (#2d7a4f), lit the way the
+       Simplify banner lights its cyan: a bright bloom top-right, the brand
+       green through the middle, and a darker corner to anchor the type. */
+    .card {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 1200px;
+      height: 630px;
+      padding: 0 0 0 68px;
+      overflow: hidden;
+      background:
+        radial-gradient(820px 520px at 82% -6%, rgba(255, 255, 255, 0.26), transparent 64%),
+        radial-gradient(620px 420px at -8% 104%, rgba(6, 34, 21, 0.42), transparent 62%),
+        linear-gradient(126deg, #123f2b 0%, #23684a 44%, #35935f 100%);
+    }
+
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 22%);
+      pointer-events: none;
+    }
+
+    .left {
+      position: relative;
+      z-index: 2;
+      width: 500px;
+      flex: 0 0 auto;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .mark {
+      display: grid;
+      place-items: center;
+      width: 58px;
+      height: 58px;
+      border-radius: 17px;
+      background: #ffffff;
+      box-shadow: 0 10px 26px rgba(4, 26, 16, 0.28);
+    }
+
+    .mark img {
+      width: 42px;
+      height: 40px;
+      display: block;
+    }
+
+    .word {
+      color: #ffffff;
+      font-size: 31px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .card h1 {
+      margin-top: 30px;
+      color: #ffffff;
+      font-size: 63px;
+      font-weight: 700;
+      line-height: 0.99;
+      letter-spacing: -0.042em;
+    }
+
+    .sub {
+      margin-top: 20px;
+      max-width: 452px;
+      color: rgba(255, 255, 255, 0.87);
+      font-size: 19px;
+      font-weight: 400;
+      line-height: 1.5;
+      letter-spacing: -0.008em;
+    }
+
+    .sub b {
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .chips {
+      display: flex;
+      gap: 9px;
+      margin-top: 28px;
+    }
+
+    .chip {
+      padding: 10px 15px;
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.13);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      white-space: nowrap;
+    }
+
+    .chip b {
+      font-weight: 800;
+    }
+
+    /* The real board, on the same white surface the site's .feature cards
+       use, raised off the gradient instead of sitting in a browser chrome. */
+    .right {
+      position: relative;
+      z-index: 2;
+      flex: 1 1 auto;
+      padding: 0 34px 0 30px;
+    }
+
+    .board {
+      padding: 16px 16px 10px;
+      border: 1px solid #e7ebe8;
+      border-radius: 16px;
+      background: #ffffff;
+      box-shadow: 0 26px 64px rgba(3, 24, 14, 0.32);
+    }
+
+    /* Table.css gives .search-input its real padding, radius and focus ring;
+       this only kills the caret and shrinks it for the card. */
+    .board .search-input {
+      cursor: default;
+      font-size: 13px;
+      padding: 9px 12px;
+      margin-bottom: 12px;
+    }
+
+    .board .results-header {
+      margin-bottom: 6px;
+    }
+
+    .board .result-count {
+      font-size: 12px;
+      margin-bottom: 0;
+    }
+
+    .board .sort_btn {
+      padding: 5px 10px;
+      font-size: 12px;
+      border-width: 1px;
+      margin: 0;
+    }
+
+    .board .sort_btn svg {
+      width: 13px;
+      height: 13px;
+    }
+
+    .og-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      table-layout: fixed;
+    }
+
+    .og-table .mantine-Table-th {
+      padding: 7px 8px;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      color: var(--table-th-color);
+      border-bottom: 1px solid var(--border-light);
+      text-align: left;
+    }
+
+    .og-table .mantine-Table-td {
+      padding: 10px 8px;
+      color: var(--table-td-color);
+      vertical-align: top;
+    }
+
+    /* The board is striped, as <Table striped> renders it. */
+    .og-table .job-row:nth-child(odd) {
+      background: #f8f9fa;
+    }
+
+    .og-table .job-row {
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .og-table .job-row:last-child {
+      border-bottom: none;
+    }
+
+    .og-table .company-cell {
+      gap: 6px;
+      align-items: flex-start;
+    }
+
+    .og-table .bookmark-icon {
+      flex-shrink: 0;
+      margin-top: 1px;
+      color: var(--text-slate);
+    }
+
+    .company-line {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--text-dark);
+      font-weight: 500;
+      line-height: 1.3;
+    }
+
+    .company-favicon {
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .company-badges {
+      display: flex;
+      gap: 3px;
+      margin-top: 3px;
+    }
+
+    /* Mantine Badge, size="xs" variant="light" color="teal". */
+    .h1b-badge {
+      display: inline-flex;
+      align-items: center;
+      height: 17px;
+      padding: 0 6px;
+      border-radius: 4px;
+      background: #e6fcf5;
+      color: #0ca678;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .og-table .apply-link {
+      display: inline-block;
+      font-size: 12.5px;
+      font-weight: 500;
+      line-height: 1.35;
+    }
+
+    .og-table .job-row-date {
+      gap: 2px;
+      color: var(--text-muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    /* Real control, card-sized: the caret that only appears when
+       has_overview is true. */
+    .og-table .job-row-expand {
+      min-width: 17px;
+      min-height: 17px;
+      padding: 0;
+      margin: 0;
+      border-radius: 4px;
+      color: var(--text-light);
+    }
+
+    .og-table .job-row-expand svg {
+      width: 11px;
+      height: 11px;
+    }
+
+    /* <Pagination> footer: Mantine's 32px controls at card scale, with the
+       active page painted from --primary-green like the real one. */
+    .og-pager {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-light);
+    }
+
+    .og-pager-meta {
+      color: var(--text-gray);
+      font-size: 11px;
+    }
+
+    .og-pager-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pager-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 25px;
+      height: 25px;
+      padding: 0;
+      margin: 0;
+      border: 1px solid var(--border-slate);
+      border-radius: 5px;
+      background: #ffffff;
+      color: var(--text-slate);
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+
+    .pager-btn.is-active {
+      background: var(--primary-green);
+      border-color: var(--primary-green);
+      color: #ffffff;
+    }
+
+    .pager-dots {
+      padding: 0 1px;
+      color: var(--text-gray);
+      font-size: 11.5px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <div class="left">
+      <div class="brand">
+        <div class="mark"><img src="../public/favicon-96x96.png" alt="" /></div>
+        <span class="word">SearchTern</span>
+      </div>
+
+      <h1>Internships<br />straight from<br />the source.</h1>
+
+      <p class="sub">
+        Roles pulled directly from <b>45+ company ATS systems</b>, refreshed
+        hourly, with H-1B sponsorship data where available.
+      </p>
+
+      <div class="chips">
+        <span class="chip"><b>22,237</b> live roles</span>
+        <span class="chip"><b>3,837</b> H-1B sponsors</span>
+        <span class="chip">Free &amp; open source</span>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="board">
+        <input class="search-input" placeholder="Search by company, role, or location..." readonly />
+
+        <div class="results-header">
+          <p class="result-count desktop-result-count">22,237 listings found</p>
+          <div class="results-controls">
+            <button class="sort_btn" type="button"><span aria-hidden="true">⇅</span> Newest</button>
+            <button class="sort_btn" type="button">Roles <span aria-hidden="true">▾</span></button>
+            <button class="sort_btn" type="button">
+              <svg viewBox="0 0 256 256" aria-hidden="true">
+                <path fill="currentColor"
+                  d="M216,136H40a8,8,0,0,1,0-16H216a8,8,0,0,1,0,16Zm-40-48H80a8,8,0,0,1,0-16h96a8,8,0,0,1,0,16Zm-32,96H112a8,8,0,0,1,0-16h32a8,8,0,0,1,0,16Z" />
+              </svg>
+              Filters
+            </button>
+          </div>
+        </div>
+
+        <table class="og-table">
+          <colgroup>
+            <col style="width: 132px" />
+            <col />
+            <col style="width: 116px" />
+            <col style="width: 76px" />
+          </colgroup>
+          <thead class="mantine-Table-thead">
+            <tr class="mantine-Table-tr">
+              <th class="mantine-Table-th">Company</th>
+              <th class="mantine-Table-th">Role</th>
+              <th class="mantine-Table-th">Location</th>
+              <th class="mantine-Table-th">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="mantine-Table-tr job-row">
+              <td class="mantine-Table-td company-cell" data-label="Company">
+                <svg class="bookmark-icon" width="17" height="17" viewBox="0 0 256 256" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" stroke-width="16" stroke-linejoin="round"
+                    d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Z" />
+                </svg>
+                <div>
+                  <span class="company-line">
+                    <img class="company-favicon" src="https://www.google.com/s2/favicons?domain=palantir.com&sz=32" alt="" />
+                    Palantir
+                  </span>
+                </div>
+              </td>
+              <td class="mantine-Table-td" data-label="Role">
+                <a class="apply-link" href="https://jobs.lever.co/palantir/cd64bcd4-50bb-4aeb-a135-4e0487ffd312"
+                  target="_blank" rel="noopener noreferrer"
+                  title="Apply at Palantir — opens the employer's site">Software Engineer, Internship - Sovereign AI
+                  Systems</a>
+              </td>
+              <td class="mantine-Table-td" data-label="Location">New York, NY</td>
+              <td class="mantine-Table-td" data-label="Date">
+                <span class="job-row-date">Today
+                  <button type="button" class="job-row-expand" aria-label="Show overview">
+                    <svg viewBox="0 0 256 256" aria-hidden="true">
+                      <path fill="currentColor"
+                        d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z" />
+                    </svg>
+                  </button>
+                </span>
+              </td>
+            </tr>
+
+            <tr class="mantine-Table-tr job-row">
+              <td class="mantine-Table-td company-cell" data-label="Company">
+                <svg class="bookmark-icon" width="17" height="17" viewBox="0 0 256 256" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" stroke-width="16" stroke-linejoin="round"
+                    d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Z" />
+                </svg>
+                <div>
+                  <span class="company-line">
+                    <img class="company-favicon" src="https://www.google.com/s2/favicons?domain=microsoft.com&sz=32" alt="" />
+                    Microsoft
+                  </span>
+                  <span class="company-badges"><span class="h1b-badge">H-1B sponsor</span></span>
+                </div>
+              </td>
+              <td class="mantine-Table-td" data-label="Role">
+                <a class="apply-link" href="https://microsoft.eightfold.ai/careers/job/1970393556982928" target="_blank"
+                  rel="noopener noreferrer" title="Apply at Microsoft — opens the employer's site">Data Science: PhD
+                  Internship Opportunities - Redmond</a>
+              </td>
+              <td class="mantine-Table-td" data-label="Location">Redmond, WA</td>
+              <td class="mantine-Table-td" data-label="Date">
+                <span class="job-row-date">Yesterday
+                  <button type="button" class="job-row-expand" aria-label="Show overview">
+                    <svg viewBox="0 0 256 256" aria-hidden="true">
+                      <path fill="currentColor"
+                        d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z" />
+                    </svg>
+                  </button>
+                </span>
+              </td>
+            </tr>
+
+            <tr class="mantine-Table-tr job-row">
+              <td class="mantine-Table-td company-cell" data-label="Company">
+                <svg class="bookmark-icon" width="17" height="17" viewBox="0 0 256 256" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" stroke-width="16" stroke-linejoin="round"
+                    d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Z" />
+                </svg>
+                <div>
+                  <span class="company-line">
+                    <img class="company-favicon" src="https://www.google.com/s2/favicons?domain=amazon.com&sz=32" alt="" />
+                    Amazon
+                  </span>
+                </div>
+              </td>
+              <td class="mantine-Table-td" data-label="Role">
+                <a class="apply-link" href="https://account.amazon.jobs/jobs/10595839/apply" target="_blank"
+                  rel="noopener noreferrer" title="Apply at Amazon — opens the employer's site">Software Development
+                  Engineer (Embedded Systems) Early Career - 2027 (US)</a>
+              </td>
+              <td class="mantine-Table-td" data-label="Location">Cupertino, California, USA</td>
+              <td class="mantine-Table-td" data-label="Date">
+                <span class="job-row-date">3 days ago
+                  <button type="button" class="job-row-expand" aria-label="Show overview">
+                    <svg viewBox="0 0 256 256" aria-hidden="true">
+                      <path fill="currentColor"
+                        d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z" />
+                    </svg>
+                  </button>
+                </span>
+              </td>
+            </tr>
+
+            <tr class="mantine-Table-tr job-row">
+              <td class="mantine-Table-td company-cell" data-label="Company">
+                <svg class="bookmark-icon" width="17" height="17" viewBox="0 0 256 256" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" stroke-width="16" stroke-linejoin="round"
+                    d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Z" />
+                </svg>
+                <div>
+                  <span class="company-line">
+                    <img class="company-favicon" src="https://www.google.com/s2/favicons?domain=stripe.com&sz=32" alt="" />
+                    Stripe
+                  </span>
+                  <span class="company-badges"><span class="h1b-badge">H-1B sponsor</span></span>
+                </div>
+              </td>
+              <td class="mantine-Table-td" data-label="Role">
+                <a class="apply-link" href="https://stripe.com/jobs/search?gh_jid=8328662" target="_blank"
+                  rel="noopener noreferrer" title="Apply at Stripe — opens the employer's site">PhD Machine Learning
+                  Engineer, Intern</a>
+              </td>
+              <td class="mantine-Table-td" data-label="Location">San Francisco, New York City, Seattle</td>
+              <td class="mantine-Table-td" data-label="Date">
+                <span class="job-row-date">6 days ago
+                  <button type="button" class="job-row-expand" aria-label="Show overview">
+                    <svg viewBox="0 0 256 256" aria-hidden="true">
+                      <path fill="currentColor"
+                        d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z" />
+                    </svg>
+                  </button>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="og-pager">
+          <span class="og-pager-meta">Showing 1–15 of 22,237</span>
+          <div class="og-pager-controls">
+            <button class="pager-btn" type="button" aria-label="Previous page">‹</button>
+            <button class="pager-btn is-active" type="button" aria-current="page">1</button>
+            <button class="pager-btn" type="button">2</button>
+            <button class="pager-btn" type="button">3</button>
+            <span class="pager-dots">…</span>
+            <button class="pager-btn" type="button">1,483</button>
+            <button class="pager-btn" type="button" aria-label="Next page">›</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>
