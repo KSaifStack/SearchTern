@@ -7,7 +7,12 @@ import { BookmarkSimpleIcon, FunnelSimple, CaretLeft, CaretRight, CaretDown, Arr
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
+import { useAuth } from "../components/AuthContext"
 import { makeJobFingerprint } from "../utils/jobFingerprint"
+import {
+  loadLocalJobFilters, saveLocalJobFilters, accountJobFilters, saveAccountJobFilters, sameJobFilters,
+} from "../utils/jobFilterPrefs"
+import type { JobFilterPrefs } from "../utils/jobFilterPrefs"
 import { parseLocation, US_STATES, trimLocations } from "../utils/locationFilter"
 import type { ParsedLocation } from "../utils/locationFilter"
 import { matchCompanyMeta, EMPLOYEE_BUCKETS, inEmployeeBucket } from "../utils/companyMeta"
@@ -73,27 +78,72 @@ function Jobs() {
   const [refreshCountdown, setRefreshCountdown] = useState(() => getSecondsUntilNextHour())
   const debounceRef = useRef<number | undefined>(undefined)
   const [searchText, setSearchText] = useState('')
-  const [sortOrder, setSortOrder] = useState('newest')
-  const [categoryFilters, setCategoryFilters] = useState<string[]>([])
-  const [typeFilters, setTypeFilters] = useState({ internship: true, newgrad: true })
   const [sortOpen, setSortOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [countryFilter, setCountryFilter] = useState('')
-  const [stateFilter, setStateFilter] = useState('')
-  const [faangOnly, setFaangOnly] = useState(false)
-  const [visaSponsorOnly, setVisaSponsorOnly] = useState(false)
-  const [employeeBucket, setEmployeeBucket] = useState<string>('')
-  const [recencyDays, setRecencyDays] = useState(0)
-  const [hideStale, setHideStale] = useState(() => {
-    try {
-      return localStorage.getItem('searchtern-hide-stale') === '1'
-    } catch {
-      // Private mode / blocked storage: the filter is a preference, not a
-      // requirement, so fall back to the default rather than failing the render.
-      return false
+
+  // Filter/sort settings are remembered: this browser's copy seeds the first
+  // render, and a signed-in user's account copy replaces it (see below).
+  const { user } = useAuth()
+  const [initialFilters] = useState(loadLocalJobFilters)
+  const [sortOrder, setSortOrder] = useState(initialFilters.sortOrder)
+  const [categoryFilters, setCategoryFilters] = useState<string[]>(initialFilters.categoryFilters)
+  const [typeFilters, setTypeFilters] = useState(initialFilters.typeFilters)
+  const [countryFilter, setCountryFilter] = useState(initialFilters.countryFilter)
+  const [stateFilter, setStateFilter] = useState(initialFilters.stateFilter)
+  const [faangOnly, setFaangOnly] = useState(initialFilters.faangOnly)
+  const [visaSponsorOnly, setVisaSponsorOnly] = useState(initialFilters.visaSponsorOnly)
+  const [employeeBucket, setEmployeeBucket] = useState<string>(initialFilters.employeeBucket)
+  const [recencyDays, setRecencyDays] = useState(initialFilters.recencyDays)
+  const [hideStale, setHideStale] = useState(initialFilters.hideStale)
+
+  // Key order matches JobFilterPrefs so sameJobFilters' JSON compare is stable.
+  const filterPrefs = useMemo<JobFilterPrefs>(() => ({
+    sortOrder, categoryFilters, typeFilters, countryFilter, stateFilter,
+    faangOnly, visaSponsorOnly, employeeBucket, recencyDays, hideStale,
+  }), [sortOrder, categoryFilters, typeFilters, countryFilter, stateFilter, faangOnly, visaSponsorOnly, employeeBucket, recencyDays, hideStale])
+
+  // On sign-in, the account's saved settings win over this browser's. Done
+  // during render (not in an effect) so the first committed render already
+  // shows them and the save effect below never sees the stale local copy.
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null)
+  const currentUserId = user?.id ?? null
+  if (currentUserId !== hydratedUserId) {
+    setHydratedUserId(currentUserId)
+    const saved = user ? accountJobFilters(user) : null
+    if (saved) {
+      setSortOrder(saved.sortOrder)
+      setCategoryFilters(saved.categoryFilters)
+      setTypeFilters(saved.typeFilters)
+      setCountryFilter(saved.countryFilter)
+      setStateFilter(saved.stateFilter)
+      setFaangOnly(saved.faangOnly)
+      setVisaSponsorOnly(saved.visaSponsorOnly)
+      setEmployeeBucket(saved.employeeBucket)
+      setRecencyDays(saved.recencyDays)
+      setHideStale(saved.hideStale)
+      setPage(1)
     }
-  })
+  }
+
+  useEffect(() => { saveLocalJobFilters(filterPrefs) }, [filterPrefs])
+
+  // Account copy: debounced so clicking through several checkboxes is one
+  // request. If they navigate away mid-debounce, flush it on unmount.
+  const pendingAccountSave = useRef<JobFilterPrefs | null>(null)
+  useEffect(() => {
+    pendingAccountSave.current = null
+    if (!user || sameJobFilters(accountJobFilters(user), filterPrefs)) return
+    pendingAccountSave.current = filterPrefs
+    const t = window.setTimeout(() => {
+      pendingAccountSave.current = null
+      void saveAccountJobFilters(filterPrefs)
+    }, 800)
+    return () => clearTimeout(t)
+  }, [user, filterPrefs])
+  useEffect(() => () => {
+    if (pendingAccountSave.current) void saveAccountJobFilters(pendingAccountSave.current)
+  }, [])
 
   const perPage = 15;
 
@@ -198,6 +248,14 @@ function Jobs() {
       .map(([name]) => name)
   }, [allJobs])
 
+  // A saved role category can disappear from the feed. It would then have no
+  // checkbox to untick yet still filter everything out, so once listings have
+  // loaded, only categories that still exist count.
+  const activeCategoryFilters = useMemo(
+    () => categoryOptions.length ? categoryFilters.filter(c => categoryOptions.includes(c)) : categoryFilters,
+    [categoryFilters, categoryOptions]
+  )
+
   const filtered = useMemo(() => {
     let jobs = allJobs.filter(j => j && j.company)
     jobs = jobs.filter(j => {
@@ -214,7 +272,7 @@ function Jobs() {
     }
     if (countryFilter) jobs = jobs.filter(j => parsedLocations.get(j.id)?.countries.includes(countryFilter))
     if (stateFilter) jobs = jobs.filter(j => parsedLocations.get(j.id)?.states.includes(stateFilter))
-    if (categoryFilters.length) jobs = jobs.filter(j => j.category && categoryFilters.includes(j.category))
+    if (activeCategoryFilters.length) jobs = jobs.filter(j => j.category && activeCategoryFilters.includes(j.category))
     if (!typeFilters.internship) jobs = jobs.filter(j => j.type === 'newgrad')
     if (!typeFilters.newgrad) jobs = jobs.filter(j => j.type !== 'newgrad')
     // === true, not truthy: a stringified "false" must never match.
@@ -242,7 +300,7 @@ function Jobs() {
       const bNum = isNaN(bParsed) ? 999 : bParsed
       return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
-  }, [allJobs, searchText, sortOrder, categoryFilters, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, visaSponsorActive, employeeBucket, hideStale, recencyDays])
+  }, [allJobs, searchText, sortOrder, activeCategoryFilters, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, visaSponsorActive, employeeBucket, hideStale, recencyDays])
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
@@ -266,11 +324,6 @@ function Jobs() {
     setFaangOnly(false)
     setVisaSponsorOnly(false)
     setEmployeeBucket('')
-    try {
-      localStorage.setItem('searchtern-hide-stale', '0')
-    } catch {
-      // Preference just won't survive the session.
-    }
     setPage(1)
   }
 
@@ -429,9 +482,9 @@ function Jobs() {
               <Popover.Target>
                 <button className="sort_btn" onClick={() => setRoleOpen(o => !o)} title="Filter by role category">
                   Roles
-                  {categoryFilters.length > 0 && (
+                  {activeCategoryFilters.length > 0 && (
                     <Badge size="xs" variant="filled" color="teal" className="filters-count">
-                      {categoryFilters.length}
+                      {activeCategoryFilters.length}
                     </Badge>
                   )}
                   <span aria-hidden="true">▾</span>
@@ -440,14 +493,14 @@ function Jobs() {
               <Popover.Dropdown>
                 <div className="filter-option-list">
                   {categoryOptions.map(name => {
-                    const checked = categoryFilters.includes(name)
+                    const checked = activeCategoryFilters.includes(name)
                     return (
                       <label key={name} className="filter-option">
                         <input
                           type="checkbox"
                           name="role"
                           checked={checked}
-                          onChange={() => { setCategoryFilters(checked ? categoryFilters.filter(x => x !== name) : [...categoryFilters, name]); setPage(1) }}
+                          onChange={() => { setCategoryFilters(checked ? activeCategoryFilters.filter(x => x !== name) : [...activeCategoryFilters, name]); setPage(1) }}
                         />
                         {name}
                       </label>
@@ -490,11 +543,6 @@ function Jobs() {
                           type="checkbox"
                           checked={hideStale}
                           onChange={() => {
-                            try {
-                              localStorage.setItem('searchtern-hide-stale', hideStale ? '0' : '1')
-                            } catch {
-                              // Preference just won't survive the session.
-                            }
                             setHideStale(!hideStale)
                             setPage(1)
                           }}
