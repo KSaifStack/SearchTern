@@ -175,16 +175,27 @@ def job_pruned(job_id):
     return found
 
 
-# When the scraper last wrote. Backed by idx_last_seen, so this is an index
-# lookup, not a scan. /health reports it because the scheduler's next_run_time
-# looks healthy even when the process has been dead for days.
+# When the scraper last completed. The run marker is the source of truth;
+# max(last_seen_at) is only a fallback for databases created before the marker
+# existed. /health reports it because the scheduler's next_run_time looks
+# healthy even when the process has been dead for days.
 def last_scrape_at():
     conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("SELECT max(last_seen_at) FROM internships")
-        row = cur.fetchone()
-    conn.close()
-    return row[0] if row else None
+    try:
+        with conn.cursor() as cur:
+            try:
+                cur.execute("SELECT max(ran_at) FROM scrape_runs")
+                row = cur.fetchone()
+                if row and row[0] is not None:
+                    return row[0]
+            except psycopg2.errors.UndefinedTable:
+                conn.rollback()
+
+            cur.execute("SELECT max(last_seen_at) FROM internships")
+            row = cur.fetchone()
+            return row[0] if row else None
+    finally:
+        conn.close()
 
 
 # Search by location

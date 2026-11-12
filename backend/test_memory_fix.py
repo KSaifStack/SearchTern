@@ -139,6 +139,61 @@ class MemoryFixTests(unittest.TestCase):
         self.assertEqual(calls, [])
 
 
+class WriteAmplificationTests(unittest.TestCase):
+    def test_upsert_only_touches_changed_rows(self):
+        sql = scraper._UPSERT_SQL
+        self.assertIn("DO UPDATE", sql)
+        self.assertIn("IS DISTINCT FROM", sql)
+        self.assertIn("last_seen_at = EXCLUDED.last_seen_at", sql)
+
+    def test_closures_use_the_current_run_keyset(self):
+        sql = scraper._PRUNE_MISSING_SQL
+        self.assertIn("scrape_seen", sql)
+        self.assertNotIn("last_seen_at <", sql)
+
+
+class RunMarkerTests(unittest.TestCase):
+    def test_last_scrape_at_prefers_the_run_marker(self):
+        marker = object()
+
+        class FakeReadCursor:
+            def __init__(self):
+                self.query = ""
+                self.row = (marker,)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def execute(self, query, params=None):
+                self.query = query
+
+            def fetchone(self):
+                return self.row
+
+        class FakeReadConnection:
+            def __init__(self):
+                self.cursor_obj = FakeReadCursor()
+                self.closed = False
+
+            def cursor(self):
+                return self.cursor_obj
+
+            def rollback(self):
+                pass
+
+            def close(self):
+                self.closed = True
+
+        connection = FakeReadConnection()
+        with patch.object(read_db, "get_conn", return_value=connection):
+            self.assertIs(read_db.last_scrape_at(), marker)
+        self.assertIn("scrape_runs", connection.cursor_obj.query)
+        self.assertTrue(connection.closed)
+
+
 class SearchTernFeedTests(unittest.TestCase):
     def test_feed_uses_full_listings_copy_and_keeps_category(self):
         # The full listings copy carries the per-listing group/category the app
