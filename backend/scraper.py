@@ -85,6 +85,59 @@ MAX_AGE_DAYS = int(os.environ.get("SCRAPER_MAX_AGE_DAYS", "90"))
 _update_lock = Lock()
 _SCRAPE_ADVISORY_LOCK_ID = 742031
 
+# A scrape runs hourly and most rows are unchanged. Updating every row (and the
+# indexed last_seen_at) rewrites the table and its indexes each hour, which
+# burns Supabase disk IO even when nothing changed. Only touch rows whose
+# visible fields differ; the temp scrape_seen table handles closures without a
+# per-row write.
+_UPSERT_SQL = """
+    INSERT INTO internships (company, role, location, date, link, type, season, ats, description, category, visa_sponsor, last_seen_at)
+    VALUES %s
+    ON CONFLICT (company, role, location, link)
+    DO UPDATE SET
+        date = EXCLUDED.date,
+        type = EXCLUDED.type,
+        season = EXCLUDED.season,
+        ats = EXCLUDED.ats,
+        description = EXCLUDED.description,
+        category = EXCLUDED.category,
+        visa_sponsor = EXCLUDED.visa_sponsor,
+        last_seen_at = EXCLUDED.last_seen_at
+    WHERE (
+        internships.date,
+        internships.type,
+        internships.season,
+        internships.ats,
+        internships.description,
+        internships.category,
+        internships.visa_sponsor
+    ) IS DISTINCT FROM (
+        EXCLUDED.date,
+        EXCLUDED.type,
+        EXCLUDED.season,
+        EXCLUDED.ats,
+        EXCLUDED.description,
+        EXCLUDED.category,
+        EXCLUDED.visa_sponsor
+    )
+"""
+
+_PRUNE_MISSING_SQL = """
+    WITH gone AS (
+        DELETE FROM internships AS i
+        WHERE NOT EXISTS (
+            SELECT 1 FROM scrape_seen AS s
+            WHERE s.company = i.company
+              AND s.role = i.role
+              AND s.location = i.location
+              AND s.link = i.link
+        )
+        RETURNING i.id
+    )
+    INSERT INTO pruned_job_ids (id) SELECT id FROM gone
+    ON CONFLICT (id) DO NOTHING
+"""
+
 
 def clean_text(text):
     text = text.replace("\u21b3", "")
@@ -619,6 +672,16 @@ def _update_database():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_role ON internships(role)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_internships_location ON internships(location)")
 
+        # Health checks need the last successful run, not the last row that
+        # happened to change. Keeping this tiny marker avoids touching every
+        # listing just to prove the scraper is alive.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS scrape_runs (
+                id BIGSERIAL PRIMARY KEY,
+                ran_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+
         listing_count = len(in_range)
         del all_jobs, seen, deduped, valid_link, us_jobs
 
@@ -646,23 +709,31 @@ def _update_database():
             (MAX_AGE_DAYS,),
         )
 
-        upsert_query = """
-            INSERT INTO internships (company, role, location, date, link, type, season, ats, description, category, visa_sponsor, last_seen_at)
-            VALUES %s
-            ON CONFLICT (company, role, location, link)
-            DO UPDATE SET
-                date = EXCLUDED.date,
-                type = EXCLUDED.type,
-                season = EXCLUDED.season,
-                ats = EXCLUDED.ats,
-                description = EXCLUDED.description,
-                category = EXCLUDED.category,
-                visa_sponsor = EXCLUDED.visa_sponsor,
-                last_seen_at = EXCLUDED.last_seen_at
-        """
+        # The current run's keys, used to close rows that disappeared from
+        # every source. This is deliberately separate from last_seen_at, which
+        # now changes only when a row actually changes.
+        cursor.execute("""
+            CREATE TEMP TABLE scrape_seen (
+                company TEXT,
+                role TEXT,
+                location TEXT,
+                link TEXT
+            ) ON COMMIT DROP
+        """)
         execute_values(
             cursor,
-            upsert_query,
+            "INSERT INTO scrape_seen (company, role, location, link) VALUES %s",
+            (
+                (job["company"], job["role"], job["location"], job["link"])
+                for job in in_range
+            ),
+            page_size=1000,
+        )
+        cursor.execute("ANALYZE scrape_seen")
+
+        execute_values(
+            cursor,
+            _UPSERT_SQL,
             (
                 (job["company"], job["role"], job["location"], job["date"], job["link"], job["type"], job["season"], job.get("ats", ""), job.get("description"), job.get("category"), bool(job.get("visa_sponsor")), current_run_time)
                 for job in in_range
@@ -671,22 +742,16 @@ def _update_database():
         )
         del in_range
 
-        cursor.execute("""
-            WITH gone AS (
-                DELETE FROM internships
-                WHERE last_seen_at < %s
-                RETURNING id
-            )
-            INSERT INTO pruned_job_ids (id) SELECT id FROM gone
-            ON CONFLICT (id) DO NOTHING
-            """, (current_run_time,))
+        cursor.execute(_PRUNE_MISSING_SQL)
+
+        cursor.execute("INSERT INTO scrape_runs (ran_at) VALUES (%s)", (current_run_time,))
 
         # Ids older than the age cap are indistinguishable from ids we never had,
         # so keeping them longer only grows the table.
         cursor.execute("DELETE FROM pruned_job_ids WHERE pruned_at < now() - interval '90 days'")
 
         conn.commit()
-        return f"Done! {listing_count} listings upserted."
+        return f"Done! {listing_count} listings seen."
     finally:
         conn.close()
 

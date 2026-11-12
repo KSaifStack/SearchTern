@@ -2,6 +2,11 @@ import { useEffect } from "react"
 
 export const SITE_URL = "https://searchtern.net"
 
+// Kept as its own constant because the filename is the cache key: platforms pin
+// a preview image to the URL it was scraped from, so a new picture ships under a
+// new name (see the note in index.html).
+export const OG_IMAGE = `${SITE_URL}/og-image-white.png`
+
 export interface PageMeta {
     title: string
     description: string
@@ -52,14 +57,14 @@ export function usePageMeta(meta: PageMeta) {
         upsertMeta("property", "og:title", title)
         upsertMeta("property", "og:description", description)
         upsertMeta("property", "og:url", url)
-        upsertMeta("property", "og:image", `${SITE_URL}/og-image.png`)
+        upsertMeta("property", "og:image", OG_IMAGE)
         upsertMeta("property", "og:image:type", "image/png")
         upsertMeta("property", "og:image:width", "1200")
         upsertMeta("property", "og:image:height", "630")
         upsertMeta("name", "twitter:card", "summary_large_image")
         upsertMeta("name", "twitter:title", title)
         upsertMeta("name", "twitter:description", description)
-        upsertMeta("name", "twitter:image", `${SITE_URL}/og-image.png`)
+        upsertMeta("name", "twitter:image", OG_IMAGE)
         upsertJsonLd(jsonLd ?? null)
     }, [title, description, path, jsonLdKey])
 }
