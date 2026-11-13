@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useMemo, Fragment } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Link } from "react-router-dom"
-import { Table, Pagination, Popover, Text, Select, Badge } from '@mantine/core'
+import { Pagination, Popover, Text, Select, Badge } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { checkHealth, fetchSources, pullJob } from "../api/internships"
-import { BookmarkSimpleIcon, FunnelSimple, CaretLeft, CaretRight, CaretDown, ArrowSquareOut } from '@phosphor-icons/react';
+import { checkHealth, fetchSources } from "../api/internships"
+import { BookmarkSimpleIcon, FunnelSimple, CaretLeft, CaretRight, ArrowSquareOut, ListBullets, SquaresFour, MapPin, Clock, Briefcase, Tag, CurrencyDollar } from '@phosphor-icons/react';
+import type { Icon } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
 import { useTracker } from "../components/TrackerContext"
@@ -12,7 +13,7 @@ import { parseLocation, US_STATES, trimLocations } from "../utils/locationFilter
 import type { ParsedLocation } from "../utils/locationFilter"
 import { matchCompanyMeta, EMPLOYEE_BUCKETS, inEmployeeBucket } from "../utils/companyMeta"
 import { CompanyFavicon } from "../components/CompanyFavicon"
-import { parseJobDescription } from "../utils/jobDescription"
+import { estimateSalary } from "../utils/salaryEstimate"
 
 interface Job {
   id: number
@@ -36,6 +37,32 @@ const RECENCY_OPTIONS = [
   { days: 30, label: 'Past 30 days' },
 ]
 
+// Explorer-style layouts. Tiles trade density for detail, so each view carries
+// its own page size: the compact list shows more listings per page.
+type ViewMode = 'tiles' | 'list'
+const VIEW_MODES: { value: ViewMode; label: string; hint: string; perPage: number; icon: Icon }[] = [
+  { value: 'tiles', label: 'Tiles', hint: 'Full details, 24 per page', perPage: 24, icon: SquaresFour },
+  { value: 'list', label: 'List', hint: 'Compact, 60 per page', perPage: 60, icon: ListBullets },
+]
+const VIEW_STORAGE_KEY = 'searchtern-jobs-view'
+
+function readStoredView(): ViewMode {
+  try {
+    const v = localStorage.getItem(VIEW_STORAGE_KEY)
+    if (VIEW_MODES.some(m => m.value === v)) return v as ViewMode
+  } catch {
+    // Blocked storage: fall through to the default layout.
+  }
+  return 'tiles'
+}
+
+function formatSeason(season?: string): string | null {
+  if (!season || season === 'searchtern') return null
+  if (season === 'offseason') return 'Off-season'
+  return /^\d{4}$/.test(season) ? `Summer ${season}` : season
+}
+
+
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
   { value: 'oldest', label: 'Oldest' },
@@ -54,10 +81,6 @@ function isStale(j: Job): boolean {
 }
 function jobKey(c: string, r: string, l: string): string {
   return [c, r, l].map(s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim()).join('|')
-}
-function clampPreview(text: string, max = 320): string {
-  const s = text.replace(/\s+/g, ' ').trim()
-  return s.length <= max ? s : s.slice(0, max).replace(/\s+\S*$/, '') + '…'
 }
 
 function Jobs() {
@@ -95,30 +118,23 @@ function Jobs() {
     }
   })
 
-  const perPage = 15;
+  const [viewMode, setViewMode] = useState<ViewMode>(readStoredView)
+  const [viewOpen, setViewOpen] = useState(false)
+  const activeView = VIEW_MODES.find(m => m.value === viewMode) ?? VIEW_MODES[0]
+  const perPage = activeView.perPage
 
-  const [expandedKey, setExpandedKey] = useState<string | null>(null)
-  const [detailCache, setDetailCache] = useState<Record<string, { description: string | null; status: 'loading' | 'ready' | 'error' }>>({})
-
-  // Backend ids rotate every scrape, so cache/expand state is keyed by the
-  // stable content fingerprint and only uses the id for the one-off fetch.
-  function toggleExpand(job: Job) {
-    const key = makeJobFingerprint(job.company, job.role, job.location)
-    if (expandedKey === key) {
-      setExpandedKey(null)
-      return
-    }
-    setExpandedKey(key)
-    if (!detailCache[key]) {
-      setDetailCache(prev => ({ ...prev, [key]: { description: null, status: 'loading' } }))
-      pullJob(job.id).then(res => {
-        setDetailCache(prev => ({
-          ...prev,
-          [key]: res
-            ? { description: res.description ?? null, status: 'ready' }
-            : { description: null, status: 'error' }
-        }))
-      })
+  // Keep the first listing on screen visible across a layout change instead of
+  // jumping back to page 1 (or past the end, since page sizes differ).
+  function changeView(next: ViewMode) {
+    const nextPer = VIEW_MODES.find(m => m.value === next)!.perPage
+    const firstIndex = (page - 1) * perPage
+    setViewMode(next)
+    setPage(Math.floor(firstIndex / nextPer) + 1)
+    setViewOpen(false)
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, next)
+    } catch {
+      // Preference just won't survive the session.
     }
   }
 
@@ -244,8 +260,8 @@ function Jobs() {
     })
   }, [allJobs, searchText, sortOrder, categoryFilters, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, visaSponsorActive, employeeBucket, hideStale, recencyDays])
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
-  const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered, perPage])
+  const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page, perPage])
 
   const activeFilterCount =
     (recencyDays > 0 ? 1 : 0) +
@@ -319,6 +335,151 @@ function Jobs() {
         autoClose: 3000,
       });
     }
+  }
+
+  function renderSaveButton(job: Job, size: number) {
+    const tracked = isJobTracked(job.company, job.role, job.location)
+    return (
+      <button
+        type="button"
+        className="job-card-save"
+        onClick={(e) => { e.stopPropagation(); toggleSave(job) }}
+        aria-pressed={tracked}
+        aria-label={tracked ? `Remove ${job.company} from tracker` : `Save ${job.company} to tracker`}
+        title={tracked ? 'Saved to tracker' : 'Save to tracker'}
+      >
+        <BookmarkSimpleIcon
+          size={size}
+          weight={tracked ? 'fill' : 'regular'}
+          color={tracked ? 'var(--accent-color)' : 'currentColor'}
+        />
+      </button>
+    )
+  }
+
+  function renderCardViews() {
+    if (loading) return <p className="empty-state job-view-empty">Loading...</p>
+    if (paginated.length === 0) return <p className="empty-state job-view-empty">No listings found!</p>
+
+    if (viewMode === 'list') {
+      return (
+        <ul className="job-list">
+          {paginated.map(job => (
+            <li key={job.id} className="job-list-item" style={{ opacity: isStale(job) ? 0.55 : 1 }}>
+              {renderSaveButton(job, 18)}
+              <CompanyFavicon company={job.company} />
+              <span className="job-list-main">
+                <span className="job-list-company">{job.company}</span>
+                <a
+                  href={job.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="apply-link job-list-role"
+                  title={`${job.role} — apply at ${job.company}`}
+                >
+                  {job.role}
+                </a>
+              </span>
+              <span className="job-list-date">{formatRelativeDate(job.date)}</span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+
+    return (
+      <div className="job-grid">
+        {paginated.map(job => {
+          const stale = isStale(job)
+          const repost = (freshness.get(jobKey(job.company, job.role, job.location)) || 0) > 1
+          const meta = matchCompanyMeta(job.company)
+          const season = formatSeason(job.season)
+          const typeLabel = job.type === 'newgrad' ? 'New Grad' : 'Internship'
+          const salary = estimateSalary({
+            category: job.category,
+            type: job.type,
+            topTier: meta?.faang === true,
+            inUS: parsedLocations.get(job.id)?.countries.includes('United States') === true,
+          })
+          return (
+            <article key={job.id} className="job-card" style={{ opacity: stale ? 0.6 : 1 }}>
+              <header className="job-card-header">
+                <CompanyFavicon company={job.company} />
+                <span className="job-card-company" title={job.company}>{job.company}</span>
+                {renderSaveButton(job, 20)}
+              </header>
+
+              <a
+                href={job.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="apply-link job-card-role"
+                title={`Apply at ${job.company} — opens the employer's site`}
+              >
+                {job.role}
+              </a>
+
+              {salary ? (
+                <span className="job-card-salary" title={salary.explanation}>
+                  <CurrencyDollar size={14} weight="bold" aria-hidden="true" />
+                  {salary.label}
+                  <span className="visually-hidden-text"> ({salary.explanation})</span>
+                </span>
+              ) : (
+                <span
+                  className="job-card-salary job-card-salary-unknown"
+                  title="This listing doesn't include pay, and there isn't enough info (US location + role category) to estimate it."
+                >
+                  <CurrencyDollar size={14} weight="bold" aria-hidden="true" />
+                  Pay unknown
+                </span>
+              )}
+
+              <ul className="job-card-facts">
+                <li title={job.location}>
+                  <MapPin size={14} weight="bold" aria-hidden="true" />
+                  <span className="job-card-fact-text">{trimLocations(job.location) || 'Location not listed'}</span>
+                </li>
+                <li>
+                  <Clock size={14} weight="bold" aria-hidden="true" />
+                  <span className="job-card-fact-text">
+                    {formatRelativeDate(job.date) === 'N/A' ? 'Post date unknown' : `Posted ${formatRelativeDate(job.date).toLowerCase()}`}
+                  </span>
+                </li>
+                <li>
+                  <Briefcase size={14} weight="bold" aria-hidden="true" />
+                  <span className="job-card-fact-text">{typeLabel}{season ? ` · ${season}` : ''}</span>
+                </li>
+                {job.category && (
+                  <li>
+                    <Tag size={14} weight="bold" aria-hidden="true" />
+                    <span className="job-card-fact-text">{job.category}</span>
+                  </li>
+                )}
+              </ul>
+
+              {(stale || repost || job.visa_sponsor === true || meta?.faang) && (
+                <div className="job-card-badges">
+                  {job.visa_sponsor === true && <Badge size="xs" variant="light" color="teal">H-1B sponsor</Badge>}
+                  {meta?.faang && <Badge size="xs" variant="light" color="blue">FAANG+</Badge>}
+                  {repost && <Badge size="xs" variant="light" color="yellow">Reposted</Badge>}
+                  {stale && <Badge size="xs" variant="light" color="gray">Likely filled</Badge>}
+                </div>
+              )}
+
+              <footer className="job-card-footer">
+                <a href={job.link} target="_blank" rel="noreferrer" className="inline-job-detail-apply">
+                  Apply <ArrowSquareOut size={14} weight="bold" />
+                </a>
+                <Link to={`/jobs/${job.id}`} className="inline-job-detail-link">
+                  {job.has_overview ? 'View overview →' : 'View listing →'}
+                </Link>
+              </footer>
+            </article>
+          )
+        })}
+      </div>
+    )
   }
 
   return (
@@ -596,147 +757,44 @@ function Jobs() {
                 </div>
               </Popover.Dropdown>
             </Popover>
+
+            <Popover opened={viewOpen} onChange={setViewOpen} width={220} position="bottom-end" withArrow shadow="md">
+              <Popover.Target>
+                <button
+                  className="sort_btn view_btn"
+                  onClick={() => setViewOpen(o => !o)}
+                  title="Change how listings are displayed"
+                  aria-label={`Display (currently ${activeView.label})`}
+                >
+                  <activeView.icon size={16} weight="bold" />
+                  <span className="view_btn-label">Display</span>
+                  <span aria-hidden="true">▾</span>
+                </button>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <div className="view-option-list" role="radiogroup" aria-label="Listing layout">
+                  {VIEW_MODES.map(mode => (
+                    <button
+                      key={mode.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={viewMode === mode.value}
+                      className={`view-option${viewMode === mode.value ? ' view-option-active' : ''}`}
+                      onClick={() => changeView(mode.value)}
+                    >
+                      <mode.icon size={18} weight={viewMode === mode.value ? 'fill' : 'regular'} />
+                      <span className="view-option-text">
+                        <span className="view-option-label">{mode.label}</span>
+                        <span className="view-option-hint">{mode.hint}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </Popover.Dropdown>
+            </Popover>
           </div>
         </div>
-        <Table striped highlightOnHover mt="md">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Company</Table.Th>
-              <Table.Th>Role</Table.Th>
-              <Table.Th>Location</Table.Th>
-              <Table.Th>Date</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {loading ? (
-              <Table.Tr>
-                <Table.Td colSpan={4} className="empty-state">Loading...</Table.Td>
-              </Table.Tr>
-            ) : paginated.length === 0 ? (
-              <Table.Tr>
-                <Table.Td colSpan={4} className="empty-state">No listings found!</Table.Td>
-              </Table.Tr>
-            ) : (
-              paginated.map(job => {
-                const stale = isStale(job)
-                const repost = (freshness.get(jobKey(job.company, job.role, job.location)) || 0) > 1
-                const rowKey = makeJobFingerprint(job.company, job.role, job.location)
-                const expanded = expandedKey === rowKey
-                const detail = detailCache[rowKey]
-                // Strictly gated: only a listing whose feed row reports an
-                // overview gets a control. Without the flag (an older API) the
-                // arrow stays hidden rather than opening an empty dropdown.
-                const canExpand = job.has_overview === true
-                return (
-                  <Fragment key={job.id}>
-                    <Table.Tr
-                      className="job-row"
-                      style={{ opacity: stale ? 0.55 : 1 }}
-                    >
-                      <Table.Td className="company-cell" data-label="Company">
-                        <BookmarkSimpleIcon
-                          size={25}
-                          className="bookmark-icon"
-                          weight={isJobTracked(job.company, job.role, job.location) ? "fill" : "regular"}
-                          color={isJobTracked(job.company, job.role, job.location) ? "var(--accent-color)" : "currentColor"}
-                          onClick={(e) => { e.stopPropagation(); toggleSave(job) }}
-                        />
-                        <div>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <CompanyFavicon company={job.company} />
-                            {job.company}
-                          </span>
-                          {(stale || repost || job.visa_sponsor === true) && (
-                            <span style={{ display: 'flex', gap: 4, marginTop: 2 }}>
-                              {stale && <Badge size="xs" variant="light" color="gray">Likely filled</Badge>}
-                              {repost && <Badge size="xs" variant="light" color="yellow">Reposted</Badge>}
-                              {job.visa_sponsor === true && <Badge size="xs" variant="light" color="teal">H-1B sponsor</Badge>}
-                            </span>
-                          )}
-                        </div>
-                      </Table.Td>
-                      <Table.Td data-label="Role">
-                        <a
-                          href={job.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="apply-link"
-                          title={`Apply at ${job.company} — opens the employer's site`}
-                        >
-                          {job.role}
-                        </a>
-                      </Table.Td>
-                      <Table.Td data-label="Location">{trimLocations(job.location)}</Table.Td>
-                      <Table.Td data-label="Date">
-                        <span className="job-row-date">
-                          {formatRelativeDate(job.date)}
-                          {canExpand && (
-                            <button
-                              type="button"
-                              className="job-row-expand"
-                              onClick={() => toggleExpand(job)}
-                              aria-expanded={expanded}
-                              aria-controls={`job-overview-${job.id}`}
-                              aria-label={expanded ? `Hide overview for ${job.role}` : `Show overview for ${job.role}`}
-                              title={expanded ? 'Hide overview' : 'Show overview'}
-                            >
-                              <CaretDown size={14} weight="bold" className={`job-row-caret${expanded ? ' job-row-caret-open' : ''}`} />
-                            </button>
-                          )}
-                        </span>
-                      </Table.Td>
-                    </Table.Tr>
-                    {expanded && (
-                      <Table.Tr className="job-detail-row" id={`job-overview-${job.id}`}>
-                        <Table.Td colSpan={4} className="job-detail-cell">
-                          <div className="inline-job-detail">
-                            <div className="inline-job-detail-header">
-                              <span className="inline-job-detail-title">Quick glance</span>
-                              <a
-                                href={job.link}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-job-detail-apply"
-                                onClick={e => e.stopPropagation()}
-                              >
-                                Apply <ArrowSquareOut size={14} weight="bold" />
-                              </a>
-                            </div>
-                            {!detail || detail.status === 'loading' ? (
-                              <p className="inline-job-detail-body inline-job-detail-muted">Loading details...</p>
-                            ) : detail.status === 'error' || !detail.description ? (
-                              <p className="inline-job-detail-body inline-job-detail-muted">No description provided for this listing — check the full listing for details.</p>
-                            ) : (() => {
-                              const sections = parseJobDescription(detail.description)
-                              if (sections.length === 0) {
-                                return <p className="inline-job-detail-body">{clampPreview(detail.description)}</p>
-                              }
-                              return (
-                                <div className="inline-job-detail-sections">
-                                  {sections.map(section => (
-                                    <div key={section.label} className="inline-job-detail-section">
-                                      <span className="inline-job-detail-section-label">{section.label}</span>
-                                      <ul className="inline-job-detail-list">
-                                        {section.items.map((item, i) => <li key={i}>{item}</li>)}
-                                      </ul>
-                                    </div>
-                                  ))}
-                                </div>
-                              )
-                            })()}
-                            <Link to={`/jobs/${job.id}`} className="inline-job-detail-link" onClick={e => e.stopPropagation()}>
-                              View full listing →
-                            </Link>
-                          </div>
-                        </Table.Td>
-                      </Table.Tr>
-                    )}
-                  </Fragment>
-                )
-              })
-            )}
-          </Table.Tbody>
-        </Table>
+        {renderCardViews()}
 
         <Pagination
           total={totalPages}
