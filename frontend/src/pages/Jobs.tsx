@@ -300,7 +300,7 @@ function Jobs() {
       const bNum = isNaN(bParsed) ? 999 : bParsed
       return sortOrder === 'newest' ? aNum - bNum : bNum - aNum
     })
-  }, [allJobs, searchText, sortOrder, activeCategoryFilters, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, visaSponsorActive, employeeBucket, hideStale, recencyDays])
+  }, [allJobs, searchText, sortOrder, categoryFilters, typeFilters, countryFilter, stateFilter, parsedLocations, faangOnly, visaSponsorActive, employeeBucket, hideStale, recencyDays])
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filtered.length / perPage)), [filtered])
   const paginated = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page])
