@@ -100,7 +100,7 @@ function App() {
                                                 description: "Browse thousands of active software engineering internships and new-grad positions. Filter by company, role, location, FAANG status, and company size.",
                                                 path: "/jobs",
                                             }} />
-                                            <main className="standard-layout"><Jobs /></main>
+                                            <main className="full-width-layout"><Jobs /></main>
                                         </>
                                     }
                                 />

@@ -236,6 +236,16 @@
   color: var(--white);
 }
 
+/* Status popover. Source names carry long unbreakable tokens
+   ("Eightfold/Oracle/iCIMS/ADP/BambooHR/WorkforceNow"), which used to push past
+   the dropdown edge and leak over the listing rows. Let them wrap, and keep the
+   panel inside the viewport on narrow screens. */
+.health-popover {
+  max-width: min(320px, calc(100vw - 24px));
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 
 .company-cell {
   display: flex;
@@ -410,62 +420,25 @@
   text-decoration: underline;
 }
 
-/* ---- Layout switcher (Details / List / Tiles / Large cards) ---- */
+/* ---- Layout switcher: one icon button per layout ---- */
 
-.view-option-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-/* Reset the global button rule (green fill + hover lift). */
-.view-option {
-  display: flex;
+.view-toggle {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  margin: 0;
-  padding: 7px 8px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-dark);
-  text-align: left;
-  cursor: pointer;
+  gap: 6px;
 }
 
-.view-option:hover {
-  background: var(--hover-bg);
-  color: var(--text-dark);
-  transform: none;
-  box-shadow: none;
+/* Icon-only: .sort_btn already supplies the pill shape, border and hover fill. */
+.view_toggle_btn {
+  padding: 6px 9px;
+  color: var(--text-slate);
 }
 
-.view-option-active,
-.view-option-active:hover {
+.view_toggle_btn-active,
+.view_toggle_btn-active:hover {
+  border-color: var(--primary-green);
   background: var(--primary-green-light);
   color: var(--primary-green);
-}
-
-.view-option:focus-visible {
-  outline: 2px solid var(--primary-green);
-  outline-offset: 1px;
-}
-
-.view-option-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.25;
-}
-
-.view-option-label {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.view-option-hint {
-  font-size: 11.5px;
-  color: var(--text-muted);
 }
 
 .job-view-empty {
@@ -602,13 +575,6 @@
   color: var(--primary-green);
 }
 
-.job-card-salary-unknown,
-[data-theme="dark"] .job-card-salary-unknown {
-  background: var(--hover-bg);
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
 .visually-hidden-text {
   position: absolute;
   width: 1px;
@@ -697,10 +663,6 @@
 }
 
 @media (max-width: 640px) {
-  .view_btn-label {
-    display: none;
-  }
-
   .job-grid {
     grid-template-columns: minmax(0, 1fr);
   }

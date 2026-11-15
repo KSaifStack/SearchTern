@@ -307,29 +307,65 @@
   border-width: 1px;
 }
 
-.landing-preview .mantine-Table-th {
-  padding: 8px 10px;
-  font-size: 0.7rem;
-}
-
-.landing-preview .mantine-Table-td {
-  padding: 9px 10px;
+.landing-preview .apply-link {
   font-size: 0.8rem;
 }
 
-.landing-preview .company-cell {
-  gap: 0.45rem;
-  font-size: 0.8rem;
+/* The same tiles the live board renders, scaled down to fit the frame. */
+.landing-preview .job-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.6rem;
 }
 
-.landing-preview .bookmark-icon {
-  width: 18px;
-  height: 18px;
+.landing-preview .job-card {
+  gap: 0.35rem;
+  padding: 0.7rem;
+}
+
+.landing-preview .job-card-company {
+  font-size: 0.78rem;
+}
+
+.landing-preview .job-card-role.apply-link {
+  font-size: 0.78rem;
+}
+
+.landing-preview .job-card-salary {
+  padding: 1px 7px;
+  font-size: 0.66rem;
+}
+
+.landing-preview .job-card-save {
   cursor: default;
 }
 
-.landing-preview .apply-link {
-  font-size: 0.8rem;
+.landing-preview .job-card-facts {
+  gap: 0.15rem;
+  font-size: 0.68rem;
+}
+
+.landing-preview .job-card-facts li {
+  gap: 0.3rem;
+}
+
+.landing-preview .job-card-facts svg {
+  width: 12px;
+  height: 12px;
+}
+
+.landing-preview .job-card-footer {
+  gap: 0.4rem;
+  padding-top: 0.45rem;
+}
+
+.landing-preview .inline-job-detail-apply {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.7rem;
+}
+
+.landing-preview .inline-job-detail-link {
+  font-size: 0.7rem;
 }
 
 .landing-preview-tracker-stats {
@@ -426,10 +462,10 @@
 }
 
 /* The selected feature card outlines the part of the real UI it describes. */
-.landing-preview-focus-browse .mantine-Table-root,
+.landing-preview-focus-browse .job-grid,
 .landing-preview-focus-filters .results-controls,
 .landing-preview-focus-fresh .results-header,
-.landing-preview-focus-save .mantine-Table-tbody tr:first-child .company-cell,
+.landing-preview-focus-save .job-card:first-child .job-card-header,
 .landing-preview-focus-progress .landing-preview-tracker-stats,
 .landing-preview-focus-details .tracker-card,
 .landing-preview-focus-counts .tracker-column:first-child .column-header,
@@ -501,6 +537,11 @@
 @media (max-width: 760px) {
   .landing-preview-tracker .tracker-board {
     min-width: 40rem;
+  }
+
+  /* Keep the three-up grid and let the frame scroll, like the tracker board. */
+  .landing-preview .job-grid {
+    min-width: 46rem;
   }
 
   /* Same stack the tracker uses on small screens. */

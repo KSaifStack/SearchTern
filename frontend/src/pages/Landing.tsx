@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { RingProgress, Table, Text } from "@mantine/core";
-import { BookmarkSimpleIcon, FunnelSimple } from "@phosphor-icons/react";
+import { RingProgress, Text } from "@mantine/core";
+import {
+  BookmarkSimpleIcon, FunnelSimple, SquaresFour, ListBullets,
+  MapPin, Clock, Briefcase, Tag, CurrencyDollar,
+} from "@phosphor-icons/react";
 import { pullCount } from "../api/internships";
 import { CompanyFavicon } from "../components/CompanyFavicon";
 import { JobCard, STATUS_COLORS } from "../components/JobCard";
@@ -53,11 +56,27 @@ const SAMPLE_TRACKED: Record<JobStatus, TrackedJob[]> = {
 
 const SAMPLE_BOARD_ORDER: JobStatus[] = ["Saved", "Applied", "Interview", "Offer", "Rejected"];
 
-// Rows for the Jobs preview — same columns the live table renders.
-const SAMPLE_LISTINGS = [
-  { company: "Google", role: "Software Engineer Intern", location: "Mountain View, CA", date: "Today", saved: true },
-  { company: "Microsoft", role: "Software Engineer Intern", location: "Redmond, WA", date: "Yesterday", saved: false },
-  { company: "Spotify", role: "Frontend Engineer", location: "New York, NY", date: "2 days ago", saved: false },
+// Tiles for the Jobs preview — the same card markup the live board renders,
+// including the conditional pay pill and the role-category fact.
+type SampleListing = {
+  company: string;
+  role: string;
+  location: string;
+  posted: string;
+  type: string;
+  season?: string;
+  category?: string;
+  pay?: string;
+  saved?: boolean;
+};
+
+const SAMPLE_LISTINGS: SampleListing[] = [
+  { company: "Google", role: "Software Engineer Intern", location: "Mountain View, CA", posted: "Today", type: "Internship", season: "Summer 2027", category: "Software Engineering", pay: "Est. $45–$60/hr", saved: true },
+  { company: "Microsoft", role: "Software Engineer Intern", location: "Redmond, WA", posted: "Yesterday", type: "Internship", season: "Summer 2027", category: "Software Engineering", pay: "Est. $42–$55/hr" },
+  { company: "Stripe", role: "Backend Engineer Intern", location: "San Francisco, CA", posted: "2 days ago", type: "Internship", season: "Summer 2027", category: "Software Engineering", pay: "Est. $50–$65/hr" },
+  { company: "Airbnb", role: "Product Design Intern", location: "San Francisco, CA", posted: "3 days ago", type: "Internship", season: "Summer 2027", category: "Product/Design" },
+  { company: "Spotify", role: "Frontend Engineer", location: "New York, NY", posted: "4 days ago", type: "New Grad", category: "Software Engineering", pay: "Est. $48–$62/hr" },
+  { company: "IBM", role: "Data Analyst Intern", location: "Remote", posted: "5 days ago", type: "Internship", season: "Summer 2027", category: "Data/ML/AI", pay: "Est. $30–$42/hr" },
 ];
 
 const DEMO_PRODUCTS = [
@@ -191,55 +210,80 @@ function Landing() {
                       </p>
                     )}
                     <div className="results-controls">
-                      <button className="sort_btn" type="button" tabIndex={-1}>
+                      <span className="sort_btn">
                         <span aria-hidden="true">⇅</span> Newest
-                      </button>
-                      <button className="sort_btn" type="button" tabIndex={-1}>
+                      </span>
+                      <span className="sort_btn">
                         Roles <span aria-hidden="true">▾</span>
-                      </button>
-                      <button className="sort_btn" type="button" tabIndex={-1}>
+                      </span>
+                      <span className="sort_btn">
                         <FunnelSimple size={16} weight="bold" /> Filters
-                      </button>
+                      </span>
+                      <span className="view-toggle">
+                        <span className="sort_btn view_toggle_btn view_toggle_btn-active">
+                          <SquaresFour size={18} weight="fill" />
+                        </span>
+                        <span className="sort_btn view_toggle_btn">
+                          <ListBullets size={18} />
+                        </span>
+                      </span>
                     </div>
                   </div>
 
-                  <Table striped highlightOnHover mt="md">
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>Company</Table.Th>
-                        <Table.Th>Role</Table.Th>
-                        <Table.Th>Location</Table.Th>
-                        <Table.Th>Date</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {SAMPLE_LISTINGS.map((listing) => (
-                        <Table.Tr className="job-row" key={`${listing.company}-${listing.role}`}>
-                          <Table.Td className="company-cell" data-label="Company">
+                  <div className="job-grid">
+                    {SAMPLE_LISTINGS.map((listing) => (
+                      <article className="job-card" key={`${listing.company}-${listing.role}`}>
+                        <div className="job-card-header">
+                          <CompanyFavicon company={listing.company} />
+                          <span className="job-card-company">{listing.company}</span>
+                          <span className="job-card-save">
                             <BookmarkSimpleIcon
-                              size={25}
-                              className="bookmark-icon"
+                              size={20}
                               weight={listing.saved ? "fill" : "regular"}
                               color={listing.saved ? "var(--accent-color)" : "currentColor"}
                             />
-                            <div>
-                              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <CompanyFavicon company={listing.company} />
-                                {listing.company}
-                              </span>
-                            </div>
-                          </Table.Td>
-                          <Table.Td data-label="Role">
-                            <span className="apply-link">{listing.role}</span>
-                          </Table.Td>
-                          <Table.Td data-label="Location">{listing.location}</Table.Td>
-                          <Table.Td data-label="Date">
-                            <span className="job-row-date">{listing.date}</span>
-                          </Table.Td>
-                        </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
+                          </span>
+                        </div>
+
+                        <span className="apply-link job-card-role">{listing.role}</span>
+
+                        {listing.pay && (
+                          <span className="job-card-salary">
+                            <CurrencyDollar size={14} weight="bold" aria-hidden="true" />
+                            {listing.pay}
+                          </span>
+                        )}
+
+                        <ul className="job-card-facts">
+                          <li>
+                            <MapPin size={14} weight="bold" aria-hidden="true" />
+                            <span className="job-card-fact-text">{listing.location}</span>
+                          </li>
+                          <li>
+                            <Clock size={14} weight="bold" aria-hidden="true" />
+                            <span className="job-card-fact-text">Posted {listing.posted.toLowerCase()}</span>
+                          </li>
+                          <li>
+                            <Briefcase size={14} weight="bold" aria-hidden="true" />
+                            <span className="job-card-fact-text">
+                              {listing.type}{listing.season ? ` · ${listing.season}` : ""}
+                            </span>
+                          </li>
+                          {listing.category && (
+                            <li>
+                              <Tag size={14} weight="bold" aria-hidden="true" />
+                              <span className="job-card-fact-text">{listing.category}</span>
+                            </li>
+                          )}
+                        </ul>
+
+                        <div className="job-card-footer">
+                          <span className="inline-job-detail-apply">Apply</span>
+                          <span className="inline-job-detail-link">View listing →</span>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
                 </section>
               ) : (
                 <section className="feature landing-preview-tracker" inert>
