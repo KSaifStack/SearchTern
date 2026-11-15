@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Link } from "react-router-dom"
-import { Pagination, Popover, Text, Select, Badge } from '@mantine/core'
+import { Pagination, Popover, Text, Select, Badge, Tooltip } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth, fetchSources } from "../api/internships"
 import { BookmarkSimpleIcon, FunnelSimple, CaretLeft, CaretRight, ArrowSquareOut, ListBullets, SquaresFour, MapPin, Clock, Briefcase, Tag, CurrencyDollar } from '@phosphor-icons/react';
@@ -169,7 +169,6 @@ function Jobs() {
   }, [])
 
   const [viewMode, setViewMode] = useState<ViewMode>(readStoredView)
-  const [viewOpen, setViewOpen] = useState(false)
   const activeView = VIEW_MODES.find(m => m.value === viewMode) ?? VIEW_MODES[0]
   const perPage = activeView.perPage
 
@@ -180,7 +179,6 @@ function Jobs() {
     const firstIndex = (page - 1) * perPage
     setViewMode(next)
     setPage(Math.floor(firstIndex / nextPer) + 1)
-    setViewOpen(false)
     try {
       localStorage.setItem(VIEW_STORAGE_KEY, next)
     } catch {
@@ -456,11 +454,14 @@ function Jobs() {
           })
           return (
             <article key={job.id} className="job-card" style={{ opacity: stale ? 0.6 : 1 }}>
-              <header className="job-card-header">
+              {/* A <div>, not a <header>: index.css styles every <header> as the
+                  site nav bar (fill, shadow, 0 20px padding), which painted a
+                  floating rectangle around the company, role row and bookmark. */}
+              <div className="job-card-header">
                 <CompanyFavicon company={job.company} />
                 <span className="job-card-company" title={job.company}>{job.company}</span>
                 {renderSaveButton(job, 20)}
-              </header>
+              </div>
 
               <a
                 href={job.link}
@@ -472,19 +473,12 @@ function Jobs() {
                 {job.role}
               </a>
 
-              {salary ? (
+              {/* Only render the pay pill when there is a figure to show. */}
+              {salary && (
                 <span className="job-card-salary" title={salary.explanation}>
                   <CurrencyDollar size={14} weight="bold" aria-hidden="true" />
                   {salary.label}
                   <span className="visually-hidden-text"> ({salary.explanation})</span>
-                </span>
-              ) : (
-                <span
-                  className="job-card-salary job-card-salary-unknown"
-                  title="This listing doesn't include pay, and there isn't enough info (US location + role category) to estimate it."
-                >
-                  <CurrencyDollar size={14} weight="bold" aria-hidden="true" />
-                  Pay unknown
                 </span>
               )}
 
@@ -545,7 +539,7 @@ function Jobs() {
               {loading ? 'Loading...' : `${filtered.length.toLocaleString()} listings found`}
             </p>
           </div>
-          <Popover width={250} position="bottom-start" withArrow shadow="md" opened={popoverOpened} onChange={setPopoverOpened}>
+          <Popover width={280} position="bottom-start" withArrow shadow="md" opened={popoverOpened} onChange={setPopoverOpened} classNames={{ dropdown: 'health-popover' }}>
             <Popover.Target>
               <button className="health_btn" onClick={() => {
                 if (!popoverOpened) {
@@ -806,40 +800,31 @@ function Jobs() {
               </Popover.Dropdown>
             </Popover>
 
-            <Popover opened={viewOpen} onChange={setViewOpen} width={220} position="bottom-end" withArrow shadow="md">
-              <Popover.Target>
-                <button
-                  className="sort_btn view_btn"
-                  onClick={() => setViewOpen(o => !o)}
-                  title="Change how listings are displayed"
-                  aria-label={`Display (currently ${activeView.label})`}
-                >
-                  <activeView.icon size={16} weight="bold" />
-                  <span className="view_btn-label">Display</span>
-                  <span aria-hidden="true">▾</span>
-                </button>
-              </Popover.Target>
-              <Popover.Dropdown>
-                <div className="view-option-list" role="radiogroup" aria-label="Listing layout">
-                  {VIEW_MODES.map(mode => (
+            <div className="view-toggle" role="radiogroup" aria-label="Listing layout">
+              {VIEW_MODES.map(mode => {
+                const isActive = viewMode === mode.value
+                return (
+                  <Tooltip
+                    key={mode.value}
+                    label={`${mode.label} — ${mode.hint}`}
+                    position="bottom"
+                    withArrow
+                    openDelay={120}
+                  >
                     <button
-                      key={mode.value}
                       type="button"
                       role="radio"
-                      aria-checked={viewMode === mode.value}
-                      className={`view-option${viewMode === mode.value ? ' view-option-active' : ''}`}
+                      aria-checked={isActive}
+                      aria-label={`${mode.label} — ${mode.hint}`}
+                      className={`sort_btn view_toggle_btn${isActive ? ' view_toggle_btn-active' : ''}`}
                       onClick={() => changeView(mode.value)}
                     >
-                      <mode.icon size={18} weight={viewMode === mode.value ? 'fill' : 'regular'} />
-                      <span className="view-option-text">
-                        <span className="view-option-label">{mode.label}</span>
-                        <span className="view-option-hint">{mode.hint}</span>
-                      </span>
+                      <mode.icon size={18} weight={isActive ? 'fill' : 'regular'} />
                     </button>
-                  ))}
-                </div>
-              </Popover.Dropdown>
-            </Popover>
+                  </Tooltip>
+                )
+              })}
+            </div>
           </div>
         </div>
         {renderCardViews()}
