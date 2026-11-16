@@ -41,7 +41,7 @@ function readSessionToken(): Promise<string | null> {
     return tokenRead;
 }
 
-async function sessionHeaders(): Promise<Record<string, string>> {
+export async function sessionHeaders(): Promise<Record<string, string>> {
     const token = await readSessionToken();
     return token ? { "X-Supabase-Token": token } : {};
 }
