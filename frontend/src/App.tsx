@@ -25,7 +25,6 @@ const Tracker = lazy(() => import("./pages/Tracker"))
 const Auth = lazy(() => import("./pages/Auth"))
 const Privacy = lazy(() => import("./pages/Privacy"))
 const Settings = lazy(() => import("./pages/Settings"))
-const ForYou = lazy(() => import("./pages/ForYou"))
 
 const SITE_ORG = {
     "@context": "https://schema.org",
@@ -126,20 +125,9 @@ function App() {
                                         </>
                                     }
                                 />
-                                <Route
-                                    path="/for-you"
-                                    element={
-                                        <>
-                                            <RouteMeta meta={{
-                                                title: "SearchTern · For You",
-                                                description: "Internships and new-grad roles curated to your school, graduation date, role interests, locations, and work authorization.",
-                                                path: "/for-you",
-                                            }} />
-                                            <main className="standard-layout"><ForYou /></main>
-                                        </>
-                                    }
-                                />
                                 <Route path="/resume" element={<Navigate to="/settings" replace />} />
+                                {/* For You became a drawer on the listings page. */}
+                                <Route path="/for-you" element={<Navigate to="/jobs" replace />} />
                                 <Route
                                     path="/auth"
                                     element={

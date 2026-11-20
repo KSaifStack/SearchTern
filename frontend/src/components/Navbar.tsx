@@ -47,7 +47,6 @@ function Navbar() {
 
             <ul className={`nav-left${menuOpen ? ' open' : ''}`}>
                 <li><Link to="/jobs" className={location.pathname === '/jobs' ? 'active' : ''} onClick={() => setMenuOpen(false)}>Internships</Link></li>
-                <li><Link to="/for-you" className={location.pathname === '/for-you' ? 'active' : ''} onClick={() => setMenuOpen(false)}>For You</Link></li>
                 <li><Link to="/tracker" className={location.pathname === '/tracker' ? 'active' : ''} onClick={() => setMenuOpen(false)}>Applications</Link></li>
                 
                 {/* Mobile Auth Items */}

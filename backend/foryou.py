@@ -2,8 +2,8 @@
 #
 # The frontend stores the full onboarding profile in Supabase user_metadata and
 # only sends the matching fields here (roles, job types, metros, remote, work
-# auth). Once a day, each opted-in user gets the single best listing they have
-# not been emailed before.
+# auth, daily count). Once a day, each opted-in user gets their top unsent
+# matches — 1 to 5, chosen by the user, 5 by default.
 #
 # ROLE_OPTIONS / METROS / score_job mirror frontend/src/utils/forYou.ts.
 # Keep them in sync so the email picks what the For You page ranks first.
@@ -34,6 +34,12 @@ API_URL = (os.environ.get("PUBLIC_API_URL") or "https://api.searchtern.net").rst
 # A user is due again once this long has passed, so a slow run or a restart
 # near the scheduled time never produces two emails in one day.
 _RESEND_AFTER = "20 hours"
+
+# Matches per daily email. The user picks a number in this range; the profile
+# stores it, and it is re-clamped here because the value comes from the browser.
+DAILY_MIN = 1
+DAILY_MAX = 5
+DAILY_DEFAULT = 5
 
 ROLE_OPTIONS = {
     "swe": (["Software Engineering"], r"\b(software|swe|developer|full[- ]?stack|front[- ]?end|back[- ]?end|mobile|ios|android|web)\b"),
@@ -113,12 +119,17 @@ def sanitize_prefs(raw):
         return [v for v in dict.fromkeys(vals) if v in allowed] if isinstance(vals, list) else []
 
     auth = raw.get("workAuth")
+    try:
+        daily = int(raw.get("dailyCount"))
+    except (TypeError, ValueError):
+        daily = DAILY_DEFAULT
     return {
         "roles": pick("roles", ROLE_OPTIONS),
         "jobTypes": pick("jobTypes", JOB_TYPES),
         "metros": pick("metros", METROS),
         "remoteOk": raw.get("remoteOk") is not False,
         "workAuth": auth if auth in WORK_AUTH else "",
+        "dailyCount": max(DAILY_MIN, min(daily, DAILY_MAX)),
     }
 
 
@@ -196,19 +207,25 @@ def fingerprint(job):
     return f"{norm(job.get('company'))}|{norm(job.get('role'))}|{norm(job.get('location'))}"
 
 
-def best_match(jobs, prefs, exclude=frozenset()):
-    best = None
+def best_matches(jobs, prefs, exclude=frozenset(), limit=DAILY_DEFAULT):
+    """Up to `limit` unsent matches, best first — the drawer's order.
+
+    Ranked by score then by how recently the listing was posted, and deduped by
+    fingerprint so the same job never fills two places in one email.
+    """
+    ranked = []
+    seen = set(exclude)
     for job in jobs:
         scored = score_job(job, prefs)
         if not scored:
             continue
-        key = (scored[0], -_days(job))
-        if best is None or key > best[0]:
-            fp = fingerprint(job)
-            if fp in exclude:
-                continue
-            best = (key, job, scored[1])
-    return (best[1], best[2]) if best else (None, None)
+        fp = fingerprint(job)
+        if fp in seen:
+            continue
+        seen.add(fp)
+        ranked.append(((scored[0], -_days(job)), job, scored[1]))
+    ranked.sort(key=lambda row: row[0], reverse=True)
+    return [(job, reasons) for _, job, reasons in ranked[:limit]]
 
 
 def _days(job):
@@ -317,29 +334,54 @@ def smtp_configured():
     return bool(SMTP_HOST and DIGEST_FROM)
 
 
-def render_email(job, reasons, unsubscribe_token):
+def _job_url(job):
+    return f"{SITE_URL}/jobs/{job.get('id')}" if job.get("id") else job.get("link")
+
+
+def render_email(matches, unsubscribe_token):
+    """One email listing every match the user asked for, best first."""
     e = html.escape
-    job_url = f"{SITE_URL}/jobs/{job.get('id')}" if job.get("id") else job.get("link")
     unsub_url = f"{API_URL}/foryou/unsubscribe?token={unsubscribe_token}"
-    subject = f"Your SearchTern match today: {job.get('company')}"
-    why = " · ".join(reasons)
-    text = (
-        f"Here's today's best match for you:\n\n"
-        f"{job.get('company')}: {job.get('role')}\n{job.get('location') or ''}\n"
-        f"Why: {why}\n\nView & apply: {job_url}\n\n"
-        f"Change preferences: {SITE_URL}/for-you\nUnsubscribe: {unsub_url}\n"
+    count = len(matches)
+    subject = (
+        f"Your SearchTern match today: {matches[0][0].get('company')}"
+        if count == 1
+        else f"{count} new SearchTern matches for you"
     )
-    body = f"""\
-<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#172b4d">
-  <div style="font-weight:800;font-size:20px;margin:16px 0">Search<span style="color:#2d7a4f">Tern</span></div>
-  <p>Here's today's best match for you:</p>
-  <div style="border:1px solid #e2e8f0;border-radius:8px;padding:16px">
+    intro = (
+        "Here's today's best match for you:"
+        if count == 1
+        else f"Here are your top {count} matches today:"
+    )
+    text_parts = [intro, ""]
+    cards = []
+    for job, reasons in matches:
+        why = " · ".join(reasons)
+        job_url = _job_url(job)
+        text_parts += [
+            f"{job.get('company')}: {job.get('role')}",
+            f"{job.get('location') or ''}",
+            f"Why: {why}",
+            f"View & apply: {job_url}",
+            "",
+        ]
+        cards.append(f"""\
+  <div style="border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:12px">
     <div style="font-weight:700;font-size:16px">{e(job.get('company') or '')}</div>
     <div>{e(job.get('role') or '')}</div>
     <div style="color:#5e6c84;font-size:13px">{e(job.get('location') or '')}</div>
     <div style="color:#2d7a4f;font-size:13px;margin-top:6px">Why: {e(why)}</div>
     <a href="{e(job_url or '')}" style="display:inline-block;margin-top:12px;padding:8px 14px;border-radius:6px;background:#3aa76d;color:#fff;text-decoration:none;font-weight:600">View &amp; apply</a>
-  </div>
+  </div>""")
+    text = "\n".join(text_parts + [
+        f"Change preferences: {SITE_URL}/for-you",
+        f"Unsubscribe: {unsub_url}",
+    ])
+    body = f"""\
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#172b4d">
+  <div style="font-weight:800;font-size:20px;margin:16px 0">Search<span style="color:#2d7a4f">Tern</span></div>
+  <p>{intro}</p>
+{chr(10).join(cards)}
   <p style="font-size:12px;color:#5e6c84;margin-top:20px">
     You're getting this because you turned on daily matches.
     <a href="{e(SITE_URL)}/for-you" style="color:#2d7a4f">Change preferences</a> ·
@@ -368,7 +410,7 @@ _run_lock = Lock()
 
 
 def send_daily_digests():
-    """Email each due, opted-in user their best unsent match. Returns a summary."""
+    """Email each due, opted-in user their top unsent matches. Returns a summary."""
     if not smtp_configured():
         logger.info("For You digest: SMTP not configured, skipping")
         return {"skipped": "smtp not configured"}
@@ -396,20 +438,21 @@ def send_daily_digests():
                 with conn.cursor() as cur:
                     cur.execute("SELECT fingerprint FROM foryou_sent WHERE user_id = %s", (row["user_id"],))
                     already = {r[0] for r in cur.fetchall()}
-                job, reasons = best_match(jobs, sanitize_prefs(row["prefs"]), already)
-                if not job:
+                prefs = sanitize_prefs(row["prefs"])
+                matches = best_matches(jobs, prefs, already, prefs["dailyCount"])
+                if not matches:
                     no_match += 1
                     continue
                 try:
-                    _send(row["email"], *render_email(job, reasons, row["unsubscribe_token"]))
+                    _send(row["email"], *render_email(matches, row["unsubscribe_token"]))
                 except Exception as e:
                     failed += 1
                     logger.error(f"For You digest: send to user {row['user_id']} failed: {e}")
                     continue
                 with conn.cursor() as cur:
-                    cur.execute(
+                    cur.executemany(
                         "INSERT INTO foryou_sent (user_id, fingerprint) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                        (row["user_id"], fingerprint(job)),
+                        [(row["user_id"], fingerprint(job)) for job, _ in matches],
                     )
                     cur.execute("UPDATE foryou_profiles SET last_sent_at = now() WHERE user_id = %s", (row["user_id"],))
                 conn.commit()

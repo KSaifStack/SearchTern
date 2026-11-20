@@ -3,7 +3,7 @@ import { Link } from "react-router-dom"
 import { Pagination, Popover, Text, Select, Badge, Tooltip } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { checkHealth, fetchSources } from "../api/internships"
-import { BookmarkSimpleIcon, FunnelSimple, CaretLeft, CaretRight, ArrowSquareOut, ListBullets, SquaresFour, MapPin, Clock, Briefcase, Tag, CurrencyDollar } from '@phosphor-icons/react';
+import { BookmarkSimpleIcon, FunnelSimple, CaretLeft, CaretRight, ArrowSquareOut, ListBullets, SquaresFour, MapPin, Clock, Briefcase, Tag, CurrencyDollar, SparkleIcon } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
 import "../styles/Table.css"
 import { getRecent, clearCache, getSecondsUntilNextHour } from "../services/internshipmanager"
@@ -19,6 +19,10 @@ import type { ParsedLocation } from "../utils/locationFilter"
 import { matchCompanyMeta, EMPLOYEE_BUCKETS, inEmployeeBucket } from "../utils/companyMeta"
 import { CompanyFavicon } from "../components/CompanyFavicon"
 import { estimateSalary } from "../utils/salaryEstimate"
+import { rankJobs } from "../utils/forYou"
+import { useForYou } from "../components/ForYouContext"
+import ForYouDrawer from "../components/ForYouDrawer"
+import type { FeedJob } from "../components/ForYouDrawer"
 
 interface Job {
   id: number
@@ -104,6 +108,15 @@ function Jobs() {
   const [sortOpen, setSortOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [forYouOpen, setForYouOpen] = useState(false)
+
+  // For You lives here instead of its own page: the same ranking the daily
+  // email uses, surfaced over the listings the user is already looking at.
+  const { profile: forYouProfile } = useForYou()
+  const forYouMatches = useMemo(
+    () => (forYouProfile ? rankJobs(allJobs as FeedJob[], forYouProfile, 200) : []),
+    [allJobs, forYouProfile]
+  )
 
   // Filter/sort settings are remembered: this browser's copy seeds the first
   // render, and a signed-in user's account copy replaces it (see below).
@@ -609,6 +622,20 @@ function Jobs() {
         <div className="results-header">
           <p className="result-count desktop-result-count">{loading ? 'Loading...' : `${filtered.length.toLocaleString()} listings found`}</p>
           <div className="results-controls">
+            <button
+              className={`sort_btn foryou-btn${forYouProfile ? ' foryou-btn-on' : ''}`}
+              onClick={() => setForYouOpen(true)}
+              title="Internships ranked against your For You preferences"
+            >
+              <SparkleIcon size={16} weight="fill" />
+              For You
+              {forYouMatches.length > 0 && (
+                <Badge size="xs" variant="filled" color="teal" className="filters-count">
+                  {forYouMatches.length >= 200 ? '200+' : forYouMatches.length}
+                </Badge>
+              )}
+            </button>
+
             <Popover opened={sortOpen} onChange={setSortOpen} width={180} position="bottom-end" withArrow shadow="md">
               <Popover.Target>
                 <button className="sort_btn" onClick={() => setSortOpen(o => !o)}>
@@ -836,6 +863,13 @@ function Jobs() {
           mt="md"
         />
       </section>
+
+      <ForYouDrawer
+        opened={forYouOpen}
+        onClose={() => setForYouOpen(false)}
+        matches={forYouMatches}
+        loading={loading}
+      />
     </>
   )
 }
