@@ -1,10 +1,8 @@
 import { createContext, lazy, Suspense, useCallback, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useLocation } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import {
-  accountProfile, dismissOnboarding, loadLocalProfile, onboardingDismissed,
-  saveAccountProfile, saveLocalProfile,
+  accountProfile, loadLocalProfile, saveAccountProfile, saveLocalProfile,
 } from '../utils/forYou'
 import type { ForYouProfile } from '../utils/forYou'
 import { syncDigest } from '../api/forYou'
@@ -22,8 +20,7 @@ interface ForYouContextType {
 const ForYouContext = createContext<ForYouContextType | undefined>(undefined)
 
 export function ForYouProvider({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth()
-  const { pathname } = useLocation()
+  const { user } = useAuth()
   // Same dev-only guest fallback as the Agent hub: local dev can walk the
   // whole flow without Supabase; production requires a real session.
   const actorId = user?.id ?? (import.meta.env.DEV ? 'local' : null)
@@ -32,12 +29,10 @@ export function ForYouProvider({ children }: { children: ReactNode }) {
   const [local] = useState<ForYouProfile | null>(() => loadLocalProfile())
   const profile = saved ?? (user ? accountProfile(user) : null) ?? local
 
-  const [manualOpen, setManualOpen] = useState(false)
-  const [dismissed, setDismissed] = useState(() => onboardingDismissed())
-  // First visit after creating an account: ask the onboarding questions once.
-  const autoOpen = !loading && !!actorId && !profile && !dismissed &&
-    pathname !== '/auth' && pathname !== '/privacy'
-  const open = manualOpen || autoOpen
+  // For You is a drawer on the Internships page, so the questions are only
+  // asked when someone opens it — an unrequested modal on the listings page
+  // was worse than a "Set up your feed" button.
+  const [open, setOpen] = useState(false)
 
   const saveProfile = useCallback(async (p: ForYouProfile) => {
     setSaved(p)
@@ -47,25 +42,17 @@ export function ForYouProvider({ children }: { children: ReactNode }) {
     return syncDigest(user.id, user.email ?? p.email, p)
   }, [user])
 
-  const close = () => {
-    if (!profile) {
-      dismissOnboarding()
-      setDismissed(true)
-    }
-    setManualOpen(false)
-  }
-
   return (
-    <ForYouContext.Provider value={{ actorId, profile, saveProfile, openOnboarding: () => setManualOpen(true) }}>
+    <ForYouContext.Provider value={{ actorId, profile, saveProfile, openOnboarding: () => setOpen(true) }}>
       {children}
       {open && actorId && (
         <Suspense fallback={null}>
         <ForYouOnboarding
           initial={profile}
           defaultEmail={user?.email ?? ''}
-          onClose={close}
+          onClose={() => setOpen(false)}
           onSave={async p => {
-            setManualOpen(false)
+            setOpen(false)
             return saveProfile(p)
           }}
         />

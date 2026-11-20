@@ -1,7 +1,11 @@
 /* ── Onboarding modal ─────────────────────────────────────── */
 .fy-modal-title { font-size: 18px; font-weight: 700; color: var(--text-dark); }
 .fy-modal-sub { margin: 0 0 18px; font-size: 14px; color: var(--text-muted); line-height: 1.5; }
-.fy-stepper .mantine-Stepper-steps { flex-wrap: wrap; row-gap: 8px; }
+/* Five short labels on one row; the modal is ~570px wide, so the steps must
+   not wrap and the separators stay tight. */
+.fy-stepper .mantine-Stepper-steps { flex-wrap: nowrap; gap: 0 4px; }
+.fy-stepper .mantine-Stepper-stepLabel { font-size: 12px; }
+.fy-stepper .mantine-Stepper-separator { margin: 0 3px; min-width: 8px; }
 .fy-step { display: flex; flex-direction: column; gap: 16px; padding-top: 8px; min-height: 220px; }
 .fy-label { font-size: 14px; font-weight: 500; margin-bottom: 8px; color: var(--text-dark); }
 .fy-chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -13,19 +17,91 @@
     background: var(--page-bg);
 }
 
+/* ── Global button skin reset ──────────────────────────────
+   index.css styles every bare <button> as a green pill: a 4px margin, a green
+   fill and a green glow + 1px lift on hover. Mantine already styles the
+   controls in this page and its onboarding modal, so cancel the global skin
+   here — otherwise the stepper steps and the modal close button fill solid
+   green on hover (under dark text) and the footer buttons drift out of line.
+   The modal renders in a portal, so it gets its own class on Modal content. */
+.fy-page button,
+.fy-modal button,
+.fy-drawer button {
+    margin: 0;
+    transform: none;
+    box-shadow: none;
+}
+.fy-page button:hover,
+.fy-modal button:hover,
+.fy-drawer button:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Only Mantine's default (filled) Button keeps a background of its own; the
+   stepper steps, close buttons, file pickers and the subtle/default variants
+   would otherwise take the global green fill as their only hover state. Give
+   those the stock neutral hover instead, via the theme's own token. */
+/* (No comments inside this selector list — lightningcss reads a stray one as a
+   pseudo-element token and drops the rest of the list.) */
+.fy-page .mantine-Stepper-step:hover,
+.fy-page .mantine-CloseButton-root:hover,
+.fy-page .mantine-FileInput-input:hover,
+.fy-page button[data-variant]:not([data-variant="filled"]):not(.fy-link-btn):hover,
+.fy-modal .mantine-Stepper-step:hover,
+.fy-modal .mantine-CloseButton-root:hover,
+.fy-modal .mantine-FileInput-input:hover,
+.fy-modal button[data-variant]:not([data-variant="filled"]):not(.fy-link-btn):hover,
+.fy-drawer .mantine-CloseButton-root:hover,
+.fy-drawer button[data-variant]:not([data-variant="filled"]):not(.fy-link-btn):hover {
+    background-color: var(--mantine-color-default-hover, var(--menu-hover-bg));
+}
+
+/* Filled buttons must keep white text in every state. index.css sets
+   --button-color: #3aa76d globally, and Mantine's default (filled) Button only
+   stays readable because its own inline --button-color is white — if that var
+   is ever inherited instead, the label turns green on green. Pin it here. */
+.fy-page .mantine-Button-root:not([data-variant]),
+.fy-modal .mantine-Button-root:not([data-variant]),
+.fy-page .mantine-Button-root:not([data-variant]):hover,
+.fy-modal .mantine-Button-root:not([data-variant]):hover,
+.fy-page .mantine-Button-root:not([data-variant]):active,
+.fy-modal .mantine-Button-root:not([data-variant]):active,
+.fy-drawer .mantine-Button-root:not([data-variant]),
+.fy-drawer .mantine-Button-root:not([data-variant]):hover,
+.fy-drawer .mantine-Button-root:not([data-variant]):active,
+.fy-drawer .mantine-Button-root:not([data-variant]) *,
+.fy-drawer .mantine-Button-root:not([data-variant]):hover *,
+.fy-drawer .mantine-Button-root:not([data-variant]):active * {
+    color: #fff;
+}
+
 /* ── Page ─────────────────────────────────────────────────── */
-.fy-page { display: flex; flex-direction: column; gap: 20px; }
+.fy-page { display: flex; flex-direction: column; }
+.fy-feed { margin: 0; padding: 22px 26px; }
 .fy-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .fy-title {
     display: flex; align-items: center; gap: 8px;
-    margin: 0 0 4px; font-size: 28px; font-weight: 800; color: var(--text-dark);
+    margin: 0 0 4px; font-size: 24px; font-weight: 800; color: var(--text-dark);
 }
 .fy-title svg { color: var(--accent-color); }
 .fy-muted { color: var(--text-muted); font-size: 13px; margin: 0; }
 
-.fy-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
-.fy-feed { padding: 8px 24px !important; }
-.fy-side { display: flex; flex-direction: column; gap: 20px; position: sticky; top: 84px; }
+/* One compact strip for the email control and a one-line profile summary.
+   The rest of the site is single-panel, so this page has no sidebar. */
+.fy-tools {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px 20px; margin: 14px 0 4px; padding: 12px 0;
+    border-top: 1px solid var(--border-slate); border-bottom: 1px solid var(--border-slate);
+}
+.fy-tools-row { display: flex; align-items: center; gap: 8px; }
+.fy-tools-icon, .fy-tools-sep { color: var(--text-muted); }
+.fy-tools-row .mantine-Switch-root { margin: 0; }
+.fy-summary {
+    flex: 1 1 280px; margin: 0; text-align: right;
+    font-size: 12px; line-height: 1.5; color: var(--text-muted); overflow-wrap: anywhere;
+}
+.fy-loading { padding: 18px 0; }
 
 .fy-row {
     display: grid;
@@ -45,8 +121,6 @@
 .fy-row-reasons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .fy-row-actions { display: flex; gap: 8px; align-items: center; }
 
-.fy-card { padding: 20px !important; display: flex; flex-direction: column; gap: 12px; }
-.fy-card-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--text-dark); }
 .fy-link-btn,
 .fy-link-btn:hover {
     background: none; border: none; padding: 0; margin: 0; cursor: pointer; text-align: left;
@@ -54,12 +128,6 @@
     box-shadow: none; transform: none; min-height: 0; align-self: flex-start;
 }
 .fy-link-btn:hover { text-decoration: underline; }
-
-.fy-profile { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px 10px; margin: 0; font-size: 13px; }
-.fy-profile dt { color: var(--text-muted); font-weight: 600; }
-.fy-profile dd { margin: 0; color: var(--text-dark); overflow-wrap: anywhere; }
-.fy-profile a { color: var(--accent-color); }
-.fy-links { display: flex; flex-direction: column; gap: 2px; }
 
 .fy-none { text-align: center; padding: 40px 0; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .fy-none p { margin: 0; }
@@ -73,7 +141,7 @@
 .fy-empty-icon { color: var(--accent-color); }
 
 /* ── Email preview (mirrors backend/foryou.py's template) ── */
-.fy-email { border: 1px solid var(--border-slate); border-radius: 8px; overflow: hidden; font-size: 13px; }
+.fy-email { margin: 14px 0 4px; max-width: 560px; border: 1px solid var(--border-slate); border-radius: 8px; overflow: hidden; font-size: 13px; }
 .fy-email-meta {
     display: flex; flex-direction: column; gap: 2px; padding: 10px 12px;
     background: var(--page-bg); border-bottom: 1px solid var(--border-slate); color: var(--text-muted);
@@ -82,7 +150,15 @@
 .fy-email-body p { margin: 0 0 10px; }
 .fy-email-brand { font-weight: 800; font-size: 16px; margin-bottom: 10px; }
 .fy-email-brand span { color: var(--accent-color); }
-.fy-email-job { border: 1px solid var(--border-slate); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 3px; }
+.fy-email-job { border: 1px solid var(--border-slate); border-radius: 8px; padding: 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 3px; }
+/* The email strip now holds the switch, a count box and the preview link. Let
+   it wrap onto a second line in the 460px drawer instead of squeezing the
+   switch label into two words. */
+.fy-drawer .fy-tools-row { flex-wrap: wrap; row-gap: 8px; }
+.fy-drawer .fy-tools-row > * { flex: 0 0 auto; }
+.fy-drawer .mantine-Switch-label { white-space: nowrap; }
+.fy-daily-count { display: inline-flex; align-items: center; gap: 6px; }
+.fy-daily-count .mantine-NumberInput-root { margin: 0; }
 .fy-email-company { font-weight: 700; font-size: 14px; }
 .fy-email-why { font-size: 12px; color: var(--accent-color); margin-top: 4px; }
 .fy-email-btn {
@@ -91,11 +167,40 @@
 }
 .fy-email-foot { font-size: 11px; color: var(--text-muted); margin-top: 12px !important; }
 
-@media (max-width: 900px) {
-    .fy-grid { grid-template-columns: 1fr; }
-    .fy-side { position: static; order: -1; }
+@media (max-width: 720px) {
+    .fy-feed { padding: 18px 16px; }
+    .fy-summary { text-align: left; }
 }
+/* ── Toolbar button + drawer (For You on the Internships page) ── */
+.foryou-btn { display: inline-flex; align-items: center; gap: 6px; }
+.foryou-btn svg { color: var(--accent-color); }
+.foryou-btn-on { border-color: var(--accent-color); }
+
+.fy-drawer { background: var(--feature-color); }
+/* Sticky and opaque: the match list scrolls underneath it, so a transparent
+   header let rows run into the title. */
+.fy-drawer-header {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--feature-color);
+    border-bottom: 1px solid var(--border-slate);
+}
+.fy-drawer-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 16px; font-weight: 800; color: var(--text-dark);
+}
+.fy-drawer-title svg { color: var(--accent-color); }
+.fy-drawer-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.fy-drawer-top .fy-summary { flex: 1 1 auto; text-align: left; }
+.fy-drawer-count { margin: 12px 0 0; }
+.fy-drawer .fy-row { padding: 14px 0; }
+.fy-drawer .fy-tools { margin-top: 12px; }
+.fy-drawer .fy-email { max-width: none; }
+
 @media (max-width: 560px) {
+    /* Wrapped rows leave a dangling connector at the end of each row, so drop
+       the separators once the steps stack. */
+    .fy-stepper .mantine-Stepper-steps { flex-wrap: wrap; row-gap: 10px; }
+    .fy-stepper .mantine-Stepper-separator { display: none; }
     .fy-row { grid-template-columns: 28px minmax(0, 1fr); }
     .fy-row-actions { grid-column: 2; }
 }

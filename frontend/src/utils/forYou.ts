@@ -31,6 +31,8 @@ export interface ForYouProfile {
   links: string[]
   workAuth: WorkAuth
   digestOptIn: boolean
+  /** How many matches the daily email lists, 1–5. */
+  dailyCount: number
   completedAt: string
 }
 
@@ -48,6 +50,7 @@ export const EMPTY_PROFILE: ForYouProfile = {
   links: [],
   workAuth: '',
   digestOptIn: false,
+  dailyCount: 5,
   completedAt: '',
 }
 
@@ -84,6 +87,16 @@ export const WORK_AUTH_OPTIONS: { value: WorkAuth; label: string; needsSponsor: 
   { value: 'h1b', label: 'H-1B (need transfer / sponsorship)', needsSponsor: true },
   { value: 'other_sponsor', label: 'Other visa, will need sponsorship', needsSponsor: true },
 ]
+
+export const DAILY_COUNT_MIN = 1
+export const DAILY_COUNT_MAX = 5
+
+/** The daily email lists 1–5 matches; anything else falls back to 5. */
+export function clampDailyCount(v: unknown): number {
+  const n = Math.round(Number(v))
+  if (!Number.isFinite(n)) return DAILY_COUNT_MAX
+  return Math.min(DAILY_COUNT_MAX, Math.max(DAILY_COUNT_MIN, n))
+}
 
 export function needsSponsorship(auth: WorkAuth): boolean {
   return WORK_AUTH_OPTIONS.some(o => o.value === auth && o.needsSponsor)
@@ -157,6 +170,7 @@ function sanitize(raw: unknown): ForYouProfile | null {
     links: strList(r.links),
     workAuth: WORK_AUTH_OPTIONS.some(o => o.value === auth) ? auth : '',
     digestOptIn: r.digestOptIn === true,
+    dailyCount: clampDailyCount(r.dailyCount),
     completedAt,
   }
 }
@@ -309,5 +323,6 @@ export function digestPayload(p: ForYouProfile) {
     metros: p.metros,
     remoteOk: p.remoteOk,
     workAuth: p.workAuth,
+    dailyCount: p.dailyCount,
   }
 }

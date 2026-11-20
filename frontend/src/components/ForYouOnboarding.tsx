@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import {
-  Button, Checkbox, Chip, FileInput, Group, Modal, Select, Stepper, Switch, TagsInput, TextInput,
+  Button, Checkbox, Chip, FileInput, Group, Modal, NumberInput, Select, Stepper, Switch, TagsInput, TextInput,
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { CheckCircleIcon, FilePdfIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { useAuth } from './AuthContext'
 import {
-  EMPTY_PROFILE, JOB_TYPE_OPTIONS, METRO_OPTIONS, ROLE_OPTIONS, WORK_AUTH_OPTIONS,
+  clampDailyCount, DAILY_COUNT_MAX, DAILY_COUNT_MIN, EMPTY_PROFILE, JOB_TYPE_OPTIONS, METRO_OPTIONS,
+  ROLE_OPTIONS, WORK_AUTH_OPTIONS,
 } from '../utils/forYou'
 import type { ForYouProfile, WorkAuth } from '../utils/forYou'
 import {
@@ -119,14 +120,16 @@ export default function ForYouOnboarding({ initial, defaultEmail, onClose, onSav
     if (res.ok) {
       notifications.show({
         title: 'Your For You feed is ready',
-        message: p.digestOptIn ? "We'll email you one strong match a day." : 'Matches are on your For You page.',
+        message: p.digestOptIn
+          ? `We'll email your top ${p.dailyCount} match${p.dailyCount === 1 ? '' : 'es'} each morning.`
+          : 'Open For You on the Internships page to see them.',
         color: 'teal',
         icon: <CheckCircleIcon size={18} weight="fill" />,
       })
     } else {
       notifications.show({
         title: 'Profile saved, but email signup failed',
-        message: `${res.error} You can retry from the For You page.`,
+        message: `${res.error} You can retry from the For You panel.`,
         color: 'orange',
         icon: <WarningCircleIcon size={18} />,
       })
@@ -139,8 +142,9 @@ export default function ForYouOnboarding({ initial, defaultEmail, onClose, onSav
       onClose={onClose}
       size="lg"
       centered
-      title={<span className="fy-modal-title">{initial ? 'Edit your For You profile' : 'Set up your For You feed'}</span>}
+      title={<span className="fy-modal-title">{initial ? 'Edit your For You profile' : 'Set up your feed'}</span>}
       closeOnClickOutside={false}
+      classNames={{ content: 'fy-modal' }}
     >
       <p className="fy-modal-sub">
         A few questions so we can surface the internships and new-grad roles that fit you, on the site and, if you want, in one email a day.
@@ -278,16 +282,30 @@ export default function ForYouOnboarding({ initial, defaultEmail, onClose, onSav
           </div>
         </Stepper.Step>
 
-        <Stepper.Step label="Daily email">
+        <Stepper.Step label="Email">
           <div className="fy-step">
             <div className="fy-digest-card">
               <Switch
                 size="md"
                 checked={p.digestOptIn}
                 onChange={e => set('digestOptIn', e.currentTarget.checked)}
-                label="Email me one potential match a day"
-                description={`Sent to ${user?.email ?? (p.email || 'your email')}. At most one email a day, only when there's a new match. Unsubscribe any time from the email or the For You page.`}
+                label="Email me my matches each morning"
+                description={`Sent to ${user?.email ?? (p.email || 'your email')}. One email a day, only when there's a new match. Unsubscribe any time from the email.`}
               />
+              {p.digestOptIn && (
+                <NumberInput
+                  mt="md"
+                  w={150}
+                  label="Matches per email"
+                  description="1 to 5, best first."
+                  min={DAILY_COUNT_MIN}
+                  max={DAILY_COUNT_MAX}
+                  allowDecimal={false}
+                  clampBehavior="strict"
+                  value={p.dailyCount}
+                  onChange={v => set('dailyCount', clampDailyCount(v))}
+                />
+              )}
             </div>
           </div>
         </Stepper.Step>
