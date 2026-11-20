@@ -23,6 +23,7 @@ from urllib.parse import quote_plus, quote
 sys.path.insert(0, str(Path(__file__).parent))
 import scraper
 import read_db
+import foryou
 import os
 
 # Checks for api key
@@ -62,20 +63,22 @@ def enforce_signin(request: Request, user_id: str):
     Supabase session token whose sub matches the claimed user_id. Without
     Supabase (local dev only) this is a no-op so the app keeps working.
     This stops someone with the public SDK key from minting agent keys for
-    arbitrary user_ids in production."""
+    arbitrary user_ids in production.
+
+    Returns the session's verified account email (None in local dev)."""
     if not _supabase_configured():
-        return
+        return None
     token = (request.headers.get("X-Supabase-Token") or "").strip()
     if not token:
         raise HTTPException(status_code=401, detail="Sign in required to manage agents.")
     now = time.monotonic()
     with _SIGNIN_CACHE_LOCK:
         hit = _SIGNIN_CACHE.get(token)
-        sub = hit[1] if hit and hit[0] > now else None
+        sub, email = (hit[1], hit[2]) if hit and hit[0] > now else (None, None)
     if sub is not None:
         if str(sub) != str(user_id):
             raise HTTPException(status_code=403, detail="Session does not match this user.")
-        return
+        return email
     url = f"{SUPABASE_URL.rstrip('/')}/auth/v1/user"
     resp = None
     try:
@@ -84,13 +87,14 @@ def enforce_signin(request: Request, user_id: str):
             headers={"apikey": SUPABASE_SERVICE_ROLE_KEY, "Authorization": f"Bearer {token}"},
             timeout=10,
         )
-        sub = (resp.json() or {}).get("id") if resp.status_code == 200 else None
+        body = (resp.json() or {}) if resp.status_code == 200 else {}
+        sub, email = body.get("id"), body.get("email")
     except requests.RequestException:
-        sub = None
+        sub, email = None, None
     with _SIGNIN_CACHE_LOCK:
         if len(_SIGNIN_CACHE) >= _SIGNIN_CACHE_MAX:
             _SIGNIN_CACHE.clear()
-        _SIGNIN_CACHE[token] = (now + (_SIGNIN_CACHE_OK_TTL if sub else _SIGNIN_CACHE_BAD_TTL), sub)
+        _SIGNIN_CACHE[token] = (now + (_SIGNIN_CACHE_OK_TTL if sub else _SIGNIN_CACHE_BAD_TTL), sub, email)
     if sub is None:
         logging.warning(
             "Session verification failed for user_id=%s against %s (HTTP %s)",
@@ -99,6 +103,7 @@ def enforce_signin(request: Request, user_id: str):
         raise HTTPException(status_code=401, detail=f"Session invalid (HTTP {getattr(resp, 'status_code', 'error')}).")
     if str(sub) != str(user_id):
         raise HTTPException(status_code=403, detail="Session does not match this user.")
+    return email
 
 def agent_resume_list(user_id):
     """List files in resumes/{user_id}/. Returns (rows, note)."""
@@ -167,11 +172,19 @@ def scheduled_scrape():
     except Exception as e:
         logger.error(f"Scheduler: scrape failed — {e}")
 
+def scheduled_digest():
+    try:
+        foryou.send_daily_digests()
+    except Exception as e:
+        logger.error(f"Scheduler: For You digest failed — {e}")
+
 scheduler = BackgroundScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.add_job(scheduled_scrape, CronTrigger(minute=0))
+    # 14:20 UTC ≈ 9–10am US Eastern; offset from :00 so it reads a finished scrape.
+    scheduler.add_job(scheduled_digest, CronTrigger(hour=14, minute=20))
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -820,3 +833,45 @@ def agent_policies_delete(request: Request, policy_id: int, payload: dict = Body
     if not read_db.delete_agent_policy(policy_id, user_id):
         raise HTTPException(status_code=404, detail="Policy not found.")
     return {"policy_id": policy_id, "deleted": True}
+
+
+# ── For You daily match email ─────────────────────────────────────────────────
+# The frontend keeps the full onboarding profile in Supabase user_metadata and
+# only registers the matching fields + opt-in here. With Supabase configured the
+# email always goes to the session's verified account address, never to an
+# address supplied in the body, so nobody can subscribe someone else.
+
+@app.put("/foryou/profile")
+@limiter.limit("20/minute")
+def foryou_profile_put(request: Request, payload: dict = Body(...), verified=Depends(verify_key)):
+    user_id = str(payload.get("user_id") or "").strip()
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required.")
+    verified_email = enforce_signin(request, user_id)
+    email = (verified_email or str(payload.get("email") or "")).strip()
+    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) or len(email) > 254:
+        raise HTTPException(status_code=400, detail="A valid email is required.")
+    prefs = foryou.sanitize_prefs(payload.get("prefs"))
+    foryou.upsert_profile(user_id, email, prefs, payload.get("opt_in") is True)
+    return {"ok": True, "opt_in": payload.get("opt_in") is True, "email_configured": foryou.smtp_configured()}
+
+
+@app.get("/foryou/unsubscribe")
+@limiter.limit("10/minute")
+def foryou_unsubscribe(request: Request, token: str = ""):
+    ok = bool(token) and foryou.unsubscribe(token)
+    msg = "You're unsubscribed from SearchTern daily matches." if ok else "That unsubscribe link isn't valid."
+    page = (
+        "<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>SearchTern</title><body style=\"font-family:Arial,sans-serif;max-width:480px;margin:80px auto;padding:0 16px;color:#172b4d\">"
+        f"<h2>{msg}</h2><p>You can turn daily matches back on from your "
+        f"<a href='{foryou.SITE_URL}/for-you' style='color:#2d7a4f'>For You page</a>.</p></body>"
+    )
+    return Response(content=page, media_type="text/html", status_code=200 if ok else 404)
+
+
+@app.post("/foryou/digest/run")
+@limiter.limit("2/minute")
+def foryou_digest_run(request: Request, verified=Depends(verify_key)):
+    """Manual trigger for testing; the scheduler runs it daily."""
+    return {"result": foryou.send_daily_digests()}

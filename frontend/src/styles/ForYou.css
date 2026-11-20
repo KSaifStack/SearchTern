@@ -1,0 +1,101 @@
+/* ── Onboarding modal ─────────────────────────────────────── */
+.fy-modal-title { font-size: 18px; font-weight: 700; color: var(--text-dark); }
+.fy-modal-sub { margin: 0 0 18px; font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+.fy-stepper .mantine-Stepper-steps { flex-wrap: wrap; row-gap: 8px; }
+.fy-step { display: flex; flex-direction: column; gap: 16px; padding-top: 8px; min-height: 220px; }
+.fy-label { font-size: 14px; font-weight: 500; margin-bottom: 8px; color: var(--text-dark); }
+.fy-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fy-error { color: var(--mantine-color-error); font-size: 12px; margin-top: 6px; }
+.fy-digest-card {
+    border: 1px solid var(--border-slate);
+    border-radius: 10px;
+    padding: 18px;
+    background: var(--page-bg);
+}
+
+/* ── Page ─────────────────────────────────────────────────── */
+.fy-page { display: flex; flex-direction: column; gap: 20px; }
+.fy-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.fy-title {
+    display: flex; align-items: center; gap: 8px;
+    margin: 0 0 4px; font-size: 28px; font-weight: 800; color: var(--text-dark);
+}
+.fy-title svg { color: var(--accent-color); }
+.fy-muted { color: var(--text-muted); font-size: 13px; margin: 0; }
+
+.fy-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+.fy-feed { padding: 8px 24px !important; }
+.fy-side { display: flex; flex-direction: column; gap: 20px; position: sticky; top: 84px; }
+
+.fy-row {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: start;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border-slate);
+}
+.fy-row:last-of-type { border-bottom: none; }
+.fy-row img { width: 28px; height: 28px; border-radius: 6px; }
+.fy-row-main { min-width: 0; }
+.fy-row-company { font-weight: 700; font-size: 15px; color: var(--text-dark); text-decoration: none; }
+.fy-row-company:hover { color: var(--accent-color); }
+.fy-row-role { font-size: 14px; color: var(--text-dark); margin-top: 2px; }
+.fy-row-loc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.fy-row-reasons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.fy-row-actions { display: flex; gap: 8px; align-items: center; }
+
+.fy-card { padding: 20px !important; display: flex; flex-direction: column; gap: 12px; }
+.fy-card-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--text-dark); }
+.fy-link-btn,
+.fy-link-btn:hover {
+    background: none; border: none; padding: 0; margin: 0; cursor: pointer; text-align: left;
+    color: var(--accent-color); font: inherit; font-size: 13px; font-weight: 600;
+    box-shadow: none; transform: none; min-height: 0; align-self: flex-start;
+}
+.fy-link-btn:hover { text-decoration: underline; }
+
+.fy-profile { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px 10px; margin: 0; font-size: 13px; }
+.fy-profile dt { color: var(--text-muted); font-weight: 600; }
+.fy-profile dd { margin: 0; color: var(--text-dark); overflow-wrap: anywhere; }
+.fy-profile a { color: var(--accent-color); }
+.fy-links { display: flex; flex-direction: column; gap: 2px; }
+
+.fy-none { text-align: center; padding: 40px 0; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.fy-none p { margin: 0; }
+
+.fy-empty {
+    max-width: 520px; margin: 48px auto; padding: 40px !important; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.fy-empty h1 { margin: 0; font-size: 24px; color: var(--text-dark); }
+.fy-empty p { margin: 0 0 8px; color: var(--text-muted); line-height: 1.5; }
+.fy-empty-icon { color: var(--accent-color); }
+
+/* ── Email preview (mirrors backend/foryou.py's template) ── */
+.fy-email { border: 1px solid var(--border-slate); border-radius: 8px; overflow: hidden; font-size: 13px; }
+.fy-email-meta {
+    display: flex; flex-direction: column; gap: 2px; padding: 10px 12px;
+    background: var(--page-bg); border-bottom: 1px solid var(--border-slate); color: var(--text-muted);
+}
+.fy-email-body { padding: 14px 12px; color: var(--text-dark); }
+.fy-email-body p { margin: 0 0 10px; }
+.fy-email-brand { font-weight: 800; font-size: 16px; margin-bottom: 10px; }
+.fy-email-brand span { color: var(--accent-color); }
+.fy-email-job { border: 1px solid var(--border-slate); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 3px; }
+.fy-email-company { font-weight: 700; font-size: 14px; }
+.fy-email-why { font-size: 12px; color: var(--accent-color); margin-top: 4px; }
+.fy-email-btn {
+    align-self: flex-start; margin-top: 8px; padding: 6px 12px; border-radius: 6px;
+    background: var(--button-color); color: #fff; font-weight: 600; font-size: 12px;
+}
+.fy-email-foot { font-size: 11px; color: var(--text-muted); margin-top: 12px !important; }
+
+@media (max-width: 900px) {
+    .fy-grid { grid-template-columns: 1fr; }
+    .fy-side { position: static; order: -1; }
+}
+@media (max-width: 560px) {
+    .fy-row { grid-template-columns: 28px minmax(0, 1fr); }
+    .fy-row-actions { grid-column: 2; }
+}

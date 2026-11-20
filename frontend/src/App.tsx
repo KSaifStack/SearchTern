@@ -7,6 +7,7 @@ import SiteFooter from "./components/SiteFooter"
 import ThemeNudge from "./components/ThemeNudge"
 import ChangesNotice from "./components/ChangesNotice"
 import { TrackerProvider } from "./components/TrackerContext"
+import { ForYouProvider } from "./components/ForYouContext"
 import { AgentOverlay } from "./components/AgentOverlay"
 import ErrorBoundary from "./components/ErrorBoundary"
 import { usePageMeta } from "./utils/seo"
@@ -24,6 +25,7 @@ const Tracker = lazy(() => import("./pages/Tracker"))
 const Auth = lazy(() => import("./pages/Auth"))
 const Privacy = lazy(() => import("./pages/Privacy"))
 const Settings = lazy(() => import("./pages/Settings"))
+const ForYou = lazy(() => import("./pages/ForYou"))
 
 const SITE_ORG = {
     "@context": "https://schema.org",
@@ -82,6 +84,7 @@ function App() {
     return (
         <BrowserRouter>
             <TrackerProvider>
+            <ForYouProvider>
                     <div>
                         <Navbar />
                         <ThemeNudge />
@@ -120,6 +123,19 @@ function App() {
                                                 path: "/tracker",
                                             }} />
                                             <main className="full-width-layout"><Tracker /></main>
+                                        </>
+                                    }
+                                />
+                                <Route
+                                    path="/for-you"
+                                    element={
+                                        <>
+                                            <RouteMeta meta={{
+                                                title: "SearchTern · For You",
+                                                description: "Internships and new-grad roles curated to your school, graduation date, role interests, locations, and work authorization.",
+                                                path: "/for-you",
+                                            }} />
+                                            <main className="standard-layout"><ForYou /></main>
                                         </>
                                     }
                                 />
@@ -172,6 +188,7 @@ function App() {
                         <SpeedInsights />
                         <Analytics />
                     </div>
+            </ForYouProvider>
                 </TrackerProvider>
         </BrowserRouter>
     )
